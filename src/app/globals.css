@@ -1,7 +1,13 @@
 @import "tailwindcss";
 
 /* Palette lifted from the reference product: black chrome, a cyan→pink
-   gradient for anything that wants attention, and a paper-white board. */
+   gradient for anything that wants attention, and a paper-white board.
+
+   Light mode swaps the chrome palette for warm paper while keeping the
+   brand gradient; every utility (bg-ink, border-line, text-muted…) reads
+   these variables, so a data-theme attribute on <html> flips the whole UI.
+   Board colors are separate on purpose — the board keeps its own paper /
+   chalk themes regardless of the chrome. */
 @theme {
   --color-ink: #000000;
   --color-panel: #0a0a0b;
@@ -9,10 +15,13 @@
   --color-panel-3: #1c1c20;
   --color-line: #222222;
   --color-line-2: #313131;
+  --color-fg: #ffffff;
   --color-muted: #ababab;
   --color-dim: #626262;
   --color-cyan: #06b2fc;
   --color-pink: #f653a2;
+  --color-good: #34d399;
+  --color-warn: #fcd34d;
   --color-board: #fcfcfa;
   --color-board-line: #e6e6e2;
   --color-board-ink: #16161a;
@@ -28,10 +37,37 @@
   --radius-xl: 34px;
 }
 
+/* The dark palette above is the default; light re-points the same tokens.
+   `fg` is the chrome foreground — components use text-fg instead of
+   text-white so both themes read correctly. */
+:root {
+  color-scheme: dark;
+  --sb-thumb: #2a2a2e;
+  --sb-hover: #3a3a40;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-ink: #f4f2ec;
+  --color-panel: #fcfbf8;
+  --color-panel-2: #f0eee6;
+  --color-panel-3: #e5e2d8;
+  --color-line: #dcd8cd;
+  --color-line-2: #c1bdae;
+  --color-fg: #17171b;
+  --color-muted: #50505a;
+  --color-dim: #85858f;
+  --color-cyan: #0789c9;
+  --color-pink: #e03e97;
+  --color-good: #148f4e;
+  --color-warn: #b45309;
+  --sb-thumb: #c8c4b7;
+  --sb-hover: #aeaa9b;
+}
+
 html,
 body {
   background: var(--color-ink);
-  color: #fff;
+  color: var(--color-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
 }
@@ -78,24 +114,24 @@ body {
   z-index: -1;
 }
 
-/* --- scrollbars: thin, dark, unobtrusive -------------------------------- */
+/* --- scrollbars: thin, unobtrusive, themed ------------------------------- */
 
 * {
   scrollbar-width: thin;
-  scrollbar-color: #313131 transparent;
+  scrollbar-color: var(--sb-thumb) transparent;
 }
 *::-webkit-scrollbar {
   width: 9px;
   height: 9px;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2a2a2e;
+  background: var(--sb-thumb);
   border-radius: 99px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #3a3a40;
+  background: var(--sb-hover);
   background-clip: content-box;
 }
 

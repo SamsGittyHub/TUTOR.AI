@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Nunito, Kalam, Space_Mono } from "next/font/google";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 import "katex/dist/katex.min.css";
 
@@ -31,7 +32,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#000000",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f2ec" },
+  ],
   width: "device-width",
   initialScale: 1,
 };
@@ -45,8 +49,14 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${nunito.variable} ${kalam.variable} ${spaceMono.variable}`}
+      suppressHydrationWarning
     >
-      <body className="bg-ink text-white antialiased">{children}</body>
+      <body className="bg-ink text-fg antialiased">
+        {/* Applies the stored / OS theme before first paint — no flash. It
+            also flips the browser UI (color-scheme) along with it. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+        {children}
+      </body>
     </html>
   );
 }

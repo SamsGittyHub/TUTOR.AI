@@ -16,7 +16,7 @@ import {
   type KeyStorageMode,
 } from "@/lib/keys";
 import { wipeEverything } from "@/lib/db";
-import type { Settings } from "@/lib/useTutor";
+import type { Settings } from "@/lib/settings";
 
 interface Props {
   settings: Settings;
@@ -76,7 +76,7 @@ export function SettingsModal({ settings, onChange, onKeysChanged, onClose }: Pr
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-line px-3 py-1 text-xs font-bold text-muted hover:text-white"
+            className="rounded-full border border-line px-3 py-1 text-xs font-bold text-muted hover:text-fg"
           >
             done
           </button>
@@ -89,12 +89,12 @@ export function SettingsModal({ settings, onChange, onKeysChanged, onClose }: Pr
               type="button"
               onClick={() => setActive(item.id)}
               className={`relative rounded-full px-3.5 py-1.5 text-xs font-bold transition ${
-                active === item.id ? "bg-panel-3 text-white" : "text-dim hover:text-muted"
+                active === item.id ? "bg-panel-3 text-fg" : "text-dim hover:text-muted"
               }`}
             >
               {item.label}
               {keys[item.id] ? (
-                <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-green-400 align-middle" />
+                <span className="ml-1.5 inline-block h-1.5 w-1.5 rounded-full bg-good align-middle" />
               ) : null}
             </button>
           ))}
@@ -110,7 +110,7 @@ export function SettingsModal({ settings, onChange, onKeysChanged, onClose }: Pr
             {stored ? (
               <div className="mb-2 flex items-center gap-2 rounded-md border border-line bg-panel-2 px-3 py-2">
                 <span className="font-mono text-xs text-muted">{maskKey(stored)}</span>
-                <span className="ml-auto text-[11px] font-bold text-green-400">saved</span>
+                <span className="ml-auto text-[11px] font-bold text-good">saved</span>
                 <button
                   type="button"
                   onClick={() => void saveKey("")}
@@ -144,7 +144,7 @@ export function SettingsModal({ settings, onChange, onKeysChanged, onClose }: Pr
             {results[active] ? (
               <p
                 className={`mt-1.5 text-[11.5px] font-semibold ${
-                  results[active].ok ? "text-green-400" : "text-pink"
+                  results[active].ok ? "text-good" : "text-pink"
                 }`}
               >
                 {results[active].message}
@@ -206,7 +206,7 @@ export function SettingsModal({ settings, onChange, onKeysChanged, onClose }: Pr
                   type="button"
                   disabled={!customModel.trim()}
                   onClick={() => onChange({ providerId: active, model: customModel.trim() })}
-                  className="rounded-md border border-line px-3 py-1.5 text-[11.5px] font-bold text-muted hover:text-white disabled:opacity-40"
+                  className="rounded-md border border-line px-3 py-1.5 text-[11.5px] font-bold text-muted hover:text-fg disabled:opacity-40"
                 >
                   use
                 </button>

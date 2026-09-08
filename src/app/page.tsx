@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { BoardDemo } from "@/components/landing/BoardDemo";
 
 const SUBJECTS = [
@@ -51,16 +54,19 @@ export default function LandingPage() {
         <div className="mx-auto flex max-w-6xl items-center gap-6 px-5 py-3.5">
           <Logo />
           <div className="hidden gap-6 text-[13px] font-bold text-muted sm:flex">
-            <a href="#how" className="transition hover:text-white">How it works</a>
-            <a href="#byok" className="transition hover:text-white">Your key</a>
-            <a href="#board" className="transition hover:text-white">The whiteboard</a>
+            <a href="#how" className="transition hover:text-fg">How it works</a>
+            <a href="#byok" className="transition hover:text-fg">Your key</a>
+            <a href="#board" className="transition hover:text-fg">The whiteboard</a>
           </div>
-          <Link
-            href="/app"
-            className="ml-auto rounded-full grad px-4 py-2 text-[13px] font-extrabold text-white transition hover:opacity-90"
-          >
-            Open the board
-          </Link>
+          <div className="ml-auto flex items-center gap-3">
+            <ThemeToggle />
+            <Link
+              href="/app"
+              className="rounded-full grad px-4 py-2 text-[13px] font-extrabold text-white transition hover:opacity-90"
+            >
+              Open the board
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -98,7 +104,7 @@ export default function LandingPage() {
             </Link>
             <a
               href="#byok"
-              className="w-full rounded-full border border-line px-7 py-3.5 text-sm font-bold text-muted transition hover:border-line-2 hover:text-white sm:w-auto"
+              className="w-full rounded-full border border-line px-7 py-3.5 text-sm font-bold text-muted transition hover:border-line-2 hover:text-fg sm:w-auto"
             >
               Why your own key?
             </a>
@@ -107,6 +113,7 @@ export default function LandingPage() {
           <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px] font-semibold text-dim">
             <span>✓ No account</span>
             <span>✓ Nothing uploaded to a server</span>
+            <span>✓ Live voice — it talks, you ask</span>
             <span>✓ Claude · GPT · Gemini · open models</span>
           </div>
         </div>
@@ -223,7 +230,7 @@ export default function LandingPage() {
                 key={index}
                 className="w-[330px] shrink-0 rounded-lg border border-line bg-panel p-5"
               >
-                <blockquote className="text-[13.5px] leading-relaxed text-white/85">
+                <blockquote className="text-[13.5px] leading-relaxed text-fg/85">
                   “{item.quote}”
                 </blockquote>
                 <figcaption className="mt-4 flex items-center gap-2.5">

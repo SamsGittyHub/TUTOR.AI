@@ -239,6 +239,8 @@ interface RawQuestion {
   explanation?: unknown;
   sourceLocator?: unknown;
   source_locator?: unknown;
+  sourceMaterial?: unknown;
+  source_material?: unknown;
 }
 
 export async function generateQuiz(
@@ -298,6 +300,11 @@ export async function generateQuiz(
           ? String(raw.sourceLocator)
           : raw.source_locator
             ? String(raw.source_locator)
+            : undefined,
+        sourceMaterial: raw.sourceMaterial
+          ? String(raw.sourceMaterial)
+          : raw.source_material
+            ? String(raw.source_material)
             : undefined,
       };
     })

@@ -21,6 +21,8 @@ const TARGETS = [
       "src/lib/actions.ts",
       "src/lib/stream-json.ts",
       "src/lib/expr.ts",
+      "src/lib/srs.ts",
+      "src/lib/progress.ts",
       "src/lib/materials/chunk.ts",
       "src/lib/materials/retrieve.ts",
     ],

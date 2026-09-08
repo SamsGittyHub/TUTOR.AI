@@ -7,51 +7,32 @@ import {
   deleteSession as dbDeleteSession,
   getChunksFor,
   getSession,
+  listAttempts,
+  listCards,
   listMaterials,
   listSessions,
+  putCard,
   putMaterial,
   putSession,
   type Material,
   type MaterialChunk,
-  type QuizQuestion,
+  type QuizAttempt,
   type Session,
 } from "./db";
 import { extractMaterial, materialFromText, ExtractionError } from "./materials/extract";
 import { estimateCost, ProviderError, type ProviderId } from "./providers";
 import { loadKeys, type KeyMap } from "./keys";
 import {
-  boardSummary,
-  checkAnswer,
-  generateQuiz,
-  runTutorTurn,
-  summarizeTurn,
-} from "./tutor/engine";
+  DEFAULT_SETTINGS,
+  loadSettings,
+  saveSettings,
+  type Settings,
+} from "./settings";
+import { isDue, schedule, upsertCard, type ReviewCard } from "./srs";
+import { boardSummary, checkAnswer, runTutorTurn, summarizeTurn } from "./tutor/engine";
 import { buildQuizReviewMessage } from "./tutor/prompts";
 
-const SETTINGS_KEY = "chalk.settings.v1";
-
 export type TutorStatus = "idle" | "thinking" | "teaching" | "error";
-
-export interface Settings {
-  providerId: ProviderId;
-  model: string;
-}
-
-const DEFAULT_SETTINGS: Settings = {
-  providerId: "anthropic",
-  model: "claude-sonnet-5",
-};
-
-function loadSettings(): Settings {
-  if (typeof window === "undefined") return DEFAULT_SETTINGS;
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
-  } catch {
-    return DEFAULT_SETTINGS;
-  }
-}
 
 function newSession(settings: Settings): Session {
   return {
@@ -69,6 +50,29 @@ function newSession(settings: Settings): Session {
   };
 }
 
+/**
+ * Attribute a question to one material when the model named its source file,
+ * otherwise the card spans everything selected for the quiz.
+ */
+export function resolveCardMaterials(
+  sourceMaterial: string | undefined,
+  selectedIds: string[],
+  materials: Material[],
+): string[] {
+  if (sourceMaterial) {
+    const needle = sourceMaterial.trim().toLowerCase();
+    const match = needle
+      ? materials.find((m) => {
+          if (!selectedIds.includes(m.id)) return false;
+          const name = m.name.toLowerCase();
+          return name === needle || name.includes(needle) || needle.includes(name);
+        })
+      : undefined;
+    if (match) return [match.id];
+  }
+  return [...selectedIds];
+}
+
 export interface UploadState {
   name: string;
   stage: string;
@@ -82,16 +86,21 @@ export function useTutor() {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [chunks, setChunks] = useState<MaterialChunk[]>([]);
+  const [cards, setCards] = useState<ReviewCard[]>([]);
+  const [attempts, setAttempts] = useState<QuizAttempt[]>([]);
   const [status, setStatus] = useState<TutorStatus>("idle");
   const [error, setError] = useState<{ message: string; hint?: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [upload, setUpload] = useState<UploadState | null>(null);
-  const [quizBusy, setQuizBusy] = useState(false);
   const [ready, setReady] = useState(false);
 
   const abort = useRef<AbortController | null>(null);
   const sessionRef = useRef(session);
   sessionRef.current = session;
+  /** Mirror of the cards store — the source for read-modify-write upserts. */
+  const cardsRef = useRef<ReviewCard[]>([]);
+  /** Card mutations queue here so rapid answers can't read a stale mirror. */
+  const cardOps = useRef<Promise<void>>(Promise.resolve());
 
   /* --- boot ------------------------------------------------------------- */
 
@@ -100,27 +109,43 @@ export function useTutor() {
     setSettings(stored);
     setKeys(loadKeys());
     void (async () => {
-      const [allMaterials, allSessions] = await Promise.all([
-        listMaterials(),
-        listSessions(),
-      ]);
-      setMaterials(allMaterials);
-      setSessions(allSessions);
-      const last = allSessions[0];
-      if (last && last.actions.length) {
-        setSession(last);
-        setChunks(await getChunksFor(last.materialIds));
-      } else {
+      try {
+        const [allMaterials, allSessions, allCards, allAttempts] = await Promise.all([
+          listMaterials(),
+          listSessions(),
+          listCards(),
+          listAttempts(),
+        ]);
+        setMaterials(allMaterials);
+        setSessions(allSessions);
+        cardsRef.current = allCards;
+        setCards(allCards);
+        setAttempts(allAttempts);
+        const last = allSessions[0];
+        if (last && last.actions.length) {
+          setSession(last);
+          setChunks(await getChunksFor(last.materialIds));
+        } else {
+          setSession(newSession(stored));
+        }
+      } catch (caught) {
+        // A failed upgrade or blocked store must not look like an empty
+        // account — say so instead of rendering a blank slate.
         setSession(newSession(stored));
+        setError({
+          message: "Couldn't open the local study database.",
+          hint:
+            caught instanceof Error
+              ? caught.message
+              : "IndexedDB access failed; try closing other tabs and reloading.",
+        });
       }
       setReady(true);
     })();
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-    }
+    saveSettings(settings);
   }, [settings]);
 
   /** Persist on a trailing edge — a streaming lesson writes constantly. */
@@ -135,14 +160,50 @@ export function useTutor() {
   const apiKey = keys[settings.providerId];
   const hasKey = Boolean(apiKey);
 
-  const selectedMaterials = useMemo(
-    () => materials.filter((m) => session.materialIds.includes(m.id)),
-    [materials, session.materialIds],
-  );
-
   const materialName = useCallback(
     (id: string) => materials.find((m) => m.id === id)?.name ?? "your notes",
     [materials],
+  );
+
+  /* --- review queue ------------------------------------------------------- */
+
+  // `today` flips at local midnight so the due set can't go stale in a tab
+  // left open overnight.
+  const [today, setToday] = useState(() => new Date().toDateString());
+  useEffect(() => {
+    const handle = setInterval(() => {
+      const now = new Date().toDateString();
+      setToday((prev) => (prev === now ? prev : now));
+    }, 60_000);
+    return () => clearInterval(handle);
+  }, []);
+
+  /** The single writer for cards state and its ref mirror. */
+  const applyCards = useCallback((next: ReviewCard[]) => {
+    cardsRef.current = next;
+    setCards(next);
+  }, []);
+
+  const dueCount = useMemo(
+    () => cards.filter((card) => isDue(card)).length,
+    [cards, today],
+  );
+
+  const dueQueue = useMemo(
+    () => cards.filter((card) => isDue(card)).sort((a, b) => a.dueAt - b.dueAt),
+    [cards, today],
+  );
+
+  /** Grade a review card: schedule it, persist, refresh the count. */
+  const answerCard = useCallback(
+    (card: ReviewCard, response: string): boolean => {
+      const correct = checkAnswer(card, response);
+      const scheduled = schedule(card, correct, Date.now());
+      applyCards(cardsRef.current.map((c) => (c.id === card.id ? scheduled : c)));
+      void putCard(scheduled);
+      return correct;
+    },
+    [applyCards],
   );
 
   /* --- turns ------------------------------------------------------------ */
@@ -355,15 +416,21 @@ export function useTutor() {
     setChunks((prev) => [...prev, ...fresh]);
   }, []);
 
-  const removeMaterial = useCallback(async (id: string) => {
-    await dbDeleteMaterial(id);
-    setMaterials(await listMaterials());
-    setChunks((prev) => prev.filter((c) => c.materialId !== id));
-    setSession((prev) => ({
-      ...prev,
-      materialIds: prev.materialIds.filter((m) => m !== id),
-    }));
-  }, []);
+  const removeMaterial = useCallback(
+    async (id: string) => {
+      await dbDeleteMaterial(id);
+      setMaterials(await listMaterials());
+      setChunks((prev) => prev.filter((c) => c.materialId !== id));
+      // The db cascade removes overlapping cards and attempts; mirror it here.
+      applyCards(cardsRef.current.filter((c) => !c.materialIds.includes(id)));
+      setAttempts((prev) => prev.filter((a) => !a.materialIds.includes(id)));
+      setSession((prev) => ({
+        ...prev,
+        materialIds: prev.materialIds.filter((m) => m !== id),
+      }));
+    },
+    [applyCards],
+  );
 
   const toggleMaterial = useCallback(
     async (id: string) => {
@@ -405,93 +472,15 @@ export function useTutor() {
     [startFresh],
   );
 
-  /* --- quiz ------------------------------------------------------------- */
+  /* --- review-card teaching ---------------------------------------------- */
 
-  const makeQuiz = useCallback(
-    async (topic: string, count: number) => {
-      const key = loadKeys()[sessionRef.current.providerId];
-      if (!key) {
-        setError({ message: "Add an API key before generating a quiz." });
-        return;
-      }
-      setQuizBusy(true);
-      setError(null);
-      try {
-        const { questions, usage } = await generateQuiz({
-          providerId: sessionRef.current.providerId,
-          model: sessionRef.current.model,
-          apiKey: key,
-          materials: selectedMaterials,
-          chunks,
-          topic,
-          count,
-        });
-        const cost =
-          estimateCost(
-            sessionRef.current.providerId,
-            sessionRef.current.model,
-            usage.inputTokens,
-            usage.outputTokens,
-          ) ?? 0;
-        setSession((prev) => ({
-          ...prev,
-          quiz: {
-            id: `quiz_${Date.now().toString(36)}`,
-            title: topic || "Practice",
-            createdAt: Date.now(),
-            questions,
-            activeIndex: 0,
-            finished: false,
-          },
-          usage: {
-            inputTokens: prev.usage.inputTokens + usage.inputTokens,
-            outputTokens: prev.usage.outputTokens + usage.outputTokens,
-            costUsd: prev.usage.costUsd + cost,
-            turns: prev.usage.turns,
-          },
-          updatedAt: Date.now(),
-        }));
-      } catch (caught) {
-        setError({ message: (caught as Error).message });
-      } finally {
-        setQuizBusy(false);
-      }
-    },
-    [chunks, selectedMaterials],
-  );
-
-  const answerQuiz = useCallback((questionId: string, response: string) => {
-    setSession((prev) => {
-      if (!prev.quiz) return prev;
-      const questions = prev.quiz.questions.map((q) =>
-        q.id === questionId ? { ...q, response, correct: checkAnswer(q, response) } : q,
-      );
-      const answered = questions.filter((q) => q.response !== undefined).length;
-      return {
-        ...prev,
-        quiz: {
-          ...prev.quiz,
-          questions,
-          activeIndex: Math.min(answered, questions.length - 1),
-          finished: answered === questions.length,
-        },
-        updatedAt: Date.now(),
-      };
-    });
-  }, []);
-
-  const reviewQuestion = useCallback(
-    (question: QuizQuestion) => {
-      void runTurn(
-        buildQuizReviewMessage(question.prompt, question.response ?? "", question.answer),
-      );
+  /** Same walkthrough as the quiz flow, for a review card missed in the queue. */
+  const teachCard = useCallback(
+    (card: ReviewCard, response: string) => {
+      void runTurn(buildQuizReviewMessage(card.prompt, response, card.answer));
     },
     [runTurn],
   );
-
-  const closeQuiz = useCallback(() => {
-    setSession((prev) => ({ ...prev, quiz: undefined }));
-  }, []);
 
   /* --- board ------------------------------------------------------------ */
 
@@ -543,15 +532,19 @@ export function useTutor() {
     session,
     sessions,
     materials,
-    selectedMaterials,
     materialName,
+    cards,
+    attempts,
+    dueCount,
+    dueQueue,
+    answerCard,
+    teachCard,
     status,
     error,
     dismissError: () => setError(null),
     notice,
     dismissNotice: () => setNotice(null),
     upload,
-    quizBusy,
     send,
     stop,
     startLesson,
@@ -563,10 +556,6 @@ export function useTutor() {
     openSession,
     startFresh,
     removeSession,
-    makeQuiz,
-    answerQuiz,
-    reviewQuestion,
-    closeQuiz,
     toggleBoardTheme,
     wipeBoard,
   };

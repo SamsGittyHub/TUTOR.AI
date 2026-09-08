@@ -147,7 +147,7 @@ export function BoardDemo() {
           {says.map((text, index) => (
             <div key={index} className="flex gap-2">
               <span className="mt-0.5 h-5 w-5 shrink-0 rounded-full grad" />
-              <p className="text-[12.5px] leading-relaxed text-white/85">{text}</p>
+              <p className="text-[12.5px] leading-relaxed text-fg/85">{text}</p>
             </div>
           ))}
         </div>

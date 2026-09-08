@@ -102,7 +102,7 @@ export function Whiteboard({
           type="button"
           onClick={onToggleTheme}
           title={paper ? "Switch to chalkboard" : "Switch to whiteboard"}
-          className="rounded-full border border-line px-3 py-1 text-xs font-bold text-muted transition hover:border-line-2 hover:text-white"
+          className="rounded-full border border-line px-3 py-1 text-xs font-bold text-muted transition hover:border-line-2 hover:text-fg"
         >
           {paper ? "◑ chalk" : "◐ paper"}
         </button>
@@ -166,7 +166,7 @@ function StatusPill({ status }: { status: Props["status"] }) {
   const map = {
     thinking: { text: "thinking", tone: "text-cyan" },
     teaching: { text: "teaching", tone: "text-pink" },
-    error: { text: "stopped", tone: "text-amber-400" },
+    error: { text: "stopped", tone: "text-warn" },
   } as const;
   const info = map[status as keyof typeof map];
   if (!info) return null;

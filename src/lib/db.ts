@@ -2,19 +2,23 @@
 
 import type { TutorAction } from "./actions";
 import type { ProviderId } from "./providers/types";
+import type { ReviewCard } from "./srs";
 
 /**
  * Everything a student uploads or studies lives in their own browser.
- * IndexedDB, three stores, no sync, no server copy. Deleting a material
- * deletes its chunks in the same transaction — "user-deletable" from the PRD's
- * open questions, answered by making it the only way the data exists.
+ * IndexedDB, five stores, no sync, no server copy. Deleting a material
+ * deletes its chunks — and every review card and quiz attempt that cites it —
+ * in the same transaction: "user-deletable" from the PRD's open questions,
+ * answered by making deletion the only way the data exists.
  */
 
 const DB_NAME = "chalk";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const MATERIALS = "materials";
 const CHUNKS = "chunks";
 const SESSIONS = "sessions";
+const CARDS = "cards";
+const ATTEMPTS = "attempts";
 
 export type MaterialKind =
   | "pdf"
@@ -76,17 +80,10 @@ export interface QuizQuestion {
   answer: string;
   explanation?: string;
   sourceLocator?: string;
+  /** File name the model says a question came from, for card attribution. */
+  sourceMaterial?: string;
   response?: string;
   correct?: boolean;
-}
-
-export interface QuizState {
-  id: string;
-  title: string;
-  createdAt: number;
-  questions: QuizQuestion[];
-  activeIndex: number;
-  finished: boolean;
 }
 
 export interface SessionUsage {
@@ -94,6 +91,18 @@ export interface SessionUsage {
   outputTokens: number;
   costUsd: number;
   turns: number;
+}
+
+/** A finished quiz, kept for the progress panel. */
+export interface QuizAttempt {
+  id: string;
+  /** "flashcards" for quizzes taken on the flashcards page. */
+  sessionId: string;
+  title: string;
+  materialIds: string[];
+  createdAt: number;
+  score: number;
+  total: number;
 }
 
 export interface Session {
@@ -108,7 +117,6 @@ export interface Session {
   transcript: TranscriptEntry[];
   plan?: LessonPlanState;
   usage: SessionUsage;
-  quiz?: QuizState;
   boardTheme: "paper" | "chalk";
 }
 
@@ -131,9 +139,36 @@ function open(): Promise<IDBDatabase> {
         const store = db.createObjectStore(SESSIONS, { keyPath: "id" });
         store.createIndex("updatedAt", "updatedAt", { unique: false });
       }
+      // v2: the study loop. Review cards are scheduled by src/lib/srs.ts,
+      // attempts are finished quizzes kept for the progress panel.
+      if (!db.objectStoreNames.contains(CARDS)) {
+        db.createObjectStore(CARDS, { keyPath: "id" });
+      }
+      if (!db.objectStoreNames.contains(ATTEMPTS)) {
+        db.createObjectStore(ATTEMPTS, { keyPath: "id" });
+      }
     };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    // A version upgrade blocks while any older connection stays open. Fail
+    // loudly instead of leaving boot pending forever, and drop the cached
+    // promise so a reload after closing the other tab retries cleanly.
+    request.onblocked = () => {
+      dbPromise = null;
+      reject(
+        new Error(
+          "Another open Chalk tab is holding the study database. Close it and reload.",
+        ),
+      );
+    };
+    request.onsuccess = () => {
+      const db = request.result;
+      // Let this connection step aside when another tab upgrades the schema.
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    request.onerror = () => {
+      dbPromise = null;
+      reject(request.error);
+    };
   });
   return dbPromise;
 }
@@ -208,12 +243,24 @@ export async function getChunksFor(materialIds: string[]): Promise<MaterialChunk
 }
 
 export async function deleteMaterial(materialId: string): Promise<void> {
-  await tx([MATERIALS, CHUNKS], "readwrite", async (t) => {
+  await tx([MATERIALS, CHUNKS, CARDS, ATTEMPTS], "readwrite", async (t) => {
     t.objectStore(MATERIALS).delete(materialId);
     const index = t.objectStore(CHUNKS).index("materialId");
     const keys = await req(index.getAllKeys(materialId));
-    const store = t.objectStore(CHUNKS);
-    for (const key of keys) store.delete(key);
+    const chunkStore = t.objectStore(CHUNKS);
+    for (const key of keys) chunkStore.delete(key);
+
+    // Review cards and quiz attempts that cite the material go with it.
+    const cardStore = t.objectStore(CARDS);
+    const cards = await req(cardStore.getAll() as IDBRequest<ReviewCard[]>);
+    for (const card of cards) {
+      if (card.materialIds.includes(materialId)) cardStore.delete(card.id);
+    }
+    const attemptStore = t.objectStore(ATTEMPTS);
+    const attempts = await req(attemptStore.getAll() as IDBRequest<QuizAttempt[]>);
+    for (const attempt of attempts) {
+      if (attempt.materialIds.includes(materialId)) attemptStore.delete(attempt.id);
+    }
   });
 }
 
@@ -244,10 +291,39 @@ export async function deleteSession(id: string): Promise<void> {
   });
 }
 
+/* --- review cards & attempts ---------------------------------------------- */
+
+export async function putCard(card: ReviewCard): Promise<void> {
+  await tx([CARDS], "readwrite", (t) => {
+    t.objectStore(CARDS).put(card);
+  });
+}
+
+export async function listCards(): Promise<ReviewCard[]> {
+  return tx([CARDS], "readonly", (t) =>
+    req(t.objectStore(CARDS).getAll() as IDBRequest<ReviewCard[]>),
+  );
+}
+
+export async function putAttempt(attempt: QuizAttempt): Promise<void> {
+  await tx([ATTEMPTS], "readwrite", (t) => {
+    t.objectStore(ATTEMPTS).put(attempt);
+  });
+}
+
+export async function listAttempts(): Promise<QuizAttempt[]> {
+  const attempts = await tx([ATTEMPTS], "readonly", (t) =>
+    req(t.objectStore(ATTEMPTS).getAll() as IDBRequest<QuizAttempt[]>),
+  );
+  return attempts.sort((a, b) => b.createdAt - a.createdAt);
+}
+
 export async function wipeEverything(): Promise<void> {
-  await tx([MATERIALS, CHUNKS, SESSIONS], "readwrite", (t) => {
+  await tx([MATERIALS, CHUNKS, SESSIONS, CARDS, ATTEMPTS], "readwrite", (t) => {
     t.objectStore(MATERIALS).clear();
     t.objectStore(CHUNKS).clear();
     t.objectStore(SESSIONS).clear();
+    t.objectStore(CARDS).clear();
+    t.objectStore(ATTEMPTS).clear();
   });
 }

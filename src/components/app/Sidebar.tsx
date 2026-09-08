@@ -12,6 +12,7 @@ interface Props {
   currentSessionId: string;
   upload: UploadState | null;
   busy: boolean;
+  dueCount: number;
   onAddFile: (file: File) => void;
   onAddText: (name: string, text: string) => void;
   onToggle: (id: string) => void;
@@ -21,6 +22,8 @@ interface Props {
   onDeleteSession: (id: string) => void;
   onNewSession: () => void;
   onOpenQuiz: () => void;
+  onOpenReview: () => void;
+  onOpenProgress: () => void;
 }
 
 const KIND_ICON: Record<Material["kind"], string> = {
@@ -50,7 +53,7 @@ export function Sidebar(props: Props) {
             type="button"
             onClick={() => setTab(value)}
             className={`flex-1 rounded-sm px-3 py-1.5 text-xs font-extrabold capitalize transition ${
-              tab === value ? "bg-panel-3 text-white" : "text-dim hover:text-muted"
+              tab === value ? "bg-panel-3 text-fg" : "text-dim hover:text-muted"
             }`}
           >
             {value === "material" ? "Material" : "Past lessons"}
@@ -113,7 +116,7 @@ export function Sidebar(props: Props) {
                   <button
                     type="button"
                     onClick={() => setPasting((v) => !v)}
-                    className="rounded-full border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition hover:text-white"
+                    className="rounded-full border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition hover:text-fg"
                   >
                     Paste text
                   </button>
@@ -236,11 +239,26 @@ export function Sidebar(props: Props) {
             </button>
             <button
               type="button"
-              disabled={props.busy}
               onClick={props.onOpenQuiz}
-              className="mt-1.5 w-full rounded-full border border-line py-2 text-xs font-bold text-muted transition hover:border-pink/50 hover:text-white disabled:opacity-40"
+              className="mt-1.5 w-full rounded-full border border-line py-2 text-xs font-bold text-muted transition hover:border-pink/50 hover:text-fg"
             >
-              Quiz me instead
+              Quiz & flashcards →
+            </button>
+            {props.dueCount > 0 ? (
+              <button
+                type="button"
+                onClick={props.onOpenReview}
+                className="mt-1.5 w-full rounded-full border border-cyan/40 bg-cyan/[.06] py-2 text-xs font-bold text-cyan transition hover:bg-cyan/[.12]"
+              >
+                Review {props.dueCount} due card{props.dueCount === 1 ? "" : "s"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              onClick={props.onOpenProgress}
+              className="mt-1.5 w-full rounded-full border border-line py-2 text-xs font-bold text-muted transition hover:border-line-2 hover:text-fg"
+            >
+              Progress
             </button>
           </div>
         </div>
@@ -249,7 +267,7 @@ export function Sidebar(props: Props) {
           <button
             type="button"
             onClick={props.onNewSession}
-            className="w-full rounded-full border border-line py-2 text-xs font-bold text-muted transition hover:border-cyan/50 hover:text-white"
+            className="w-full rounded-full border border-line py-2 text-xs font-bold text-muted transition hover:border-cyan/50 hover:text-fg"
           >
             + New lesson
           </button>

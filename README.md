@@ -10,7 +10,7 @@ Built from [`PRD-ai-tutor.md`](./PRD-ai-tutor.md).
 ```bash
 npm install
 npm run dev      # http://localhost:3000
-npm test         # 32 checks: parser, action repair, math, retrieval, providers
+npm test         # 44 checks: parser, action repair, math, retrieval, SRS, progress, providers
 npm run build
 ```
 
@@ -84,12 +84,22 @@ below.
 - **Whiteboard** — progressive rendering, KaTeX equations, four SVG diagram
   layouts, function plotting, highlight, erase, paper/chalk themes, inline
   check-for-understanding questions.
+- **Voice** — the tutor reads each line as it streams onto the board (browser
+  speech synthesis, no keys), and you answer with your voice: the mic pauses
+  while the tutor speaks and resumes after, so you can interrupt a lesson
+  hands-free. Live questions sent by voice queue until the turn settles.
 - **BYOK** — four providers, key validation before use, per-session model
   choice, any custom model id, live cost estimate from the model price table.
-- **Practice** — quizzes generated from your material, lenient answer checking,
-  and "teach me this one" on anything you missed, which drops you back on the
-  board.
+- **Practice** — a dedicated flashcards page (`/quiz`): pick material, topic,
+  and question count, then generate as many quizzes as you like, one flashcard
+  at a time, with optional read-aloud. Every answered question becomes a
+  review card (SM-2-lite scheduling), "teach me this one" hands the question
+  to the live board, and a Progress panel tracks per-material mastery, quiz
+  history, and the due forecast.
 - **Sessions** — saved, resumable, board and all.
+- **Light / dark chrome** — a sun/moon toggle on every page; follows the OS
+  until you choose, applies before first paint (no flash), and the whiteboard
+  keeps its own paper/chalk look regardless.
 
 ### Where this deviates from the PRD
 
@@ -111,19 +121,27 @@ src/lib/
   actions.ts          the twelve actions + the forgiving normalizer
   stream-json.ts      incremental JSON object extraction from a token stream
   expr.ts             sandboxed math parser for draw_plot (never eval)
+  srs.ts              SM-2-lite review scheduling (pure, unit-tested)
+  progress.ts         mastery blend + due forecast (pure, unit-tested)
+  voice.ts            tutor TTS + student mic (Web Speech API, no keys)
+  settings.ts         shared provider/model choice for board + flashcards
   keys.ts  db.ts      browser key vault, IndexedDB stores
   providers/          anthropic · openai · google · openrouter, one interface
   materials/          extract → chunk → retrieve
   tutor/              prompts (the teaching contract) + engine (a turn)
   useTutor.ts         session state machine
+  useQuizLab.ts       the flashcards page: unlimited quizzes → review cards
+src/app/quiz/         the flashcards page — quizzes live here, not in a modal
 src/components/
   board/              Whiteboard, BoardCard, Diagram, Plot, Equation
-  app/                Sidebar, ChatRail, SettingsModal, QuizPanel
+  app/                Sidebar, ChatRail (with mic), SettingsModal,
+                      ReviewModal, ProgressPanel
   landing/BoardDemo   the landing page runs the real renderer on a canned lesson
 ```
 
 ## Not built
 
 No accounts, no sync across devices, no teacher dashboard, no native app — all
-non-goals in the PRD. Spaced repetition is stubbed out at "quiz me on what I
-missed" rather than a scheduled review queue.
+non-goals in the PRD. Review cards come from quizzes you actually took; there's
+no streak counter and no daily-goal gamification. Voice runs on whatever the
+browser ships (Chrome/Edge are best); there's no premium TTS provider option.

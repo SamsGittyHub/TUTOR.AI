@@ -2,6 +2,22 @@ import assert from "node:assert/strict";
 import { JsonObjectStream, extractFirstJson } from "../.test-build/core/stream-json.js";
 import { normalizeAction } from "../.test-build/core/actions.js";
 import { compileExpression } from "../.test-build/core/expr.js";
+import {
+  DAY_MS,
+  isDue,
+  newCard,
+  promptKeyOf,
+  schedule,
+  startOfTomorrow,
+  upsertCard,
+} from "../.test-build/core/srs.js";
+import {
+  bucketForecast,
+  cardHealth,
+  computeMastery,
+  masteryForMaterial,
+  recentAttemptAccuracy,
+} from "../.test-build/core/progress.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
 import { retrieve } from "../.test-build/core/materials/retrieve.js";
 
@@ -157,6 +173,138 @@ test("asking for a page number pulls that page", () => {
   const chunks = chunkUnits("m4", many);
   const r = retrieve(chunks, "explain page 17 again", 5000);
   assert.ok(r.chunks.some((c) => c.locator.includes("17")));
+});
+
+console.log("\n— spaced repetition —");
+
+const NOON = new Date(2026, 8, 8, 12, 0).getTime(); // Sep 8 2026, local
+
+test("promptKey collapses case, punctuation and whitespace", () => {
+  assert.equal(promptKeyOf("What is E = mc^2?!"), promptKeyOf("what   is E=MC^2!!"));
+  assert.notEqual(promptKeyOf("What is mitosis?"), promptKeyOf("What is meiosis?"));
+});
+
+test("a fresh card answered right is due tomorrow, interval 1", () => {
+  const card = newCard("c1", { prompt: "Q?", answer: "A" }, ["m1"], true, NOON);
+  assert.equal(card.reps, 1);
+  assert.equal(card.intervalDays, 1);
+  assert.equal(card.dueAt, startOfTomorrow(NOON));
+  assert.equal(isDue(card, NOON), false);
+  assert.equal(card.promptKey, promptKeyOf("Q?"));
+});
+
+test("hits walk 1 → 3 → ~8 days while ease grows", () => {
+  let card = newCard("c1", { prompt: "Q?", answer: "A" }, [], true, NOON);
+  card = schedule(card, true, NOON);
+  assert.equal(card.intervalDays, 3);
+  card = schedule(card, true, NOON);
+  assert.ok(card.intervalDays >= 7 && card.intervalDays <= 9, `got ${card.intervalDays}`);
+  assert.ok(card.ease > 2.6);
+});
+
+test("a miss resets the interval and drops ease", () => {
+  const card = newCard("c1", { prompt: "Q?", answer: "A" }, [], true, NOON); // reps 1, ease 2.65
+  const lapsed = schedule(card, false, NOON);
+  assert.equal(lapsed.reps, 0);
+  assert.equal(lapsed.lapses, 1);
+  assert.equal(lapsed.intervalDays, 1);
+  assert.equal(lapsed.ease, 2.45);
+  assert.equal(lapsed.dueAt, startOfTomorrow(NOON));
+  assert.equal(isDue(lapsed, NOON), false);
+});
+
+test("overdue cards are due; cards scheduled for later are not", () => {
+  const card = newCard("c1", { prompt: "Q?", answer: "A" }, [], true, NOON);
+  const overdue = { ...card, dueAt: NOON - DAY_MS };
+  assert.equal(isDue(overdue, NOON), true);
+  assert.equal(isDue(card, NOON), false);
+});
+
+test("re-answering an identical prompt reschedules instead of duplicating", () => {
+  const first = newCard("c1", { prompt: "What is mitosis?", answer: "cell division" }, ["m1"], false, NOON);
+  const { cards, card, created } = upsertCard(
+    [first],
+    { prompt: "  What is mitosis?  ", answer: "cell division" },
+    ["m1"],
+    true,
+    NOON,
+    "c2",
+  );
+  assert.equal(cards.length, 1);
+  assert.equal(created, false);
+  assert.equal(card.id, "c1");
+  assert.equal(card.reps, 1);
+  assert.equal(card.dueAt, startOfTomorrow(NOON));
+});
+
+test("a different prompt inserts a new card", () => {
+  const first = newCard("c1", { prompt: "What is mitosis?", answer: "cell division" }, ["m1"], true, NOON);
+  const { cards, created } = upsertCard(
+    [first],
+    { prompt: "What is meiosis?", answer: "cell division" },
+    ["m1"],
+    true,
+    NOON,
+    "c2",
+  );
+  assert.equal(cards.length, 2);
+  assert.equal(created, true);
+  assert.equal(cards[1].id, "c2");
+});
+
+console.log("\n— progress & mastery —");
+
+const attempts = [
+  { id: "a1", sessionId: "s1", title: "T1", materialIds: ["m1"], createdAt: NOON - 5000, score: 2, total: 4 },
+  { id: "a2", sessionId: "s1", title: "T2", materialIds: ["m1"], createdAt: NOON, score: 4, total: 4 },
+];
+
+test("recent accuracy weights newer attempts more", () => {
+  const acc = recentAttemptAccuracy(attempts);
+  assert.ok(Math.abs(acc - 5 / 6) < 1e-9); // weights 1 (older), 2 (newer)
+  assert.equal(recentAttemptAccuracy([]), null);
+});
+
+test("mastery is 0 with no data, 100 with a perfect record", () => {
+  assert.equal(computeMastery([], []), 0);
+  assert.equal(computeMastery(attempts, []), 83); // round(5/6 * 100)
+  const perfect = [
+    { id: "p1", sessionId: "s1", title: "T", materialIds: ["m1"], createdAt: NOON - 5000, score: 4, total: 4 },
+    { id: "p2", sessionId: "s1", title: "T", materialIds: ["m1"], createdAt: NOON, score: 4, total: 4 },
+  ];
+  const cards = [
+    newCard("c1", { prompt: "p1", answer: "a" }, ["m1"], true, NOON),
+    newCard("c2", { prompt: "p2", answer: "a" }, ["m1"], true, NOON),
+  ];
+  assert.equal(computeMastery(perfect, cards), 100);
+});
+
+test("lapsed cards drag card health down", () => {
+  const hit = newCard("c1", { prompt: "p1", answer: "a" }, ["m1"], true, NOON);
+  const miss = newCard("c2", { prompt: "p2", answer: "a" }, ["m1"], false, NOON);
+  assert.ok(Math.abs(cardHealth([hit, miss]) - 0.5) < 1e-9);
+  assert.equal(cardHealth([]), null);
+});
+
+test("per-material rollup labels and ignores other materials", () => {
+  const strong = masteryForMaterial("m1", attempts, [], NOON);
+  assert.equal(strong.label, "Strong");
+  assert.equal(strong.attemptCount, 2);
+  assert.equal(strong.lastScore.score, 4);
+  const fresh = masteryForMaterial("m2", attempts, [], NOON);
+  assert.equal(fresh.label, "New");
+  assert.equal(fresh.mastery, 0);
+});
+
+test("forecast buckets by local day and drops past the window", () => {
+  const tomorrow = startOfTomorrow(NOON);
+  const cards = [
+    { ...newCard("c1", { prompt: "p", answer: "a" }, [], true, NOON), dueAt: NOON - DAY_MS }, // overdue → today
+    { ...newCard("c2", { prompt: "p2", answer: "a" }, [], true, NOON), dueAt: tomorrow }, // tomorrow
+    { ...newCard("c3", { prompt: "p3", answer: "a" }, [], true, NOON), dueAt: tomorrow + 5 * DAY_MS }, // day 7
+    { ...newCard("c4", { prompt: "p4", answer: "a" }, [], true, NOON), dueAt: tomorrow + 6 * DAY_MS }, // day 8 → out
+  ];
+  assert.deepEqual(bucketForecast(cards, NOON, 7), [1, 1, 0, 0, 0, 0, 1]);
 });
 
 console.log(`\n${passed} checks passed\n`);

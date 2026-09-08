@@ -161,7 +161,7 @@ should require working something out rather than remembering it.
 
 Reply with a single JSON array, nothing else:
 
-[{"prompt":"...","choices":["A","B","C","D"],"answer":"B","explanation":"one or two sentences","sourceLocator":"page 4"}]
+[{"prompt":"...","choices":["A","B","C","D"],"answer":"B","explanation":"one or two sentences","sourceLocator":"page 4","sourceMaterial":"Lecture 12 slides"}]
 
 Rules:
 - "choices" is optional; omit it for a short-answer question and put the expected
@@ -169,6 +169,8 @@ Rules:
 - "answer" for multiple choice must exactly match one entry in "choices".
 - Every question must be answerable from the excerpts. Cite where in
   "sourceLocator".
+- "sourceMaterial" is the exact name of the uploaded file the question came
+  from. Omit it only if no material excerpts were provided.
 - No questions about the formatting or structure of the document itself.
 - Use plain text with inline LaTeX between $ when you need a symbol.`;
 }

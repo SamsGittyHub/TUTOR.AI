@@ -12,6 +12,13 @@ interface Props {
   onSend: (message: string) => void;
   onStop: () => void;
   disabled?: boolean;
+  /** Live voice: mic state comes from the useVoice hook. */
+  micSupported?: boolean;
+  micOn?: boolean;
+  speaking?: boolean;
+  interim?: string;
+  micError?: string | null;
+  onToggleMic?: () => void;
 }
 
 interface ChatItem {
@@ -63,7 +70,20 @@ const OPENERS = [
   "Skip ahead",
 ];
 
-export function ChatRail({ actions, transcript, status, onSend, onStop, disabled }: Props) {
+export function ChatRail({
+  actions,
+  transcript,
+  status,
+  onSend,
+  onStop,
+  disabled,
+  micSupported,
+  micOn,
+  speaking,
+  interim,
+  micError,
+  onToggleMic,
+}: Props) {
   const [draft, setDraft] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const items = useMemo(() => buildChat(actions, transcript), [actions, transcript]);
@@ -123,7 +143,7 @@ export function ChatRail({ actions, transcript, status, onSend, onStop, disabled
             ) : (
               <div key={item.key} className="flex gap-2.5">
                 <span className="mt-1 h-6 w-6 shrink-0 rounded-full grad" />
-                <p className="max-w-[88%] text-[13.5px] leading-relaxed text-white/90">
+                <p className="max-w-[88%] text-[13.5px] leading-relaxed text-fg/90">
                   {item.text}
                 </p>
               </div>
@@ -151,7 +171,7 @@ export function ChatRail({ actions, transcript, status, onSend, onStop, disabled
               type="button"
               disabled={busy || disabled}
               onClick={() => submit(suggestion)}
-              className="rounded-full border border-line px-2.5 py-1 text-[11.5px] font-semibold text-muted transition hover:border-cyan/60 hover:text-white disabled:opacity-40"
+              className="rounded-full border border-line px-2.5 py-1 text-[11.5px] font-semibold text-muted transition hover:border-cyan/60 hover:text-fg disabled:opacity-40"
             >
               {suggestion}
             </button>
@@ -166,6 +186,12 @@ export function ChatRail({ actions, transcript, status, onSend, onStop, disabled
         }}
         className="shrink-0 border-t border-line p-3"
       >
+        {micOn && interim ? (
+          <p className="mb-1.5 truncate px-1 text-[11.5px] italic text-cyan">“{interim}…”</p>
+        ) : null}
+        {micError ? (
+          <p className="mb-1.5 px-1 text-[11px] font-semibold text-pink">{micError}</p>
+        ) : null}
         <div className="grad-border flex items-end gap-2 rounded-md bg-panel-2 p-2">
           <textarea
             value={draft}
@@ -178,9 +204,39 @@ export function ChatRail({ actions, transcript, status, onSend, onStop, disabled
             }}
             rows={2}
             disabled={disabled}
-            placeholder={disabled ? "Add an API key to start" : "Wait — where did that 2 come from?"}
+            placeholder={
+              disabled
+                ? "Add an API key to start"
+                : micOn
+                  ? "Listening — or just type…"
+                  : "Wait — where did that 2 come from?"
+            }
             className="max-h-40 min-h-[42px] flex-1 resize-none bg-transparent px-2 py-1 text-[13.5px] leading-relaxed outline-none placeholder:text-dim"
           />
+          {micSupported && onToggleMic ? (
+            <button
+              type="button"
+              onClick={onToggleMic}
+              disabled={disabled}
+              title={micOn ? "Stop listening" : "Ask with your voice"}
+              aria-label={micOn ? "Stop listening" : "Ask with your voice"}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition disabled:opacity-30 ${
+                micOn
+                  ? "border-transparent bg-pink/20 text-pink"
+                  : "border-line text-muted hover:border-line-2 hover:text-fg"
+              }`}
+            >
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" strokeWidth="1.8" />
+                <path
+                  d="M5 11a7 7 0 0 0 14 0M12 18v3"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          ) : null}
           <button
             type="submit"
             disabled={busy || disabled || !draft.trim()}
@@ -198,6 +254,11 @@ export function ChatRail({ actions, transcript, status, onSend, onStop, disabled
             </svg>
           </button>
         </div>
+        {micOn ? (
+          <p className="mt-1.5 px-1 text-[10.5px] font-semibold text-dim">
+            {speaking ? "Tutor is speaking — mic paused" : "Listening — just start talking"}
+          </p>
+        ) : null}
       </form>
     </section>
   );
