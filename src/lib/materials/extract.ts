@@ -50,7 +50,7 @@ export function kindForFile(file: File): MaterialKind {
 }
 
 function newId(): string {
-  return `m_${crypto.randomUUID().slice(0, 8)}`;
+  return `m_${crypto.randomUUID()}`;
 }
 
 async function toBase64(blob: Blob): Promise<string> {

@@ -26,6 +26,8 @@ const TARGETS = [
       "src/lib/planner.ts",
       "src/lib/weakpoints.ts",
       "src/lib/exam.ts",
+      "src/lib/docx.ts",
+      "src/lib/board-doc.ts",
       "src/lib/export.ts",
       "src/lib/materials/audio.ts",
       "src/lib/materials/vector.ts",

@@ -7,6 +7,7 @@ import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
 import { deleteSession } from "@/lib/db";
 import { exportFilename, lessonToMarkdown } from "@/lib/export";
+import { BoardExport } from "@/components/board/BoardExport";
 import { useLibrary } from "@/lib/useLibrary";
 
 function when(ms: number): string {
@@ -98,14 +99,22 @@ export default function SessionsPage() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
+                  <BoardExport
+                    actions={s.actions}
+                    title={s.title}
+                    date={s.createdAt}
+                    materialName={(id) =>
+                      lib.materials.find((m) => m.id === id)?.name ?? "material"
+                    }
+                  />
                   <button
                     type="button"
                     onClick={() => exportLesson(s.id)}
                     disabled={!s.actions.length}
                     title="Download as Markdown notes"
-                    className="rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:text-fg disabled:opacity-40"
+                    className="tx press inline-flex h-7 items-center rounded-full px-3 text-[11.5px] font-medium text-muted hover:bg-[var(--tint)] hover:text-fg disabled:pointer-events-none disabled:opacity-40"
                   >
-                    Export
+                    Markdown
                   </button>
                   <button
                     type="button"

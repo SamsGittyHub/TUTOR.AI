@@ -27,6 +27,21 @@ import { deleteMaterialFiles, deleteUserFiles } from "./storage";
 const ms = (d: Date | string | null): number =>
   d ? new Date(d).getTime() : 0;
 
+/**
+ * Every upsert below is guarded by `where <table>.user_id = $n`, so an id that
+ * already belongs to a different account matches nothing and writes nothing.
+ * Postgres reports that as a successful statement affecting zero rows, which
+ * used to surface as {ok:true} while the student's work quietly vanished.
+ * Anything that should have written exactly one row goes through here.
+ */
+function assertWrote(rows: unknown[], what: string): void {
+  if (rows.length === 0) {
+    throw new Error(
+      `Couldn't save that ${what} — its id is already taken by another account. Try again.`,
+    );
+  }
+}
+
 /* -------------------------------------------------------------------------- */
 /* Courses                                                                     */
 /* -------------------------------------------------------------------------- */
@@ -64,14 +79,16 @@ export async function listCourses(userId: string): Promise<Course[]> {
 }
 
 export async function putCourse(userId: string, course: Course): Promise<void> {
-  await query(
+  const wrote = await query(
     `insert into courses (id, user_id, name, term, color)
      values ($1, $2, $3, $4, $5)
      on conflict (id) do update
        set name = excluded.name, term = excluded.term, color = excluded.color
-     where courses.user_id = $2`,
+     where courses.user_id = $2
+     returning id`,
     [course.id, userId, course.name, course.term ?? null, course.color],
   );
+  assertWrote(wrote, "course");
 }
 
 export async function deleteCourse(userId: string, id: string): Promise<void> {
@@ -157,7 +174,7 @@ export async function putMaterial(
   courseId?: string | null,
 ): Promise<void> {
   await transaction(async (client) => {
-    await client.query(
+    const wrote = await client.query(
       `insert into materials
          (id, user_id, course_id, name, kind, size_bytes, char_count,
           chunk_count, unit_count, preview, note, created_at)
@@ -168,7 +185,8 @@ export async function putMaterial(
          preview = excluded.preview,
          note = excluded.note,
          chunk_count = excluded.chunk_count
-       where materials.user_id = $2`,
+       where materials.user_id = $2
+       returning id`,
       [
         material.id,
         userId,
@@ -184,6 +202,7 @@ export async function putMaterial(
         material.createdAt || Date.now(),
       ],
     );
+    assertWrote(wrote.rows, "file");
 
     // Chunks are immutable once written; replace wholesale on re-upload.
     await client.query("delete from material_chunks where material_id = $1", [
@@ -295,7 +314,7 @@ export async function getSession(
 }
 
 export async function putSession(userId: string, s: Session): Promise<void> {
-  await query(
+  const wrote = await query(
     `insert into lessons
        (id, user_id, title, material_ids, provider_id, model, actions,
         transcript, plan, usage, board_theme, created_at, updated_at)
@@ -312,7 +331,8 @@ export async function putSession(userId: string, s: Session): Promise<void> {
        usage = excluded.usage,
        board_theme = excluded.board_theme,
        updated_at = excluded.updated_at
-     where lessons.user_id = $2`,
+     where lessons.user_id = $2
+     returning id`,
     [
       s.id,
       userId,
@@ -329,6 +349,7 @@ export async function putSession(userId: string, s: Session): Promise<void> {
       s.updatedAt || Date.now(),
     ],
   );
+  assertWrote(wrote, "lesson");
 }
 
 export async function deleteSession(userId: string, id: string): Promise<void> {
@@ -539,7 +560,7 @@ export async function listEvents(userId: string): Promise<CalendarEvent[]> {
 }
 
 export async function putEvent(userId: string, e: CalendarEvent): Promise<void> {
-  await query(
+  const wrote = await query(
     `insert into calendar_events
        (id, user_id, course_id, kind, title, starts_at, ends_at, all_day,
         location, notes, topics, source)
@@ -556,7 +577,8 @@ export async function putEvent(userId: string, e: CalendarEvent): Promise<void> 
        location = excluded.location,
        notes = excluded.notes,
        topics = excluded.topics
-     where calendar_events.user_id = $2`,
+     where calendar_events.user_id = $2
+     returning id`,
     [
       e.id,
       userId,
@@ -572,6 +594,7 @@ export async function putEvent(userId: string, e: CalendarEvent): Promise<void> 
       e.source,
     ],
   );
+  assertWrote(wrote, "event");
 }
 
 export async function deleteEvent(userId: string, id: string): Promise<void> {
@@ -835,7 +858,7 @@ export async function getExam(
 }
 
 export async function putExam(userId: string, exam: PracticeExam): Promise<void> {
-  await query(
+  const wrote = await query(
     `insert into practice_exams
        (id, user_id, title, session_ids, material_ids, minutes, paper, focus,
         created_at)
@@ -843,7 +866,8 @@ export async function putExam(userId: string, exam: PracticeExam): Promise<void>
      -- Re-saving your own paper is a no-op; it can never overwrite someone
      -- else's row, and a collision fails loudly rather than vanishing.
      on conflict (id) do update set updated_at = now()
-       where practice_exams.user_id = $2`,
+       where practice_exams.user_id = $2
+     returning id`,
     [
       exam.id,
       userId,
@@ -856,6 +880,7 @@ export async function putExam(userId: string, exam: PracticeExam): Promise<void>
       exam.createdAt || Date.now(),
     ],
   );
+  assertWrote(wrote, "exam");
 }
 
 /** Autosaves in-progress answers. Refuses to touch a submitted paper. */

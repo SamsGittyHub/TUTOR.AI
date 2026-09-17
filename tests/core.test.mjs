@@ -23,6 +23,10 @@ import {
   allocateQuestions, confusionByStep, confusionScore, findWeakPoints, isConfusion, topicsOf,
 } from "../.test-build/core/weakpoints.js";
 import { checkExamAnswer, gradeExam, totalMarks } from "../.test-build/core/exam.js";
+import {
+  blocksToXml, contentTypesXml, documentRelsXml, documentXml, esc, pxToEmu,
+} from "../.test-build/core/docx.js";
+import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
 import { actionToMarkdown, exportFilename, lessonToMarkdown } from "../.test-build/core/export.js";
 import { encodeWav, secondsPerChunk, TRANSCRIBE_LIMIT_BYTES } from "../.test-build/core/materials/audio.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
@@ -724,6 +728,135 @@ test("missed topics are reported worst-first", () => {
   const result = gradeExam(exam, { a: "x", b: "y", c: "3" });
   assert.equal(result.weakestTopics[0], "Alkenes");
   assert.ok(!result.weakestTopics.includes("Aromatics"));
+});
+
+
+console.log("\n— docx writer —");
+
+test("XML escaping handles ampersands without double-escaping", () => {
+  assert.equal(esc('a & b < c > d "e"'), "a &amp; b &lt; c &gt; d &quot;e&quot;");
+  assert.equal(esc("&lt;"), "&amp;lt;");
+});
+
+test("text is escaped inside runs, so a stray < cannot break the document", () => {
+  const xml = blocksToXml([{ kind: "paragraph", text: "if x < 3 && y > 2" }]);
+  assert.ok(xml.includes("&lt;"), "less-than was not escaped");
+  assert.ok(xml.includes("&amp;&amp;"), "ampersands were not escaped");
+  assert.ok(!/<w:t[^>]*>[^<]*<[^\/w]/.test(xml), "raw markup leaked into a text run");
+});
+
+test("runs preserve whitespace, or Word eats leading spaces", () => {
+  assert.ok(blocksToXml([{ kind: "paragraph", text: " x " }])
+    .includes('xml:space="preserve"'));
+});
+
+test("pixels convert to EMU at 96dpi", () => {
+  assert.equal(pxToEmu(96), 914400);
+  assert.equal(pxToEmu(0), 0);
+});
+
+test("a table emits one row per data row plus a header", () => {
+  const xml = blocksToXml([{ kind: "table", headers: ["A", "B"], rows: [["1", "2"], ["3", "4"]] }]);
+  assert.equal((xml.match(/<w:tr>/g) || []).length, 3);
+});
+
+test("short rows are padded so the table does not skew", () => {
+  const xml = blocksToXml([{ kind: "table", headers: ["A", "B", "C"], rows: [["1"]] }]);
+  const firstBodyRow = xml.split("<w:tr>")[2];
+  assert.equal((firstBodyRow.match(/<w:tc>/g) || []).length, 3);
+});
+
+test("image relationship ids match the ids referenced in the body", () => {
+  const img = { data: new Uint8Array([1]), widthPx: 100, heightPx: 50 };
+  const body = blocksToXml([{ kind: "image", image: img }, { kind: "image", image: img }]);
+  const rels = documentRelsXml(2);
+  for (const id of ["rId101", "rId102"]) {
+    assert.ok(body.includes(`r:embed="${id}"`), `body missing ${id}`);
+    assert.ok(rels.includes(`Id="${id}"`), `rels missing ${id}`);
+  }
+});
+
+test("the png content type is declared only when there are images", () => {
+  assert.ok(contentTypesXml(1).includes('Extension="png"'));
+  assert.ok(!contentTypesXml(0).includes('Extension="png"'));
+});
+
+test("the document is a single well-formed root with a section", () => {
+  const xml = documentXml([{ kind: "heading", text: "T", level: 1 }]);
+  assert.ok(xml.startsWith("<?xml"));
+  assert.equal((xml.match(/<w:body>/g) || []).length, 1);
+  assert.ok(xml.includes("<w:sectPr>"), "no page setup emitted");
+  // Every opened paragraph is closed.
+  assert.equal((xml.match(/<w:p>/g) || []).length, (xml.match(/<\/w:p>/g) || []).length);
+});
+
+console.log("\n— board to document —");
+
+const a = (o) => ({ id: "x", ...o });
+
+test("erased cards never reach the document", () => {
+  const { blocks } = boardToBlocks([
+    a({ id: "t1", type: "write_text", text: "Keep", style: "body", color: "ink" }),
+    a({ id: "t2", type: "write_text", text: "Wrong", style: "body", color: "ink" }),
+    a({ id: "e1", type: "erase", targetId: "t2" }),
+  ], { title: "L" });
+  const text = JSON.stringify(blocks);
+  assert.ok(text.includes("Keep"));
+  assert.ok(!text.includes("Wrong"), "an erased card survived");
+});
+
+test("board bookkeeping produces no blocks", () => {
+  const { blocks } = boardToBlocks([
+    a({ type: "highlight", targetId: "q" }), a({ type: "done" }),
+  ], { title: "L" });
+  // Only the title heading.
+  assert.equal(blocks.length, 1);
+  assert.equal(blocks[0].kind, "heading");
+});
+
+test("a diagram becomes an image when it can be rasterised", () => {
+  const diagram = a({ id: "d1", type: "draw_diagram", layout: "flow",
+    nodes: [{ id: "n1", label: "Glucose", shape: "box", color: "ink" }], edges: [] });
+  const { blocks, pending } = boardToBlocks([diagram], {
+    title: "L", rasterisable: new Set(["d1"]),
+  });
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].actionId, "d1");
+  assert.ok(blocks.some((b) => b.kind === "image"));
+});
+
+test("a diagram that cannot be rasterised is described, not dropped", () => {
+  const diagram = a({ id: "d1", type: "draw_diagram", layout: "flow", title: "Respiration",
+    nodes: [{ id: "n1", label: "Glucose", shape: "box", color: "ink" },
+            { id: "n2", label: "Pyruvate", shape: "box", color: "ink" }],
+    edges: [{ from: "n1", to: "n2", label: "glycolysis" }] });
+  const { blocks, pending } = boardToBlocks([diagram], { title: "L" });
+  assert.equal(pending.length, 0);
+  const text = JSON.stringify(blocks);
+  assert.ok(text.includes("Glucose → Pyruvate"), "the edge was not described");
+  assert.ok(text.includes("glycolysis"));
+});
+
+test("images are attached in the order they were emitted", () => {
+  const d = (id) => a({ id, type: "draw_diagram", layout: "flow", nodes: [], edges: [] });
+  const { blocks } = boardToBlocks([d("d1"), d("d2")], {
+    title: "L", rasterisable: new Set(["d1", "d2"]),
+  });
+  const out = attachImages(blocks, [
+    { data: new Uint8Array([1]), widthPx: 10, heightPx: 5 },
+    { data: new Uint8Array([2]), widthPx: 20, heightPx: 9 },
+  ]);
+  const images = out.filter((b) => b.kind === "image");
+  assert.equal(images[0].image.widthPx, 10);
+  assert.equal(images[1].image.widthPx, 20);
+});
+
+test("a card that failed to rasterise is dropped, not shipped empty", () => {
+  const d = a({ id: "d1", type: "draw_diagram", layout: "flow", nodes: [], edges: [] });
+  const { blocks } = boardToBlocks([d], { title: "L", rasterisable: new Set(["d1"]) });
+  const out = attachImages(blocks, [{ data: new Uint8Array(), widthPx: 0, heightPx: 0 }]);
+  assert.equal(out.filter((b) => b.kind === "image").length, 0,
+    "a zero-byte image would make Word refuse the file");
 });
 
 console.log(`\n${passed} checks passed\n`);

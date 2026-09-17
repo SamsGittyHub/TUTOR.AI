@@ -39,7 +39,7 @@ export type TutorStatus = "idle" | "thinking" | "teaching" | "error";
 
 function newSession(settings: Settings): Session {
   return {
-    id: `s_${crypto.randomUUID().slice(0, 8)}`,
+    id: `s_${crypto.randomUUID()}`,
     title: "New lesson",
     createdAt: Date.now(),
     updatedAt: Date.now(),

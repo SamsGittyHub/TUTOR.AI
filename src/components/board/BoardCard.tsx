@@ -23,6 +23,9 @@ export function BoardCard({ action, theme, highlighted, onAnswer, materialName }
   return (
     <article
       id={`card-${action.id}`}
+      // The exporter finds diagrams and plots by this, to rasterise them
+      // individually for a Word document.
+      data-action-id={action.id}
       className={`card-in relative rounded-md px-5 py-4 sm:px-7 sm:py-6 ${
         highlighted
           ? paper
