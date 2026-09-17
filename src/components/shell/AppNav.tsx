@@ -7,6 +7,8 @@ import { AccountMenu } from "@/components/auth/AccountMenu";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+import { isActive, NAV_LINKS } from "./nav-links";
+
 /**
  * The bar every study page shares.
  *
@@ -16,18 +18,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
  * rather than one canvas with modals stacked on it.
  */
 
-const LINKS = [
-  { href: "/app", label: "Board" },
-  { href: "/materials", label: "Material" },
-  { href: "/courses", label: "Courses" },
-  { href: "/calendar", label: "Calendar" },
-  { href: "/quiz", label: "Flashcards" },
-  { href: "/review", label: "Review" },
-  { href: "/practice-exam", label: "Practice exam" },
-  { href: "/progress", label: "Progress" },
-  { href: "/sessions", label: "Lessons" },
-  { href: "/voice", label: "Live voice" },
-] as const;
 
 export function AppNav() {
   const pathname = usePathname();
@@ -40,9 +30,8 @@ export function AppNav() {
         </Link>
 
         <nav className="-mx-1 flex flex-1 items-center gap-0.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-          {LINKS.map((link) => {
-            const active =
-              pathname === link.href || pathname.startsWith(`${link.href}/`);
+          {NAV_LINKS.map((link) => {
+            const active = isActive(pathname, link.href);
             return (
               <Link
                 key={link.href}

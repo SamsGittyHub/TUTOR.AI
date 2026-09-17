@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { SettingsModal } from "@/components/app/SettingsModal";
 import { AccountMenu } from "@/components/auth/AccountMenu";
+import { NavMenu } from "@/components/shell/NavMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuizLab } from "@/lib/useQuizLab";
 import { findModel, formatCost } from "@/lib/providers";
@@ -26,6 +27,8 @@ export default function QuizPage() {
         <Link href="/" className="flex items-center gap-2">
           <Logo size={24} />
         </Link>
+
+        <NavMenu />
         <div className="flex items-center gap-2">
           <span className="hidden rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-dim sm:block">
             {findModel(lab.settings.providerId, lab.settings.model)?.label ?? lab.settings.model}

@@ -11,6 +11,7 @@ import { SettingsModal } from "@/components/app/SettingsModal";
 import { Sidebar } from "@/components/app/Sidebar";
 import { SketchPad } from "@/components/board/SketchPad";
 import { AccountMenu } from "@/components/auth/AccountMenu";
+import { NavMenu } from "@/components/shell/NavMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Whiteboard } from "@/components/board/Whiteboard";
 import { findModel, formatCost, getProvider } from "@/lib/providers";
@@ -93,6 +94,8 @@ export default function AppPage() {
         <Link href="/" className="shrink-0">
           <Logo size={24} />
         </Link>
+
+        <NavMenu />
 
         <span className="hidden min-w-0 flex-1 truncate text-sm font-bold text-muted sm:block">
           {tutor.session.title}
@@ -212,6 +215,7 @@ export default function AppPage() {
             onDeleteSession={(id) => void tutor.removeSession(id)}
             onNewSession={tutor.startFresh}
             onOpenQuiz={() => router.push("/quiz")}
+            onOpenExam={() => router.push("/practice-exam")}
             onOpenReview={() => setShowReview(true)}
             onOpenProgress={() => setShowProgress(true)}
           />

@@ -22,6 +22,7 @@ interface Props {
   onDeleteSession: (id: string) => void;
   onNewSession: () => void;
   onOpenQuiz: () => void;
+  onOpenExam: () => void;
   onOpenReview: () => void;
   onOpenProgress: () => void;
 }
@@ -243,6 +244,13 @@ export function Sidebar(props: Props) {
               className="mt-1.5 w-full rounded-full border border-line py-2 text-xs font-bold text-muted transition hover:border-pink/50 hover:text-fg"
             >
               Quiz & flashcards →
+            </button>
+            <button
+              type="button"
+              onClick={props.onOpenExam}
+              className="mt-1.5 w-full rounded-full border border-line py-2 text-xs font-bold text-muted transition hover:border-pink/50 hover:text-fg"
+            >
+              Practice exam →
             </button>
             {props.dueCount > 0 ? (
               <button
