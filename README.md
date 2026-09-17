@@ -151,6 +151,11 @@ below.
 - **Sessions** — saved to your account, resumable on any device, board and all,
   and exportable as Markdown notes (display math, real tables, mermaid diagrams,
   source citations) so a lesson survives the tab closing.
+- **Practice exam** — pick one or more past lessons and get a full multi-section
+  paper, weighted toward what you personally found hard: the questions you
+  interrupted with mid-lesson, the cards you keep forgetting, the quizzes you
+  failed. Sections page like a real exam, answers autosave, and grading happens
+  server-side so the answer key never leaves the row.
 - **Show your work** — sketch your attempt on the board with a pen or stylus and
   the tutor reads it, marking up the step that went wrong instead of handing you
   the answer.
@@ -191,6 +196,8 @@ original clock. Needs an OpenAI key even if your tutor runs elsewhere.
 src/lib/
   actions.ts          the twelve actions + the forgiving normalizer
   planner.ts          exam date → study plan (pure, unit-tested)
+  weakpoints.ts       lessons → what you're actually weak at (pure, unit-tested)
+  exam.ts             practice exam shape + marking (pure, unit-tested)
   export.ts           lesson → Markdown notes (pure, unit-tested)
   server/             db pool, auth, repository, volume storage
   materials/embed.ts  embeddings via the student's own provider

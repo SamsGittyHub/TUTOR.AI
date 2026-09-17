@@ -19,6 +19,10 @@ import {
   recentAttemptAccuracy,
 } from "../.test-build/core/progress.js";
 import { buildPlan, describePlan, studyDays } from "../.test-build/core/planner.js";
+import {
+  allocateQuestions, confusionByStep, confusionScore, findWeakPoints, isConfusion, topicsOf,
+} from "../.test-build/core/weakpoints.js";
+import { checkExamAnswer, gradeExam, totalMarks } from "../.test-build/core/exam.js";
 import { actionToMarkdown, exportFilename, lessonToMarkdown } from "../.test-build/core/export.js";
 import { encodeWav, secondsPerChunk, TRANSCRIBE_LIMIT_BYTES } from "../.test-build/core/materials/audio.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
@@ -572,6 +576,154 @@ test("unembedded chunks fall back to BM25 instead of vanishing", () => {
   const hybrid = retrieveHybrid(chunks, "alkene addition", [1, 0], 3000);
   assert.ok(hybrid.chunks.length > 0, "hybrid returned nothing without embeddings");
   assert.equal(hybrid.chunks[0].id, "c1");
+});
+
+
+console.log("\n— weak points —");
+
+const said = (role, text) => ({ role, text, at: 0 });
+const lesson = (over) => ({
+  id: "s1", title: "Integration by parts", createdAt: 0, updatedAt: 0,
+  materialIds: ["m1"], providerId: "anthropic", model: "x",
+  actions: [], transcript: [], usage: {}, boardTheme: "paper", ...over,
+});
+
+test("confusion markers are distinguished from ordinary questions", () => {
+  assert.ok(isConfusion("wait, where did that 2 come from"));
+  assert.ok(isConfusion("I don't get it"));
+  assert.ok(!isConfusion("got it, thanks"));
+});
+
+test("a confused turn weighs more than a merely curious one", () => {
+  const confused = confusionScore([said("student", "wait, I'm lost")]);
+  const curious = confusionScore([said("student", "is that always true?")]);
+  assert.ok(confused > curious, "confusion did not outweigh a plain question");
+});
+
+test("tutor turns never count as confusion", () => {
+  assert.equal(confusionScore([said("tutor", "wait, I don't understand?")]), 0);
+});
+
+test("topics come from the lesson plan when there is one", () => {
+  const s = lesson({ plan: { title: "t", steps: ["Where it comes from", "Picking u"], currentIndex: 0 } });
+  assert.deepEqual(topicsOf(s), ["Where it comes from", "Picking u"]);
+});
+
+test("topics fall back to board titles, then the lesson title", () => {
+  const withTitles = lesson({ actions: [
+    { id: "a", type: "write_text", text: "Alkene addition", style: "title", color: "ink" },
+  ]});
+  assert.deepEqual(topicsOf(withTitles), ["Alkene addition"]);
+  assert.deepEqual(topicsOf(lesson({})), ["Integration by parts"]);
+});
+
+test("confusion is attributed to the step it happened on", () => {
+  const s = lesson({
+    plan: { title: "t", steps: ["Step one", "Step two"], currentIndex: 1 },
+    actions: [{ id: "d1", type: "done", stepIndex: 0 }, { id: "d2", type: "done", stepIndex: 1 }],
+    transcript: [said("student", "ok"), said("student", "wait, I'm totally lost")],
+  });
+  const perStep = confusionByStep(s);
+  assert.ok((perStep.get(1) ?? 0) > 0, "confusion did not land on step two");
+  assert.ok(!perStep.get(0), "an untroubled step picked up confusion");
+});
+
+test("the topic a student got stuck on outranks one they sailed through", () => {
+  const s = lesson({
+    plan: { title: "t", steps: ["Easy bit", "Hard bit"], currentIndex: 1 },
+    actions: [{ id: "d1", type: "done", stepIndex: 0 }, { id: "d2", type: "done", stepIndex: 1 }],
+    transcript: [said("student", "makes sense"), said("student", "wait, I don't understand")],
+  });
+  const weak = findWeakPoints({ sessions: [s], cards: [], attempts: [] });
+  assert.equal(weak[0].topic, "Hard bit");
+  assert.ok(weak[0].reasons.length > 0, "no reason was recorded");
+});
+
+test("every covered topic still appears, even an untroubled one", () => {
+  const s = lesson({ plan: { title: "t", steps: ["A", "B"], currentIndex: 0 } });
+  const topics = findWeakPoints({ sessions: [s], cards: [], attempts: [] }).map((w) => w.topic);
+  assert.deepEqual(topics.sort(), ["A", "B"]);
+});
+
+test("lapsed cards and low scores raise weight; unrelated material is ignored", () => {
+  const s = lesson({ plan: { title: "t", steps: ["A"], currentIndex: 0 } });
+  const card = { id: "c", promptKey: "k", materialIds: ["m1"], prompt: "Nucleophile?",
+    answer: "a", createdAt: 0, dueAt: 0, intervalDays: 1, ease: 2.5, reps: 1, lapses: 3 };
+  const other = { ...card, id: "c2", promptKey: "k2", materialIds: ["OTHER"], prompt: "Elsewhere" };
+  const weak = findWeakPoints({
+    sessions: [s], cards: [card, other],
+    attempts: [{ id: "a", sessionId: "s1", title: "Midterm practice", materialIds: ["m1"],
+                 createdAt: 0, score: 2, total: 10 }],
+  });
+  const topics = weak.map((w) => w.topic);
+  assert.ok(topics.includes("Nucleophile?"), "a lapsed card did not surface");
+  assert.ok(topics.includes("Midterm practice"), "a failed quiz did not surface");
+  assert.ok(!topics.includes("Elsewhere"), "a card from unrelated material leaked in");
+});
+
+test("question allocation spends the whole budget and starves nothing", () => {
+  const weak = [
+    { topic: "A", weight: 10, reasons: [], materialIds: [] },
+    { topic: "B", weight: 1, reasons: [], materialIds: [] },
+    { topic: "C", weight: 1, reasons: [], materialIds: [] },
+  ];
+  const out = allocateQuestions(weak, 12);
+  assert.equal(out.reduce((s, x) => s + x.count, 0), 12, "budget was not spent exactly");
+  assert.ok(out.every((x) => x.count >= 1), "a selected topic got no questions");
+  assert.ok(out[0].count > out[1].count, "the weakest topic was not weighted highest");
+});
+
+console.log("\n— practice exam —");
+
+const q = (over) => ({ id: "q1", kind: "short_answer", prompt: "?", answer: "x", marks: 2, ...over });
+const paper = (questions) => ({
+  id: "e1", title: "Paper", createdAt: 0, sessionIds: [], materialIds: [], minutes: 60, focus: [],
+  sections: [{ id: "A", title: "Section A", questions }],
+});
+
+test("answers match leniently, including a multiple-choice letter", () => {
+  assert.equal(checkExamAnswer(q({ answer: "4x" }), " 4X "), true);
+  assert.equal(checkExamAnswer(q({ answer: "4x" }), "5x"), false);
+  assert.equal(checkExamAnswer(
+    q({ kind: "multiple_choice", choices: ["red", "blue"], answer: "blue" }), "b"), true);
+});
+
+test("a blank answer is wrong, not unmarkable", () => {
+  assert.equal(checkExamAnswer(q({}), "   "), false);
+});
+
+test("worked questions are never auto-marked", () => {
+  assert.equal(checkExamAnswer(q({ kind: "worked" }), "anything"), null);
+});
+
+test("marks total across sections", () => {
+  assert.equal(totalMarks(paper([q({ id: "a", marks: 3 }), q({ id: "b", marks: 7 })])), 10);
+});
+
+test("grading awards marks, not question counts", () => {
+  const exam = paper([q({ id: "a", answer: "yes", marks: 9 }), q({ id: "b", answer: "no", marks: 1 })]);
+  const result = gradeExam(exam, { a: "yes", b: "wrong" });
+  assert.equal(result.awarded, 9);
+  assert.equal(result.total, 10);
+  assert.equal(result.percent, 90);
+});
+
+test("an all-worked paper does not read as 0%", () => {
+  const exam = paper([q({ id: "a", kind: "worked", marks: 10 })]);
+  const result = gradeExam(exam, { a: "my derivation" });
+  assert.equal(result.total, 0, "unmarkable questions inflated the denominator");
+  assert.equal(result.percent, 0);
+});
+
+test("missed topics are reported worst-first", () => {
+  const exam = paper([
+    q({ id: "a", topic: "Alkenes", answer: "1" }),
+    q({ id: "b", topic: "Alkenes", answer: "2" }),
+    q({ id: "c", topic: "Aromatics", answer: "3" }),
+  ]);
+  const result = gradeExam(exam, { a: "x", b: "y", c: "3" });
+  assert.equal(result.weakestTopics[0], "Alkenes");
+  assert.ok(!result.weakestTopics.includes("Aromatics"));
 });
 
 console.log(`\n${passed} checks passed\n`);

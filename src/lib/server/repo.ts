@@ -8,6 +8,7 @@ import type {
   Session,
 } from "@/lib/db";
 import type { CalendarEvent, EventKind, StudyBlock } from "@/lib/calendar";
+import { gradeExam, type ExamResponses, type ExamResult, type PracticeExam } from "@/lib/exam";
 import type { ReviewCard } from "@/lib/srs";
 
 import { hintFor, open, seal } from "./crypto";
@@ -768,4 +769,133 @@ export async function deleteKey(userId: string, providerId: string): Promise<voi
 
 export async function deleteAllKeys(userId: string): Promise<void> {
   await query("delete from user_api_keys where user_id = $1", [userId]);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Practice exams                                                              */
+/* -------------------------------------------------------------------------- */
+
+export interface StoredExam {
+  exam: PracticeExam;
+  responses: ExamResponses;
+  result: ExamResult | null;
+  submittedAt: number | null;
+}
+
+interface ExamRow {
+  id: string;
+  title: string;
+  session_ids: string[];
+  material_ids: string[];
+  minutes: number;
+  paper: unknown;
+  focus: unknown;
+  responses: unknown;
+  result: unknown;
+  submitted_at: Date | null;
+  created_at: Date;
+}
+
+const toStoredExam = (r: ExamRow): StoredExam => ({
+  exam: {
+    id: r.id,
+    title: r.title,
+    createdAt: ms(r.created_at),
+    sessionIds: r.session_ids,
+    materialIds: r.material_ids,
+    minutes: r.minutes,
+    sections: (r.paper ?? []) as PracticeExam["sections"],
+    focus: (r.focus ?? []) as PracticeExam["focus"],
+  },
+  responses: (r.responses ?? {}) as ExamResponses,
+  result: (r.result ?? null) as ExamResult | null,
+  submittedAt: r.submitted_at ? ms(r.submitted_at) : null,
+});
+
+const EXAM_COLUMNS = `id, title, session_ids, material_ids, minutes, paper, focus,
+                      responses, result, submitted_at, created_at`;
+
+export async function listExams(userId: string): Promise<StoredExam[]> {
+  const rows = await query<ExamRow>(
+    `select ${EXAM_COLUMNS} from practice_exams where user_id = $1 order by created_at desc`,
+    [userId],
+  );
+  return rows.map(toStoredExam);
+}
+
+export async function getExam(
+  userId: string,
+  id: string,
+): Promise<StoredExam | null> {
+  const rows = await query<ExamRow>(
+    `select ${EXAM_COLUMNS} from practice_exams where id = $1 and user_id = $2`,
+    [id, userId],
+  );
+  return rows[0] ? toStoredExam(rows[0]) : null;
+}
+
+export async function putExam(userId: string, exam: PracticeExam): Promise<void> {
+  await query(
+    `insert into practice_exams
+       (id, user_id, title, session_ids, material_ids, minutes, paper, focus,
+        created_at)
+     values ($1,$2,$3,$4,$5,$6,$7,$8, to_timestamp($9 / 1000.0))
+     -- Re-saving your own paper is a no-op; it can never overwrite someone
+     -- else's row, and a collision fails loudly rather than vanishing.
+     on conflict (id) do update set updated_at = now()
+       where practice_exams.user_id = $2`,
+    [
+      exam.id,
+      userId,
+      exam.title,
+      exam.sessionIds,
+      exam.materialIds,
+      exam.minutes,
+      JSON.stringify(exam.sections),
+      JSON.stringify(exam.focus),
+      exam.createdAt || Date.now(),
+    ],
+  );
+}
+
+/** Autosaves in-progress answers. Refuses to touch a submitted paper. */
+export async function saveExamResponses(
+  userId: string,
+  id: string,
+  responses: ExamResponses,
+): Promise<void> {
+  await query(
+    `update practice_exams
+        set responses = $3, updated_at = now()
+      where id = $1 and user_id = $2 and submitted_at is null`,
+    [id, userId, JSON.stringify(responses)],
+  );
+}
+
+/**
+ * Records the grade. Grading happens server-side so the answer key never has
+ * to be trusted from the client, and the first submission is the one that
+ * counts — resubmitting can't improve a score.
+ */
+export async function submitExam(
+  userId: string,
+  id: string,
+  responses: ExamResponses,
+): Promise<StoredExam | null> {
+  const stored = await getExam(userId, id);
+  if (!stored) return null;
+  if (stored.submittedAt) return stored;
+
+  const result = gradeExam(stored.exam, responses);
+  await query(
+    `update practice_exams
+        set responses = $3, result = $4, submitted_at = now(), updated_at = now()
+      where id = $1 and user_id = $2 and submitted_at is null`,
+    [id, userId, JSON.stringify(responses), JSON.stringify(result)],
+  );
+  return { ...stored, responses, result, submittedAt: Date.now() };
+}
+
+export async function deleteExam(userId: string, id: string): Promise<void> {
+  await query("delete from practice_exams where id = $1 and user_id = $2", [id, userId]);
 }

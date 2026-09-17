@@ -23,6 +23,7 @@ const LINKS = [
   { href: "/calendar", label: "Calendar" },
   { href: "/quiz", label: "Flashcards" },
   { href: "/review", label: "Review" },
+  { href: "/practice-exam", label: "Practice exam" },
   { href: "/progress", label: "Progress" },
   { href: "/sessions", label: "Lessons" },
   { href: "/voice", label: "Live voice" },
