@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
+import { SyllabusImport } from "@/components/app/SyllabusImport";
 import { EVENT_KINDS, type EventKind } from "@/lib/calendar";
 import { useCalendar } from "@/lib/useCalendar";
 import { useLibrary } from "@/lib/useLibrary";
@@ -169,6 +170,26 @@ export default function CalendarPage() {
           {busy ? "Adding…" : "Add"}
         </button>
       </form>
+
+      <div className="mt-3">
+        <SyllabusImport
+          materials={lib.materials}
+          courses={lib.courses}
+          onImport={async (events, importCourseId) => {
+            for (const event of events) {
+              await cal.addEvent({
+                title: event.title,
+                kind: event.kind,
+                startsAt: new Date(`${event.date}T09:00`).getTime(),
+                allDay: true,
+                courseId: importCourseId ?? undefined,
+                topics: event.topics,
+                source: "syllabus",
+              });
+            }
+          }}
+        />
+      </div>
 
       <div className="mt-6">
         {cal.loading ? (

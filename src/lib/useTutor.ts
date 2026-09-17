@@ -13,6 +13,7 @@ import {
   listSessions,
   putCard,
   putMaterial,
+  uploadOriginal,
   putSession,
   type Material,
   type MaterialChunk,
@@ -378,6 +379,11 @@ export function useTutor() {
           onProgress: (stage, ratio) => setUpload({ name: file.name, stage, ratio }),
         });
         await putMaterial(material, fresh);
+        // Keep the original so it's re-downloadable from another device. The
+        // lesson runs off the chunks, so this is deliberately not awaited into
+        // the critical path.
+        setUpload({ name: file.name, stage: "Saving to your account" });
+        void uploadOriginal(material.id, file);
         setMaterials(await listMaterials());
         setSession((prev) =>
           prev.materialIds.includes(material.id)

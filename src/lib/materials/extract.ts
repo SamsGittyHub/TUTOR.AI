@@ -1,6 +1,7 @@
 "use client";
 
 import type { Material, MaterialChunk, MaterialImage, MaterialKind } from "../db";
+import { toTranscribableChunks } from "./audio";
 import { chunkUnits, type SourceUnit } from "./chunk";
 
 /**
@@ -191,63 +192,94 @@ async function transcribe(input: ExtractInput): Promise<SourceUnit[]> {
       "Lecture recordings need an OpenAI key for transcription — add one in Settings, then re-upload.",
     );
   }
-  if (input.file.size > 25 * 1024 * 1024) {
-    throw new ExtractionError(
-      `That file is ${(input.file.size / 1024 / 1024).toFixed(0)} MB. The transcription endpoint caps at 25 MB — trim it or export audio only.`,
+
+  // Strip the video track and downmix before anything leaves the machine: a
+  // 50-minute lecture is hundreds of megabytes of pixels nobody transcribes.
+  let chunks;
+  try {
+    chunks = await toTranscribableChunks(input.file, input.onProgress);
+  } catch (caught) {
+    throw new ExtractionError((caught as Error).message);
+  }
+
+  const units: SourceUnit[] = [];
+  for (const [index, chunk] of chunks.entries()) {
+    input.onProgress?.(
+      chunks.length > 1
+        ? `Transcribing part ${index + 1} of ${chunks.length}`
+        : "Transcribing — about a minute per 10 minutes of audio",
+      chunks.length > 1 ? index / chunks.length : undefined,
     );
+
+    const form = new FormData();
+    form.append("file", chunk.blob, `part-${index + 1}.wav`);
+    form.append("model", "whisper-1");
+    form.append("response_format", "verbose_json");
+    form.append("timestamp_granularities[]", "segment");
+
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { authorization: `Bearer ${input.openaiKey}` },
+      body: form,
+      signal: input.signal,
+    });
+
+    if (!response.ok) {
+      const detail = await response.text();
+      throw new ExtractionError(
+        `Transcription failed (${response.status}): ${detail.slice(0, 200)}`,
+      );
+    }
+
+    const payload = (await response.json()) as {
+      text?: string;
+      segments?: TranscriptSegment[];
+    };
+
+    // Timestamps come back relative to the chunk, so shift them back onto the
+    // original recording's clock — otherwise every part restarts at 00:00.
+    units.push(...segmentsToUnits(payload, chunk.offsetSeconds));
   }
 
-  input.onProgress?.("Transcribing — this takes about a minute per 10 minutes of audio");
+  if (!units.length) throw new ExtractionError("Transcription came back empty.");
+  return units;
+}
 
-  const form = new FormData();
-  form.append("file", input.file);
-  form.append("model", "whisper-1");
-  form.append("response_format", "verbose_json");
-  form.append("timestamp_granularities[]", "segment");
-
-  const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { authorization: `Bearer ${input.openaiKey}` },
-    body: form,
-    signal: input.signal,
-  });
-
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new ExtractionError(`Transcription failed (${response.status}): ${detail.slice(0, 200)}`);
-  }
-
-  const payload = (await response.json()) as {
-    text?: string;
-    segments?: TranscriptSegment[];
-  };
-
+/** Groups segments into ~90-second blocks a student can actually scrub to. */
+function segmentsToUnits(
+  payload: { text?: string; segments?: TranscriptSegment[] },
+  offsetSeconds: number,
+): SourceUnit[] {
   if (payload.segments?.length) {
-    // Group segments into ~90-second blocks so citations land on a timestamp
-    // the student can actually scrub to.
     const units: SourceUnit[] = [];
     let bucketStart = payload.segments[0].start;
     let buffer = "";
     for (const segment of payload.segments) {
       if (segment.start - bucketStart > 90 && buffer) {
-        units.push({ locator: timecode(bucketStart), text: buffer.trim() });
+        units.push({ locator: timecode(bucketStart + offsetSeconds), text: buffer.trim() });
         bucketStart = segment.start;
         buffer = "";
       }
       buffer += ` ${segment.text.trim()}`;
     }
-    if (buffer.trim()) units.push({ locator: timecode(bucketStart), text: buffer.trim() });
+    if (buffer.trim()) {
+      units.push({ locator: timecode(bucketStart + offsetSeconds), text: buffer.trim() });
+    }
     return units;
   }
 
-  if (payload.text) return [{ locator: "00:00", text: payload.text }];
-  throw new ExtractionError("Transcription came back empty.");
+  const text = payload.text?.trim();
+  return text ? [{ locator: timecode(offsetSeconds), text }] : [];
 }
 
 function timecode(seconds: number): string {
-  const m = Math.floor(seconds / 60);
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
   const s = Math.floor(seconds % 60);
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  // Lectures run past an hour once chunks are stitched back together.
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
 /* --- entry point --------------------------------------------------------- */

@@ -5,7 +5,7 @@ import { useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
-import { deleteMaterial } from "@/lib/db";
+import { deleteMaterial, originalUrl, setMaterialCourse } from "@/lib/db";
 import { useLibrary } from "@/lib/useLibrary";
 
 const KIND_LABEL: Record<string, string> = {
@@ -86,14 +86,40 @@ export default function MaterialsPage() {
                     </p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => remove(m.id, m.name)}
-                  disabled={busy === m.id}
-                  className="shrink-0 rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:border-pink/50 hover:text-pink disabled:opacity-50"
-                >
-                  {busy === m.id ? "Deleting…" : "Delete"}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {lib.courses.length > 0 && (
+                    <select
+                      value={m.courseId ?? ""}
+                      aria-label={`Course for ${m.name}`}
+                      onChange={async (e) => {
+                        await setMaterialCourse(m.id, e.target.value || null);
+                        lib.reload();
+                      }}
+                      className="rounded-full border border-line bg-panel-2 px-2.5 py-1.5 text-[11.5px] font-bold text-muted outline-none focus:border-line-2"
+                    >
+                      <option value="">no course</option>
+                      {lib.courses.map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <a
+                    href={originalUrl(m.id)}
+                    className="rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:text-fg"
+                  >
+                    Download
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => remove(m.id, m.name)}
+                    disabled={busy === m.id}
+                    className="rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:border-pink/50 hover:text-pink disabled:opacity-50"
+                  >
+                    {busy === m.id ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
               </li>
             );
           })}

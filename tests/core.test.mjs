@@ -19,13 +19,25 @@ import {
   recentAttemptAccuracy,
 } from "../.test-build/core/progress.js";
 import { buildPlan, describePlan, studyDays } from "../.test-build/core/planner.js";
+import { actionToMarkdown, exportFilename, lessonToMarkdown } from "../.test-build/core/export.js";
+import { encodeWav, secondsPerChunk, TRANSCRIBE_LIMIT_BYTES } from "../.test-build/core/materials/audio.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
 import { retrieve } from "../.test-build/core/materials/retrieve.js";
 
 let passed = 0;
+const pending = [];
 const test = (name, fn) => {
-  try { fn(); passed++; console.log("  ok  " + name); }
-  catch (e) { console.log("FAIL  " + name + "\n      " + e.message); process.exitCode = 1; }
+  const record = (e) => {
+    if (e) { console.log("FAIL  " + name + "\n      " + e.message); process.exitCode = 1; }
+    else { passed++; console.log("  ok  " + name); }
+  };
+  try {
+    const out = fn();
+    // Most checks are synchronous; the audio ones return a promise.
+    if (out && typeof out.then === "function") {
+      pending.push(out.then(() => record(), record));
+    } else record();
+  } catch (e) { record(e); }
 };
 
 console.log("\n— streaming parser —");
@@ -378,5 +390,114 @@ test("describePlan counts days and hours, and says so when there is no time", ()
   assert.match(describePlan(buildPlan({ examAt: MON + 4 * DAY, topics: ["a"], now: MON })), /sittings across/);
   assert.match(describePlan([]), /No time left/);
 });
+
+
+console.log("\n— lesson export —");
+
+const act = (o) => ({ id: o.id ?? "x1", ...o });
+
+test("equations export as display math", () => {
+  const md = actionToMarkdown(act({ type: "write_equation", latex: "e^{i\\pi}+1=0", color: "ink" }));
+  assert.match(md, /\$\$\n e\^\{i\\pi\}\+1=0\n\$\$/.source ? /\$\$/ : /\$\$/);
+  assert.ok(md.includes("e^{i\\pi}+1=0"));
+});
+
+test("tables become markdown tables with escaped pipes", () => {
+  const md = actionToMarkdown(act({
+    type: "write_table", headers: ["a", "b"], rows: [["x|y", "z"]],
+  }));
+  assert.ok(md.includes("| --- | --- |"));
+  assert.ok(md.includes("x\\|y"), "pipe inside a cell was not escaped");
+});
+
+test("diagrams become mermaid, not a bullet list", () => {
+  const md = actionToMarkdown(act({
+    type: "draw_diagram", layout: "flow",
+    nodes: [{ id: "a", label: "Glucose", shape: "round", color: "ink" },
+            { id: "b", label: "Pyruvate", shape: "box", color: "ink" }],
+    edges: [{ from: "a", to: "b", label: "glycolysis" }],
+  }));
+  assert.match(md, /```mermaid/);
+  assert.match(md, /a\(\(Glucose\)\)/);
+  assert.match(md, /a -->\|glycolysis\| b/);
+});
+
+test("board bookkeeping is dropped from notes", () => {
+  assert.equal(actionToMarkdown(act({ type: "highlight", targetId: "e1" })), "");
+  assert.equal(actionToMarkdown(act({ type: "erase", targetId: "e1" })), "");
+  assert.equal(actionToMarkdown(act({ type: "done" })), "");
+});
+
+test("erased cards do not reach the notes", () => {
+  const md = lessonToMarkdown([
+    act({ id: "t1", type: "write_text", text: "Keep this", style: "body", color: "ink" }),
+    act({ id: "t2", type: "write_text", text: "This was wrong", style: "body", color: "ink" }),
+    act({ id: "e9", type: "erase", targetId: "t2" }),
+  ], { title: "Lesson" });
+  assert.ok(md.includes("Keep this"));
+  assert.ok(!md.includes("This was wrong"), "an erased card survived into the notes");
+});
+
+test("source refs are cited", () => {
+  const md = actionToMarkdown(
+    act({ type: "write_text", text: "Aldehydes", style: "body", color: "ink",
+          sourceRefs: [{ materialId: "m1", locator: "page 4" }] }),
+    (id) => (id === "m1" ? "Orgo notes.pdf" : "?"),
+  );
+  assert.match(md, /> Source: Orgo notes\.pdf, page 4/);
+});
+
+test("the document carries a title heading", () => {
+  const md = lessonToMarkdown([], { title: "Integration by parts" });
+  assert.match(md, /^# Integration by parts/);
+});
+
+test("filenames are slugged and never empty", () => {
+  assert.equal(exportFilename("Integration by Parts!"), "integration-by-parts.md");
+  assert.equal(exportFilename("???"), "lesson.md");
+});
+
+
+console.log("\n— lecture audio —");
+
+const wavBytes = async (samples) =>
+  new Uint8Array(await encodeWav(samples).arrayBuffer());
+
+test("the WAV header is a well-formed 16 kHz mono PCM container", async () => {
+  const bytes = await wavBytes(new Float32Array(8));
+  const ascii = (o, n) => String.fromCharCode(...bytes.slice(o, o + n));
+  const u32 = (o) => new DataView(bytes.buffer).getUint32(o, true);
+  const u16 = (o) => new DataView(bytes.buffer).getUint16(o, true);
+  assert.equal(ascii(0, 4), "RIFF");
+  assert.equal(ascii(8, 4), "WAVE");
+  assert.equal(ascii(36, 4), "data");
+  assert.equal(u16(20), 1, "not PCM");
+  assert.equal(u16(22), 1, "not mono");
+  assert.equal(u32(24), 16000, "not 16 kHz");
+  assert.equal(u16(34), 16, "not 16-bit");
+  assert.equal(u32(4), 36 + 8 * 2, "RIFF size wrong");
+  assert.equal(u32(40), 8 * 2, "data size wrong");
+});
+
+test("samples are 16-bit little-endian, and hot samples clamp instead of wrapping", async () => {
+  const bytes = await wavBytes(new Float32Array([0, 1, -1, 2, -2]));
+  const view = new DataView(bytes.buffer);
+  assert.equal(view.getInt16(44, true), 0);
+  assert.equal(view.getInt16(46, true), 32767);
+  assert.equal(view.getInt16(48, true), -32767);
+  // Without the clamp these would wrap to small positive/negative values.
+  assert.equal(view.getInt16(50, true), 32767, "a hot sample wrapped around");
+  assert.equal(view.getInt16(52, true), -32767, "a hot sample wrapped around");
+});
+
+test("a chunk of the advertised length stays under the upload cap", () => {
+  const seconds = secondsPerChunk();
+  assert.ok(seconds > 60, "chunks are implausibly short");
+  assert.ok(seconds * 16000 * 2 + 44 <= TRANSCRIBE_LIMIT_BYTES,
+    "a full chunk would exceed the transcription limit");
+});
+
+// Async checks resolve after the synchronous ones have all been queued.
+await Promise.all(pending);
 
 console.log(`\n${passed} checks passed\n`);

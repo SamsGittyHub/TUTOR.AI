@@ -11,6 +11,7 @@ import type { CalendarEvent, EventKind, StudyBlock } from "@/lib/calendar";
 import type { ReviewCard } from "@/lib/srs";
 
 import { query, transaction } from "./db";
+import { deleteMaterialFiles, deleteUserFiles } from "./storage";
 
 /**
  * Row ↔ client-type mapping, in one place.
@@ -228,6 +229,8 @@ export async function deleteMaterial(userId: string, id: string): Promise<void> 
   // Chunks, images and cards cascade; attempts keep their history but lose the
   // reference, matching what deleteMaterial did against IndexedDB.
   await query("delete from materials where id = $1 and user_id = $2", [id, userId]);
+  // The row is gone either way; a failed unlink must not resurrect it.
+  await deleteMaterialFiles(userId, id).catch(() => {});
 }
 
 /* -------------------------------------------------------------------------- */
@@ -483,6 +486,7 @@ export async function wipeEverything(userId: string): Promise<void> {
       await client.query(`delete from ${table} where user_id = $1`, [userId]);
     }
   });
+  await deleteUserFiles(userId).catch(() => {});
 }
 
 /* -------------------------------------------------------------------------- */

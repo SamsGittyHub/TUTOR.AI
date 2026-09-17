@@ -6,6 +6,7 @@ import { useState } from "react";
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
 import { deleteSession } from "@/lib/db";
+import { exportFilename, lessonToMarkdown } from "@/lib/export";
 import { useLibrary } from "@/lib/useLibrary";
 
 function when(ms: number): string {
@@ -19,6 +20,26 @@ function when(ms: number): string {
 export default function SessionsPage() {
   const lib = useLibrary();
   const [busy, setBusy] = useState<string | null>(null);
+
+  /** Notes the student keeps — the board is otherwise gone when the tab closes. */
+  function exportLesson(sessionId: string) {
+    const session = lib.sessions.find((s) => s.id === sessionId);
+    if (!session) return;
+    const markdown = lessonToMarkdown(session.actions, {
+      title: session.title,
+      date: session.createdAt,
+      materialName: (id) =>
+        lib.materials.find((m) => m.id === id)?.name ?? "material",
+    });
+    const url = URL.createObjectURL(
+      new Blob([markdown], { type: "text/markdown;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = exportFilename(session.title);
+    link.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function remove(id: string, title: string) {
     if (!confirm(`Delete the lesson "${title}"? The board goes with it.`)) return;
@@ -76,14 +97,25 @@ export default function SessionsPage() {
                     </p>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => remove(s.id, s.title)}
-                  disabled={busy === s.id}
-                  className="shrink-0 rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:border-pink/50 hover:text-pink disabled:opacity-50"
-                >
-                  {busy === s.id ? "Deleting…" : "Delete"}
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => exportLesson(s.id)}
+                    disabled={!s.actions.length}
+                    title="Download as Markdown notes"
+                    className="rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:text-fg disabled:opacity-40"
+                  >
+                    Export
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => remove(s.id, s.title)}
+                    disabled={busy === s.id}
+                    className="rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:border-pink/50 hover:text-pink disabled:opacity-50"
+                  >
+                    {busy === s.id ? "Deleting…" : "Delete"}
+                  </button>
+                </div>
               </li>
             );
           })}

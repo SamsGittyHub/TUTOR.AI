@@ -211,6 +211,48 @@ export async function deleteMaterial(materialId: string): Promise<void> {
   invalidate("materials", "chunks", "cards", "attempts");
 }
 
+/**
+ * Uploads the original file behind a material, after the material row exists.
+ *
+ * Best-effort on purpose: the lesson works off the extracted chunks, so a
+ * failed upload costs the student the ability to re-download the original,
+ * not the ability to study. It must not take the whole upload down with it.
+ */
+export async function uploadOriginal(
+  materialId: string,
+  file: File,
+): Promise<boolean> {
+  try {
+    const form = new FormData();
+    form.append("materialId", materialId);
+    form.append("file", file);
+    const response = await fetch("/api/materials/upload", {
+      method: "POST",
+      body: form,
+    });
+    if (response.ok) invalidate("materials");
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** File a material under a course, or pass null to unfile it. */
+export async function setMaterialCourse(
+  materialId: string,
+  courseId: string | null,
+): Promise<void> {
+  await api(`/materials/${encodeURIComponent(materialId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ courseId }),
+  });
+  invalidate("materials");
+}
+
+export function originalUrl(materialId: string): string {
+  return `/api/materials/${encodeURIComponent(materialId)}/file`;
+}
+
 /* --- courses ------------------------------------------------------------- */
 
 export interface Course {
