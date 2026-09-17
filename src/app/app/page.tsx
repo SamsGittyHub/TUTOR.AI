@@ -6,14 +6,14 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { ChatRail } from "@/components/app/ChatRail";
 import { Resizer, useStoredWidth } from "@/components/app/Resizer";
-import { CHAT_WIDTH } from "@/lib/storage-keys";
+import { CHAT_WIDTH, SIDEBAR_WIDTH } from "@/lib/storage-keys";
 import { ProgressPanel } from "@/components/app/ProgressPanel";
 import { ReviewModal } from "@/components/app/ReviewModal";
 import { SettingsModal } from "@/components/app/SettingsModal";
 import { Sidebar } from "@/components/app/Sidebar";
 import { SketchPad } from "@/components/board/SketchPad";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { NavMenu } from "@/components/shell/NavMenu";
+import { NavLinks } from "@/components/shell/NavLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Whiteboard } from "@/components/board/Whiteboard";
 import { findModel, formatCost, getProvider } from "@/lib/providers";
@@ -25,6 +25,10 @@ import { useVoice } from "@/lib/voice";
 type MobileView = "material" | "board" | "chat";
 
 /** The rail stops being usable below this, and stops being a rail above it. */
+const MIN_SIDEBAR_WIDTH = 268;
+const MAX_SIDEBAR_WIDTH = 720;
+const DEFAULT_SIDEBAR_WIDTH = 536;
+
 const MIN_CHAT_WIDTH = 260;
 const MAX_CHAT_WIDTH = 720;
 const DEFAULT_CHAT_WIDTH = 330;
@@ -38,6 +42,12 @@ export default function AppPage() {
   const [showSketch, setShowSketch] = useState(false);
   // How the board and the rail split the width is the student's call: a long
   // derivation wants the board, a conversation about it wants the rail.
+  const [sidebarWidth, setSidebarWidth] = useStoredWidth(
+    SIDEBAR_WIDTH,
+    DEFAULT_SIDEBAR_WIDTH,
+    MIN_SIDEBAR_WIDTH,
+    MAX_SIDEBAR_WIDTH,
+  );
   const [chatWidth, setChatWidth] = useStoredWidth(
     CHAT_WIDTH,
     DEFAULT_CHAT_WIDTH,
@@ -105,16 +115,15 @@ export default function AppPage() {
 
   return (
     <div className="flex h-dvh flex-col bg-ink">
-      <header className="flex shrink-0 items-center gap-3 border-b border-line px-3 py-2 sm:px-4">
+      <header className="chrome hair flex shrink-0 items-center gap-3 px-3 py-2 sm:px-4">
         <Link href="/" className="shrink-0">
           <Logo size={24} />
         </Link>
 
-        <NavMenu />
+        <NavLinks />
 
-        <span className="hidden min-w-0 flex-1 truncate text-sm font-bold text-muted sm:block">
-          {tutor.session.title}
-        </span>
+        {/* The lesson title moved off the header: it was competing with the
+            nav for the same row, and the board already names the lesson. */}
         <span className="flex-1 sm:hidden" />
 
         {tutor.session.usage.turns > 0 ? (
@@ -206,8 +215,14 @@ export default function AppPage() {
       ) : null}
 
       <div
-        className="grid min-h-0 flex-1 gap-2 p-2 lg:grid-cols-[268px_minmax(0,1fr)_10px_var(--chat-w)]"
-        style={{ ["--chat-w" as string]: `${chatWidth}px` }}
+        // The chosen widths are honoured, but never at the cost of the board: on a
+        // smaller screen a 536px panel would leave it too narrow to teach on, so
+        // each side is capped as a share of the viewport.
+        className="grid min-h-0 flex-1 gap-2 p-2 lg:grid-cols-[min(var(--side-w),38vw)_10px_minmax(0,1fr)_10px_min(var(--chat-w),32vw)]"
+        style={{
+          ["--chat-w" as string]: `${chatWidth}px`,
+          ["--side-w" as string]: `${sidebarWidth}px`,
+        }}
       >
         <div className={`min-h-0 ${mobileView === "material" ? "block" : "hidden"} lg:block`}>
           <Sidebar
@@ -238,6 +253,16 @@ export default function AppPage() {
             onOpenProgress={() => setShowProgress(true)}
           />
         </div>
+
+        <Resizer
+          width={sidebarWidth}
+          onChange={setSidebarWidth}
+          min={MIN_SIDEBAR_WIDTH}
+          max={MAX_SIDEBAR_WIDTH}
+          defaultWidth={DEFAULT_SIDEBAR_WIDTH}
+          label="Resize the material panel"
+          anchor="left"
+        />
 
         <div className={`min-h-0 ${mobileView === "board" ? "block" : "hidden"} lg:block`}>
           <Whiteboard

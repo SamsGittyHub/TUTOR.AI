@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { SettingsModal } from "@/components/app/SettingsModal";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { NavMenu } from "@/components/shell/NavMenu";
+import { NavLinks } from "@/components/shell/NavLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuizLab } from "@/lib/useQuizLab";
 import { findModel, formatCost } from "@/lib/providers";
@@ -24,12 +24,12 @@ export default function QuizPage() {
 
   return (
     <div className="flex h-dvh flex-col bg-ink">
-      <header className="flex shrink-0 items-center justify-between px-4 py-2.5">
+      <header className="chrome hair flex shrink-0 items-center gap-3 px-4 py-2.5">
         <Link href="/" className="flex items-center gap-2">
           <Logo size={24} />
         </Link>
 
-        <NavMenu />
+        <NavLinks />
         <div className="flex items-center gap-2">
           <span className="hidden rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-dim sm:block">
             {findModel(lab.settings.providerId, lab.settings.model)?.label ?? lab.settings.model}

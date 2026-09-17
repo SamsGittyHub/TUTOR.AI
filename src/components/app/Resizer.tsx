@@ -30,6 +30,11 @@ interface Props {
   /** Width to snap back to on double-click. */
   defaultWidth: number;
   label: string;
+  /**
+   * Which side the panel is pinned to. A left panel's width grows as the
+   * pointer moves right; a right panel's grows as it moves left.
+   */
+  anchor?: "left" | "right";
 }
 
 export function Resizer({
@@ -39,6 +44,7 @@ export function Resizer({
   max,
   defaultWidth,
   label,
+  anchor = "right",
 }: Props) {
   const [dragging, setDragging] = useState(false);
   const frame = useRef<number | null>(null);
@@ -78,9 +84,11 @@ export function Resizer({
 
   function onPointerMove(event: React.PointerEvent<HTMLDivElement>) {
     if (!dragging) return;
-    // The rail is right-anchored, so its width is the distance from the
-    // pointer to the right edge of the window.
-    const next = clamp(window.innerWidth - event.clientX - 8);
+    const next = clamp(
+      anchor === "right"
+        ? window.innerWidth - event.clientX - 8
+        : event.clientX - 8,
+    );
     // Coalesce to one update per frame: pointermove fires far faster than
     // React can usefully re-render a board full of KaTeX.
     if (frame.current !== null) cancelAnimationFrame(frame.current);
@@ -95,9 +103,13 @@ export function Resizer({
 
   function onKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     const step = event.shiftKey ? 48 : 16;
+    // Arrow keys move the divider, so which arrow grows the panel depends on
+    // which side it's pinned to.
+    const grow = anchor === "right" ? "ArrowLeft" : "ArrowRight";
+    const shrink = anchor === "right" ? "ArrowRight" : "ArrowLeft";
     const moves: Record<string, number> = {
-      ArrowLeft: width + step,
-      ArrowRight: width - step,
+      [grow]: width + step,
+      [shrink]: width - step,
       Home: max,
       End: min,
     };
