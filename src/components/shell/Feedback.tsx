@@ -1,6 +1,8 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+
+import { useLanguage } from "@/lib/language";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
@@ -21,6 +23,7 @@ interface Props {
 
 export function Feedback({ lessonId, compact = false }: Props) {
   const pathname = usePathname();
+  const language = useLanguage();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [state, setState] = useState<"idle" | "sending" | "sent" | "error">("idle");
@@ -69,8 +72,8 @@ export function Feedback({ lessonId, compact = false }: Props) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        title="Something wrong, or an idea?"
-        aria-label="Send feedback"
+        title={language.t("feedback.title")}
+        aria-label={language.t("feedback.open")}
         aria-expanded={open}
         className={`tx press flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-muted hover:bg-[var(--tint)] hover:text-fg ${
           compact ? "border border-line" : ""
@@ -90,13 +93,12 @@ export function Feedback({ lessonId, compact = false }: Props) {
         <div className="surface-2 raised pop-in absolute right-0 top-10 z-[60] w-[min(20rem,calc(100vw-1.5rem))] rounded-md p-3">
           {state === "sent" ? (
             <p className="px-1 py-3 text-center text-[13px] font-semibold text-good">
-              Thank you — that genuinely helps.
+              {language.t("feedback.sent")}
             </p>
           ) : (
             <>
               <p className="px-1 text-[12.5px] leading-relaxed text-muted">
-                What broke, what confused you, or what you wish it did. We&apos;ll see
-                which page you were on.
+                {language.t("feedback.lede")}
               </p>
               <textarea
                 ref={field}
@@ -106,12 +108,12 @@ export function Feedback({ lessonId, compact = false }: Props) {
                   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") void send();
                 }}
                 rows={4}
-                placeholder="The board went blank when I…"
+                placeholder={language.t("feedback.placeholder")}
                 className="mt-2 w-full resize-none rounded-xs border border-line bg-panel-2 px-3 py-2 text-[13px] text-fg outline-none transition placeholder:text-dim focus:border-line-2"
               />
               {state === "error" ? (
                 <p role="alert" className="mt-1 px-1 text-[11.5px] font-semibold text-pink">
-                  That didn&apos;t send. Try once more?
+                  {language.t("feedback.failed")}
                 </p>
               ) : null}
               <div className="mt-2 flex items-center justify-end gap-2">
@@ -120,7 +122,7 @@ export function Feedback({ lessonId, compact = false }: Props) {
                   onClick={() => setOpen(false)}
                   className="tx rounded-full px-3 py-1.5 text-[12.5px] font-medium text-muted hover:text-fg"
                 >
-                  Cancel
+                  {language.t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -129,7 +131,7 @@ export function Feedback({ lessonId, compact = false }: Props) {
                   disabled={message.trim().length < 3 || state === "sending"}
                   className="grad press rounded-full px-4 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40"
                 >
-                  {state === "sending" ? "Sending…" : "Send"}
+                  {language.t(state === "sending" ? "feedback.sending" : "feedback.send")}
                 </button>
               </div>
             </>

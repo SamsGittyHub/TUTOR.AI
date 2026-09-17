@@ -501,7 +501,7 @@ function EmptyBoard({
         {hasKey
           ? hasMaterial
             ? "Pick what to study on the left and hit Start the lesson — or just ask below."
-            : "Upload notes on the left, or start with a question."
+            : "Upload your notes, or just start with a question."
           : "TUTOR AI runs on your own API key, so nothing here costs you a subscription. Paste one and the board wakes up."}
       </p>
 

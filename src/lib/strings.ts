@@ -38,7 +38,7 @@ export const STRINGS = {
   "account.settings": "Settings",
   "language.search": "Search languages",
   "language.note":
-    "The tutor teaches in any language here, and the interface follows once it's been translated.",
+    "The tutor teaches, writes and marks entirely in the language you pick. The interface follows it, translated once and then cached — a language nobody has chosen yet takes a moment the first time.",
   "language.translating": "Translating the interface…",
 
   /* common ---------------------------------------------------------------- */
@@ -61,7 +61,7 @@ export const STRINGS = {
   /* board ----------------------------------------------------------------- */
   "board.whiteboard": "Whiteboard",
   "board.blank": "Blank board.",
-  "board.blankHint": "Upload notes on the left, or start with a question.",
+  "board.blankHint": "Upload your notes, or just start with a question.",
   "board.askAnything": "Ask anything",
   "board.interrupt": "interrupt any time",
   "board.chatPlaceholder": "Wait — where did that 2 come from?",
@@ -205,6 +205,114 @@ export const STRINGS = {
   "voice.end": "End session",
   "voice.connecting": "Connecting…",
   "voice.listening": "Listening. Say what you're stuck on.",
+
+  "tour.heading": "How this works · {n} of {total}",
+  "tour.takeMeTo": "Take me to {where}",
+  "tour.next": "Next",
+  "tour.gotIt": "Got it",
+  "common.close": "Close",
+
+  /* the board, in use ------------------------------------------------------ */
+  "board.yourTurn": "YOUR TURN",
+  "board.nothingLeft": "Nothing was left on this board.",
+  "chat.thinking": "Thinking…",
+  "chat.stop": "Stop",
+  "chat.listening": "listening…",
+  "chat.transcribing": "thinking…",
+
+  /* search ------------------------------------------------------------------ */
+  "search.title": "Search",
+  "search.lede":
+    "Everything you've uploaded and every lesson you've been taught, in one place. Search the words your notes actually use.",
+  "search.placeholder": "titration, the chain rule, what we did on Tuesday…",
+  "search.label": "Search your material and lessons",
+  "search.hint":
+    "Type at least two letters. Lecture recordings are searchable too — the transcript is indexed, so you can find something that was said out loud.",
+  "search.nothing": "Nothing matches \u201c{query}\u201d",
+  "search.nothingHint":
+    "Try a word your notes would actually use. Search looks at the text inside your files, not just their names.",
+  "search.inMaterial": "In your material",
+  "search.teachMe": "Teach me this",
+
+  /* feedback ---------------------------------------------------------------- */
+  "feedback.open": "Send feedback",
+  "feedback.title": "Something wrong, or an idea?",
+  "feedback.lede":
+    "What broke, what confused you, or what you wish it did. We'll see which page you were on.",
+  "feedback.placeholder": "The board went blank when I…",
+  "feedback.send": "Send",
+  "feedback.sending": "Sending…",
+  "feedback.sent": "Thank you — that genuinely helps.",
+  "feedback.failed": "That didn't send. Try once more?",
+
+  /* reminders and sharing ---------------------------------------------------- */
+  "reminders.turnOn": "Remind me when cards are due",
+  "reminders.on": "Reminders are on. They appear while TUTOR AI is open in a tab.",
+  "reminders.blocked": "Reminders are blocked for this site in your browser settings.",
+  "share.share": "Share",
+  "share.making": "Making a link…",
+  "share.copy": "Copy link",
+  "share.copied": "Link copied",
+  "share.stop": "stop sharing",
+
+  /* allowance ---------------------------------------------------------------- */
+  "allowance.left": "{percent}% left today",
+  "allowance.out": "out until midnight",
+
+  /* the tour ------------------------------------------------------------- */
+  "tour.app.title": "The board",
+  "tour.app.what": "This is the lesson itself. You ask a question on the right and the tutor explains it out loud while writing on the whiteboard — equations, worked steps, diagrams, even pictures it draws for you.",
+  "tour.app.how1": "Type what you're stuck on and press Enter. \"I don't get integration by parts\" is enough.",
+  "tour.app.how2": "Interrupt whenever. Cutting in mid-lesson is the point — ask \"where did that 2 come from?\" and it backs up.",
+  "tour.app.how3": "Drag the divider between the board and the chat to give either side more room.",
+  "tour.app.how4": "Hit the speaker icon and the tutor reads along; hit the microphone and you can just talk to it.",
+  "tour.materials.title": "Your material",
+  "tour.materials.what": "Upload your own notes, slides, PDFs, a photo of your handwriting, or a recording of a lecture. The tutor teaches from what your course actually says, and tells you which page it got something from.",
+  "tour.materials.how1": "Drop files onto the board's left panel, or paste text straight in.",
+  "tour.materials.how2": "A lecture recording gets transcribed, so you can ask about something said at 14:20.",
+  "tour.materials.how3": "Every card the tutor writes from your material is stamped with the file and page it came from.",
+  "tour.search.title": "Search",
+  "tour.search.what": "Everything you've uploaded and every lesson you've been taught, searchable by the words your notes actually use — including what was said out loud in a recorded lecture.",
+  "tour.search.how1": "Search a topic, not a filename: it reads the text inside your files.",
+  "tour.search.how2": "\"Teach me this\" on any result opens a lesson on that exact passage.",
+  "tour.search.how3": "Lessons match on their board too, so you can find the one where you did it.",
+  "tour.courses.title": "Subjects",
+  "tour.courses.what": "Folders — Maths, Chemistry, whatever you study. File your material and past lessons into one and the tutor draws on everything in it, not just the file you happen to have open.",
+  "tour.courses.how1": "Add a subject, then file material and lessons into it.",
+  "tour.courses.how2": "Start a lesson from inside a subject and it already has the context.",
+  "tour.courses.how3": "Ask about last week's topic mid-lesson and it has the notes for it.",
+  "tour.voice.title": "Live voice",
+  "tour.voice.what": "A spoken lesson. You talk, it talks back, and it writes on the board while it explains — the closest thing here to sitting next to someone.",
+  "tour.voice.how1": "Press Start talking and just say what you're stuck on. Interrupt it like a person.",
+  "tour.voice.how2": "It can search everything you've uploaded mid-sentence and quote your own notes back to you.",
+  "tour.voice.how3": "The board it produces is saved to Lessons like any other, and exports the same way.",
+  "tour.quiz.title": "Flashcards and review",
+  "tour.quiz.what": "Quizzes built from your own material. Every question you answer becomes a review card, scheduled so it comes back just before you'd forget it.",
+  "tour.quiz.how1": "Generate a quiz from a file or a subject and answer it.",
+  "tour.quiz.how2": "Get one wrong and it comes back tomorrow; get it right and the gap stretches out.",
+  "tour.quiz.how3": "Review shows what's ripe today. \"Teach me this one\" opens a lesson on anything you keep missing.",
+  "tour.quiz.how4": "Turn on reminders there and it tells you when cards come due.",
+  "tour.practice-exam.title": "Practice exams",
+  "tour.practice-exam.what": "A full paper, weighted toward the things you actually got stuck on rather than an even spread. Sit it, submit it, and get it marked with working.",
+  "tour.practice-exam.how1": "Pick a whole subject, or choose individual lessons.",
+  "tour.practice-exam.how2": "\"Why these questions?\" shows what it thinks your weak spots are.",
+  "tour.practice-exam.how3": "Already sat a real paper? Exam review reads a photo of the marked one and goes through it with you.",
+  "tour.calendar.title": "Calendar",
+  "tour.calendar.what": "Put your exam dates in and it works backwards into a study plan — every topic twice, then a full review the day before.",
+  "tour.calendar.how1": "Add an exam or deadline with the topics it covers.",
+  "tour.calendar.how2": "Say how many minutes a day you've actually got.",
+  "tour.calendar.how3": "Build study plan, and each day gets sittings you can start straight from the calendar.",
+  "tour.progress.title": "Progress",
+  "tour.progress.what": "What's sticking and what isn't — your subjects ranked strongest to weakest from real quiz answers, not a streak counter. It also shows what the tutor has worked out about how you learn.",
+  "tour.progress.how1": "Subjects rank themselves once you've answered enough questions to mean something.",
+  "tour.progress.how2": "\"How you learn\" is the tutor's own notes — which explanations land for you, and what trips you up.",
+  "tour.progress.how3": "You can delete any of that, or all of it, whenever you like.",
+  "tour.sessions.title": "Keeping your work",
+  "tour.sessions.what": "Every lesson is saved as you go, to your account rather than this browser — so you can pick one up on your phone exactly where you left it on a laptop.",
+  "tour.sessions.how1": "Lessons lists everything, typed and spoken. Open one to carry on.",
+  "tour.sessions.how2": "Export any board as a PDF, a Word document, an image, or Markdown notes.",
+  "tour.sessions.how3": "The Export button sits in the board's own header too, mid-lesson.",
+  "tour.sessions.how4": "Share turns a lesson into a read-only link for a classmate — and you can turn it off again.",
 
   /* auth -------------------------------------------------------------------- */
   "auth.signIn": "Sign in",

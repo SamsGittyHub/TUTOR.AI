@@ -11,6 +11,12 @@
  */
 
 export interface TourStep {
+  /**
+   * Dictionary prefix, so the whole tour can be translated with the rest of
+   * the interface. The English below stays here as the fallback and as the
+   * source the other locales are translated from.
+   */
+  key: string;
   /** Short title. Also the label in the step list. */
   title: string;
   /** Where this feature lives, so the tour can take them there. */
@@ -23,6 +29,7 @@ export interface TourStep {
 
 export const TOUR_STEPS: TourStep[] = [
   {
+    key: "tour.app",
     title: "The board",
     href: "/app",
     what:
@@ -35,6 +42,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.materials",
     title: "Your material",
     href: "/materials",
     what:
@@ -46,6 +54,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.search",
     title: "Search",
     href: "/search",
     what:
@@ -57,6 +66,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.courses",
     title: "Subjects",
     href: "/courses",
     what:
@@ -68,6 +78,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.voice",
     title: "Live voice",
     href: "/voice",
     what:
@@ -79,6 +90,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.quiz",
     title: "Flashcards and review",
     href: "/quiz",
     what:
@@ -91,6 +103,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.practice-exam",
     title: "Practice exams",
     href: "/practice-exam",
     what:
@@ -102,6 +115,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.calendar",
     title: "Calendar",
     href: "/calendar",
     what:
@@ -113,6 +127,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.progress",
     title: "Progress",
     href: "/progress",
     what:
@@ -124,6 +139,7 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    key: "tour.sessions",
     title: "Keeping your work",
     href: "/sessions",
     what:

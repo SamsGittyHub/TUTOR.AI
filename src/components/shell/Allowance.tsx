@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 
+import { useLanguage } from "@/lib/language";
+
 /**
  * How much of today's free allowance is left.
  *
@@ -27,6 +29,7 @@ interface Usage {
 }
 
 export function Allowance() {
+  const language = useLanguage();
   const [usage, setUsage] = useState<Usage | null>(null);
 
   useEffect(() => {
@@ -75,7 +78,9 @@ export function Allowance() {
           style={{ width: `${percent}%` }}
         />
       </span>
-      {usage.exceeded ? "out until midnight" : `${100 - percent}% left today`}
+      {usage.exceeded
+        ? language.t("allowance.out")
+        : language.t("allowance.left", { percent: 100 - percent })}
     </span>
   );
 }

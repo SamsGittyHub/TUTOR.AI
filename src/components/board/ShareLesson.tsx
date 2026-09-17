@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { useLanguage } from "@/lib/language";
+
 /**
  * Turning one lesson into a link.
  *
@@ -11,6 +13,7 @@ import { useState } from "react";
  * the button.
  */
 export function ShareLesson({ lessonId }: { lessonId: string }) {
+  const language = useLanguage();
   const [shareId, setShareId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -60,7 +63,7 @@ export function ShareLesson({ lessonId }: { lessonId: string }) {
         title="Get a read-only link to this board"
         className="tx press inline-flex h-8 shrink-0 items-center rounded-full px-3 text-[11.5px] font-medium text-muted hover:bg-[var(--tint)] hover:text-fg disabled:opacity-40"
       >
-        {busy ? "Making a link…" : "Share"}
+        {language.t(busy ? "share.making" : "share.share")}
       </button>
     );
   }
@@ -73,7 +76,7 @@ export function ShareLesson({ lessonId }: { lessonId: string }) {
         title={link}
         className="tx press inline-flex h-8 items-center rounded-full border border-line px-3 text-[11.5px] font-semibold text-fg"
       >
-        {copied ? "Link copied" : "Copy link"}
+        {language.t(copied ? "share.copied" : "share.copy")}
       </button>
       <button
         type="button"
@@ -82,7 +85,7 @@ export function ShareLesson({ lessonId }: { lessonId: string }) {
         title="Turn the link off — anyone holding it loses access"
         className="tx press inline-flex h-8 items-center rounded-full px-2.5 text-[11.5px] font-medium text-muted hover:text-pink disabled:opacity-40"
       >
-        stop sharing
+        {language.t("share.stop")}
       </button>
     </span>
   );

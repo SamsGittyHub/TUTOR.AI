@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Empty } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
+import { useLanguage } from "@/lib/language";
 import { splitOnTerms } from "@/lib/search";
 
 /**
@@ -49,6 +50,7 @@ function Marked({ text, query }: { text: string; query: string }) {
 }
 
 export default function SearchPage() {
+  const language = useLanguage();
   const [draft, setDraft] = useState("");
   const [query, setQuery] = useState("");
   const [material, setMaterial] = useState<MaterialHit[]>([]);
@@ -93,29 +95,30 @@ export default function SearchPage() {
 
   return (
     <PageShell
-      title="Search"
-      lede="Everything you've uploaded and every lesson you've been taught, in one place. Search the words your notes actually use."
+      title={language.t("search.title")}
+      lede={language.t("search.lede")}
     >
       <input
         ref={field}
         type="search"
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
-        placeholder="titration, the chain rule, what we did on Tuesday…"
-        aria-label="Search your material and lessons"
+        placeholder={language.t("search.placeholder")}
+        aria-label={language.t("search.label")}
         className="w-full rounded-md border border-line bg-panel-2 px-4 py-3 text-[15px] text-fg outline-none transition placeholder:text-dim focus:border-line-2"
       />
 
       {!query ? (
         <p className="mt-4 text-[13px] leading-relaxed text-muted">
-          Type at least two letters. Lecture recordings are searchable too — the
-          transcript is indexed, so you can find something that was said out loud.
+          {language.t("search.hint")}
         </p>
       ) : !found && !busy ? (
         <div className="mt-4">
-          <Empty title={`Nothing matches "${query}"`} action={{ href: "/app", label: "Upload something" }}>
-            Try a word your notes would actually use. Search looks at the text
-            inside your files, not just their names.
+          <Empty
+            title={language.t("search.nothing", { query })}
+            action={{ href: "/app", label: "Upload something" }}
+          >
+            {language.t("search.nothingHint")}
           </Empty>
         </div>
       ) : (
@@ -123,7 +126,7 @@ export default function SearchPage() {
           {lessons.length ? (
             <section className="mt-6">
               <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-                Lessons
+                {language.t("nav.lessons")}
               </h2>
               <ul className="mt-3 flex flex-col gap-2">
                 {lessons.map((hit) => (
@@ -148,7 +151,7 @@ export default function SearchPage() {
           {material.length ? (
             <section className="mt-6">
               <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-                In your material
+                {language.t("search.inMaterial")}
               </h2>
               <ul className="mt-3 flex flex-col gap-2">
                 {material.map((hit, index) => (
@@ -163,7 +166,7 @@ export default function SearchPage() {
                       href={`/app?ask=${encodeURIComponent(`Teach me this bit of ${hit.name} (${hit.locator}): ${hit.excerpt.slice(0, 160)}`)}`}
                       className="mt-2 inline-block text-[12.5px] font-semibold text-cyan hover:underline"
                     >
-                      Teach me this
+                      {language.t("search.teachMe")}
                     </Link>
                   </li>
                 ))}

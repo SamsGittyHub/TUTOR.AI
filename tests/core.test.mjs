@@ -48,6 +48,7 @@ import {
 } from "../.test-build/core/learning.js";
 import { isActive, NAV_LINKS } from "../.test-build/core/nav.js";
 import { TOUR_STEPS } from "../.test-build/core/tour.js";
+import { sourceHash, STRINGS } from "../.test-build/core/strings.js";
 import { excerpt, searchTerms, splitOnTerms } from "../.test-build/core/search.js";
 import { reminderText, shouldRemind } from "../.test-build/core/reminders.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
@@ -2326,6 +2327,43 @@ test("the reminder says how many, because 'you have reviews' is ignorable", () =
   assert.match(reminderText(1).title, /^1 card/);
   assert.match(reminderText(7).title, /^7 cards/);
   assert.notEqual(reminderText(1).body, reminderText(7).body);
+});
+
+console.log("\n— the interface in another language —");
+
+test("every tour step is in the dictionary, not just in the code", () => {
+  // The tour is the first thing a new student reads. Leaving it English-only
+  // while the rest of the nav translates is the worst of both.
+  for (const step of TOUR_STEPS) {
+    assert.equal(STRINGS[`${step.key}.title`], step.title, step.key);
+    assert.equal(STRINGS[`${step.key}.what`], step.what, `${step.key}.what`);
+    step.how.forEach((line, index) => {
+      assert.equal(STRINGS[`${step.key}.how${index + 1}`], line, `${step.key}.how${index + 1}`);
+    });
+  }
+});
+
+test("no dictionary entry is an empty string or a leftover key", () => {
+  for (const [key, value] of Object.entries(STRINGS)) {
+    assert.ok(value.trim().length > 0, `${key} is empty`);
+    assert.notEqual(value, key, `${key} is its own value`);
+  }
+});
+
+test("every placeholder in a string is one a caller could fill", () => {
+  // {n} with no caller passing n renders as "{n}" on the page.
+  const allowed = new Set(["n", "total", "where", "query", "percent"]);
+  for (const [key, value] of Object.entries(STRINGS)) {
+    for (const [, name] of value.matchAll(/\{(\w+)\}/g)) {
+      assert.ok(allowed.has(name), `${key} uses an unknown placeholder {${name}}`);
+    }
+  }
+});
+
+test("rewording a string invalidates every cached translation", () => {
+  const before = sourceHash();
+  assert.match(before, /^[a-z0-9]+$/);
+  assert.equal(sourceHash(), before, "the same dictionary hashes the same");
 });
 
 console.log(`\n${passed} checks passed\n`);

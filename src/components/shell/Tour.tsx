@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useLanguage } from "@/lib/language";
 import { TOUR_STEPS } from "@/lib/tour";
 
 /**
@@ -22,6 +23,11 @@ import { TOUR_STEPS } from "@/lib/tour";
 const SEEN_KEY = "tutor-ai.tour-seen";
 
 export function Tour({ compact = false }: { compact?: boolean }) {
+  const language = useLanguage();
+  // The English in tour.ts is both the fallback and the source the other
+  // locales are translated from, so a locale mid-translation still reads.
+  const say = (key: string, english: string) => language.t(key, undefined, english);
+
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const dialog = useRef<HTMLDivElement>(null);
@@ -118,10 +124,11 @@ export function Tour({ compact = false }: { compact?: boolean }) {
             <header className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-3.5">
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-                  How this works · {step + 1} of {TOUR_STEPS.length}
+                  {language.t("tour.heading", { n: step + 1, total: TOUR_STEPS.length },
+                    `How this works · ${step + 1} of ${TOUR_STEPS.length}`)}
                 </p>
                 <h2 className="mt-0.5 truncate text-[17px] font-semibold text-fg">
-                  {current.title}
+                  {say(`${current.key}.title`, current.title)}
                 </h2>
               </div>
               <button
@@ -130,7 +137,7 @@ export function Tour({ compact = false }: { compact?: boolean }) {
                 onClick={close}
                 className="tx press shrink-0 rounded-full px-3 py-1.5 text-[12.5px] font-medium text-muted hover:bg-[var(--tint)] hover:text-fg"
               >
-                Close
+                {language.t("common.close", undefined, "Close")}
               </button>
             </header>
 
@@ -152,13 +159,15 @@ export function Tour({ compact = false }: { compact?: boolean }) {
                           : "text-muted hover:bg-[var(--tint)] hover:text-fg"
                       }`}
                     >
-                      {item.title}
+                      {say(`${item.key}.title`, item.title)}
                     </button>
                   ))}
                 </nav>
 
                 <div className="p-5">
-                  <p className="text-[14px] leading-relaxed text-fg">{current.what}</p>
+                  <p className="text-[14px] leading-relaxed text-fg">
+                    {say(`${current.key}.what`, current.what)}
+                  </p>
                   <ul className="mt-4 flex flex-col gap-2.5">
                     {current.how.map((line, index) => (
                       <li key={index} className="flex gap-3">
@@ -166,7 +175,7 @@ export function Tour({ compact = false }: { compact?: boolean }) {
                           {index + 1}
                         </span>
                         <span className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-muted">
-                          {line}
+                          {say(`${current.key}.how${index + 1}`, line)}
                         </span>
                       </li>
                     ))}
@@ -177,7 +186,9 @@ export function Tour({ compact = false }: { compact?: boolean }) {
                     onClick={close}
                     className="grad mt-5 inline-flex h-9 items-center rounded-full px-5 text-[13px] font-semibold text-white transition hover:opacity-90"
                   >
-                    Take me to {current.title.toLowerCase()}
+                    {language.t("tour.takeMeTo", {
+                      where: say(`${current.key}.title`, current.title).toLowerCase(),
+                    }, `Take me to ${current.title.toLowerCase()}`)}
                   </Link>
                 </div>
               </div>
@@ -200,14 +211,16 @@ export function Tour({ compact = false }: { compact?: boolean }) {
                 disabled={step === 0}
                 className="tx press rounded-full border border-line px-4 py-1.5 text-[12.5px] font-medium text-muted hover:text-fg disabled:pointer-events-none disabled:opacity-35"
               >
-                Back
+                {language.t("common.back", undefined, "Back")}
               </button>
               <button
                 type="button"
                 onClick={() => (last ? close() : show(step + 1))}
                 className="grad press rounded-full px-5 py-1.5 text-[12.5px] font-semibold text-white"
               >
-                {last ? "Got it" : "Next"}
+                {last
+                  ? language.t("tour.gotIt", undefined, "Got it")
+                  : language.t("tour.next", undefined, "Next")}
               </button>
             </footer>
           </div>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { useLanguage } from "@/lib/language";
 import { reminderText, REMINDER_KEY, shouldRemind } from "@/lib/reminders";
 
 /**
@@ -15,6 +16,7 @@ import { reminderText, REMINDER_KEY, shouldRemind } from "@/lib/reminders";
  * tab is open, so it says so rather than promising a phone buzz it can't send.
  */
 export function DueReminder({ dueCount }: { dueCount: number }) {
+  const language = useLanguage();
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(
     "default",
   );
@@ -54,7 +56,7 @@ export function DueReminder({ dueCount }: { dueCount: number }) {
   if (permission === "granted") {
     return (
       <p className="mt-3 text-[12px] text-dim">
-        Reminders are on. They appear while TUTOR AI is open in a tab.
+        {language.t("reminders.on")}
       </p>
     );
   }
@@ -62,7 +64,7 @@ export function DueReminder({ dueCount }: { dueCount: number }) {
   if (permission === "denied") {
     return (
       <p className="mt-3 text-[12px] text-dim">
-        Reminders are blocked for this site in your browser settings.
+        {language.t("reminders.blocked")}
       </p>
     );
   }
@@ -73,7 +75,7 @@ export function DueReminder({ dueCount }: { dueCount: number }) {
       onClick={() => void ask()}
       className="tx press mt-3 rounded-full border border-line px-4 py-1.5 text-[12.5px] font-medium text-muted hover:border-line-2 hover:text-fg"
     >
-      Remind me when cards are due
+      {language.t("reminders.turnOn")}
     </button>
   );
 }

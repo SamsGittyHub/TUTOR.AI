@@ -29,8 +29,16 @@ interface LanguageState {
   code: string;
   change: (next: string) => void;
   ready: boolean;
-  /** Translate a key. Falls back to English for anything missing. */
-  t: (key: string, vars?: Record<string, string | number>) => string;
+  /**
+   * Translate a key. `fallback` is the English to show when the key hasn't
+   * been added to STRINGS yet, so extraction can proceed a surface at a time
+   * without any intermediate state rendering a raw key on the page.
+   */
+  t: (
+    key: string,
+    vars?: Record<string, string | number>,
+    fallback?: string,
+  ) => string;
   /** True while a locale is being translated for the first time. */
   translating: boolean;
 }
@@ -166,9 +174,17 @@ function useLanguageState(enabled = true): LanguageState {
     };
   }, [code, enabled]);
 
+  /**
+   * A string in the student's language.
+   *
+   * The third argument is the English to fall back to. Without it a key that
+   * hasn't reached STRINGS yet renders as "tour.board.what" on the page, which
+   * is worse than the English it replaced — so extraction can proceed a
+   * surface at a time without any intermediate state being broken.
+   */
   const t = useCallback(
-    (key: string, vars?: Record<string, string | number>) => {
-      let value = dict[key] ?? STRINGS[key as keyof typeof STRINGS] ?? key;
+    (key: string, vars?: Record<string, string | number>, fallback?: string) => {
+      let value = dict[key] ?? STRINGS[key as keyof typeof STRINGS] ?? fallback ?? key;
       if (vars) {
         for (const [name, replacement] of Object.entries(vars)) {
           value = value.replaceAll(`{${name}}`, String(replacement));
