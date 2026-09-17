@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLanguage } from "@/lib/language";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
@@ -36,6 +37,7 @@ const fmt = (ms: number) =>
 export default function CalendarPage() {
   const cal = useCalendar();
   const lib = useLibrary();
+  const language = useLanguage();
 
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
@@ -102,8 +104,8 @@ export default function CalendarPage() {
 
   return (
     <PageShell
-      title="Calendar"
-      lede="Put your exams and deadlines in, and TUTOR AI works backwards into a study plan — every topic twice, then a full review the day before."
+      title={language.t("calendar.title")}
+      lede={language.t("calendar.lede")}
       wide
     >
       <form

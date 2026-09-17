@@ -108,6 +108,37 @@ export default function AppPage() {
     }
   }, [tutor.ready, tutor.status, tutor.send]);
 
+  /*
+   * Deep links into the board.
+   *
+   * ?session= resumes a lesson, ?ask= starts one with a question, ?subject=
+   * files a new lesson into a folder from its first turn. Every "Teach me this
+   * one" button across review, practice exams and exam review points here, and
+   * until now the board ignored all of them.
+   *
+   * The params are cleared once acted on, so a refresh doesn't re-ask.
+   */
+  const handled = useRef(false);
+  useEffect(() => {
+    if (!tutor.ready || handled.current) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session");
+    const ask = params.get("ask");
+    const subject = params.get("subject");
+    if (!sessionId && !ask && !subject) return;
+
+    handled.current = true;
+    window.history.replaceState(null, "", "/app");
+
+    if (sessionId) {
+      void tutor.openSession(sessionId);
+      return;
+    }
+    if (subject) tutor.setSubject(subject);
+    if (ask) tutor.send(ask);
+  }, [tutor.ready, tutor.openSession, tutor.send, tutor.setSubject]);
+
   const busy = tutor.status === "thinking" || tutor.status === "teaching";
   const provider = getProvider(tutor.settings.providerId);
   const model = findModel(tutor.settings.providerId, tutor.settings.model);

@@ -1,6 +1,7 @@
 "use client";
 
 import { Button, ButtonLink } from "@/components/ui/Button";
+import { useLanguage } from "@/lib/language";
 import { useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
@@ -27,6 +28,7 @@ function size(bytes: number): string {
 
 export default function MaterialsPage() {
   const lib = useLibrary();
+  const language = useLanguage();
   const [busy, setBusy] = useState<string | null>(null);
 
   async function remove(id: string, name: string) {
@@ -42,8 +44,8 @@ export default function MaterialsPage() {
 
   return (
     <PageShell
-      title="Material"
-      lede="Everything you've uploaded, and which course it belongs to. Deleting a file takes its chunks and review cards with it."
+      title={language.t("material.title")}
+      lede={language.t("material.lede")}
       actions={
         <ButtonLink href="/app" tone="primary">
           Upload on the board

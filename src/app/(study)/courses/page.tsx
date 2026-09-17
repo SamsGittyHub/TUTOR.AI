@@ -4,7 +4,10 @@ import { useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
-import { createCourse, deleteCourse } from "@/lib/db";
+import Link from "next/link";
+
+import { createCourse, deleteCourse, setSessionCourse } from "@/lib/db";
+import { useLanguage } from "@/lib/language";
 import { masteryForMaterial, masteryLabel } from "@/lib/progress";
 import { useLibrary } from "@/lib/useLibrary";
 
@@ -20,11 +23,18 @@ const SWATCH: Record<string, string> = {
 
 export default function CoursesPage() {
   const lib = useLibrary();
+  const language = useLanguage();
   const [name, setName] = useState("");
   const [term, setTerm] = useState("");
   const [color, setColor] = useState<string>("cyan");
   const [busy, setBusy] = useState(false);
   const [now] = useState(() => Date.now());
+
+  /** Lessons with no subject yet — the pool each folder can pull from. */
+  const unfiled = lib.sessions.filter(
+    (session) =>
+      !session.courseId || !lib.courses.some((c) => c.id === session.courseId),
+  );
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
@@ -48,8 +58,8 @@ export default function CoursesPage() {
 
   return (
     <PageShell
-      title="Subjects"
-      lede="Folders for a subject — Maths, Chemistry, whatever you study. Put your material and your past lessons in one, and the tutor draws on everything in it."
+      title={language.t("subjects.title")}
+      lede={language.t("subjects.lede")}
     >
       <form
         onSubmit={add}
@@ -147,8 +157,63 @@ export default function CoursesPage() {
                       onClick={() => remove(course.id, course.name)}
                       className="shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-dim transition hover:border-pink/50 hover:text-pink"
                     >
-                      Delete
+                      {language.t("common.delete")}
                     </button>
+                  </div>
+
+                  <ul className="mt-3 flex flex-col gap-1 border-t border-line pt-2.5">
+                    {lessons.length ? (
+                      lessons.slice(0, 5).map((lesson) => (
+                        <li key={lesson.id}>
+                          <Link
+                            href={`/app?session=${encodeURIComponent(lesson.id)}`}
+                            className="tx block truncate rounded-sm px-2 py-1 text-[12.5px] text-muted hover:bg-[var(--tint)] hover:text-fg"
+                          >
+                            {lesson.title}
+                          </Link>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="px-2 py-1 text-[12px] text-dim">
+                        {language.t("subjects.noLessons")}
+                      </li>
+                    )}
+                    {lessons.length > 5 && (
+                      <li className="px-2 py-1 text-[11.5px] text-dim">
+                        +{lessons.length - 5}
+                      </li>
+                    )}
+                  </ul>
+
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {/* Starting here files the lesson into this subject from
+                        the first turn, rather than leaving it to be sorted
+                        later — which is when it doesn't happen. */}
+                    <Link
+                      href={`/app?subject=${encodeURIComponent(course.id)}`}
+                      className="tx press inline-flex h-7 items-center rounded-full grad px-3 text-[11.5px] font-semibold text-white"
+                    >
+                      {language.t("subjects.startLesson")}
+                    </Link>
+                    {unfiled.length > 0 && (
+                      <select
+                        value=""
+                        aria-label={language.t("subjects.addLesson")}
+                        onChange={async (e) => {
+                          if (!e.target.value) return;
+                          await setSessionCourse(e.target.value, course.id);
+                          lib.reload();
+                        }}
+                        className="tx h-7 rounded-full bg-[var(--tint)] px-2.5 text-[11.5px] font-medium text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] outline-none hover:text-fg"
+                      >
+                        <option value="">{language.t("subjects.addLesson")}</option>
+                        {unfiled.map((lesson) => (
+                          <option key={lesson.id} value={lesson.id}>
+                            {lesson.title}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                 </li>
               );

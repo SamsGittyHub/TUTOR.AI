@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
-import { translate } from "@/lib/i18n";
 import { useLanguage } from "@/lib/language";
 
 import { isActive, NAV_LINKS } from "./nav-links";
@@ -126,7 +125,7 @@ export function NavLinks({ spread = true }: Props) {
               active ? "text-fg" : "text-muted hover:text-fg"
             }`}
           >
-            {translate(language.code, link.key)}
+            {language.t(link.key)}
           </Link>
         );
       })}

@@ -5,14 +5,24 @@ import { useMemo, useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
-import { bucketForecast, masteryForMaterial } from "@/lib/progress";
+import { bucketForecast, masteryForMaterial, rankSubjects } from "@/lib/progress";
+import { useLanguage } from "@/lib/language";
 import { isDue } from "@/lib/srs";
 import { useLibrary } from "@/lib/useLibrary";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const SWATCH: Record<string, string> = {
+  cyan: "bg-cyan",
+  pink: "bg-pink",
+  amber: "bg-warn",
+  green: "bg-good",
+  violet: "bg-[#8b5cf6]",
+};
+
 export default function ProgressPage() {
   const lib = useLibrary();
+  const language = useLanguage();
   // Frozen per mount: a live Date.now() would recompute every memo on render.
   const [now] = useState(() => Date.now());
 
@@ -31,6 +41,25 @@ export default function ProgressPage() {
     [lib.materials, lib.attempts, lib.cards, now],
   );
 
+  const subjects = useMemo(
+    () =>
+      rankSubjects(
+        lib.courses.map((course) => ({
+          id: course.id,
+          name: course.name,
+          color: course.color,
+          materialIds: lib.materials
+            .filter((m) => m.courseId === course.id)
+            .map((m) => m.id),
+        })),
+        lib.attempts,
+        lib.cards,
+        now,
+      ),
+    [lib.courses, lib.materials, lib.attempts, lib.cards, now],
+  );
+  const ranked = subjects.filter((s) => s.confident);
+
   const scored = lib.attempts.filter((a) => a.total > 0);
   const average = scored.length
     ? Math.round(
@@ -40,8 +69,8 @@ export default function ProgressPage() {
 
   return (
     <PageShell
-      title="Progress"
-      lede="Built from the quizzes you've taken and the review queue behind them. Nothing here is a streak counter — it's just what's sticking."
+      title={language.t("progress.title")}
+      lede={language.t("progress.lede")}
       actions={
         dueToday > 0 ? (
           <Link
@@ -99,9 +128,77 @@ export default function ProgressPage() {
             )}
           </section>
 
+          {subjects.length > 0 && (
+            <section className="mt-8">
+              <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
+                {language.t("progress.bySubject")}
+              </h2>
+              <p className="mt-1 text-[12.5px] text-muted">
+                {language.t("progress.rankingHint")}
+              </p>
+
+              <ul className="stagger mt-3 flex flex-col gap-2">
+                {subjects.map((subject, i) => {
+                  const strongest = ranked.length > 1 && subject === ranked[0];
+                  const weakest =
+                    ranked.length > 1 && subject === ranked[ranked.length - 1];
+                  return (
+                    <li
+                      key={subject.courseId}
+                      className="surface rounded-md px-4 py-3.5"
+                      style={{ ["--i" as string]: i }}
+                    >
+                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${SWATCH[subject.color] ?? SWATCH.cyan}`}
+                        />
+                        <p className="text-[13.5px] font-semibold text-fg">
+                          {subject.name}
+                        </p>
+                        {strongest && (
+                          <span className="rounded-full bg-good/12 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-good">
+                            {language.t("progress.strongest")}
+                          </span>
+                        )}
+                        {weakest && (
+                          <span className="rounded-full bg-warn/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-warn">
+                            {language.t("progress.weakest")}
+                          </span>
+                        )}
+                        <span className="ml-auto text-[12px] text-dim">
+                          {subject.confident
+                            ? `${subject.label} · ${subject.mastery}%`
+                            : language.t("progress.notEnough")}
+                          {subject.dueNow ? ` · ${subject.dueNow} due` : ""}
+                        </span>
+                      </div>
+
+                      <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-[var(--tint)]">
+                        <div
+                          className={`h-full transition-[width] ${
+                            subject.confident ? "grad" : "bg-[var(--color-line-2)]"
+                          }`}
+                          style={{
+                            width: `${subject.confident ? subject.mastery : 0}%`,
+                          }}
+                        />
+                      </div>
+
+                      {!subject.confident && (
+                        <p className="mt-1.5 text-[11.5px] text-dim">
+                          {language.t("progress.notEnoughHint")}
+                        </p>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
           <section className="mt-8">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-              By material
+              {language.t("progress.byMaterial")}
             </h2>
             {!rollup.length ? (
               <div className="mt-3">

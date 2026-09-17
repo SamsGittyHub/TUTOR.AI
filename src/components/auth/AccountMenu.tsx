@@ -5,7 +5,6 @@ import { useEffect, useRef, useState } from "react";
 
 import { resetCache } from "@/lib/db";
 import { useLanguage } from "@/lib/language";
-import { hasUiTranslation, translate } from "@/lib/i18n";
 import { LANGUAGES, languageByCode } from "@/lib/languages";
 
 /**
@@ -31,7 +30,7 @@ export function AccountMenu() {
   const [filter, setFilter] = useState("");
   const boxRef = useRef<HTMLDivElement>(null);
   const language = useLanguage();
-  const t = (key: string) => translate(language.code, key);
+  const t = language.t;
 
   useEffect(() => {
     let live = true;
@@ -148,12 +147,9 @@ export function AccountMenu() {
                 {l.native !== l.name && (
                   <span className="text-[11.5px] text-dim">{l.name}</span>
                 )}
-                {hasUiTranslation(l.code) && (
-                  <span
-                    title="The interface is translated too"
-                    className="ml-auto text-[10px] font-semibold uppercase tracking-wider text-[var(--color-accent)]"
-                  >
-                    UI
+                {l.code === language.code && language.translating && (
+                  <span className="ml-auto text-[10px] text-dim">
+                    {t("language.translating")}
                   </span>
                 )}
               </button>
@@ -161,7 +157,7 @@ export function AccountMenu() {
           </div>
 
           <p className="border-t border-line px-3 py-2.5 text-[11px] leading-relaxed text-dim">
-            {t("language.tutorNote")}
+            {t("language.note")}
           </p>
         </div>
       )}

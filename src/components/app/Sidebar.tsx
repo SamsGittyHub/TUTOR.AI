@@ -3,7 +3,6 @@
 import Link from "next/link";
 
 import { NAV_LINKS } from "@/components/shell/nav-links";
-import { translate } from "@/lib/i18n";
 import { useLanguage } from "@/lib/language";
 
 import { useRef, useState } from "react";
@@ -272,7 +271,7 @@ export function Sidebar(props: Props) {
                     href={link.href}
                     className="tx press rounded-full bg-[var(--tint)] px-3 py-2 text-center text-[13px] font-medium text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] hover:text-fg"
                   >
-                    {translate(language.code, link.key)}
+                    {language.t(link.key)}
                   </Link>
                 ))}
               </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/language";
 import { keyFor } from "@/lib/beta";
 import { useEffect, useRef, useState } from "react";
 
@@ -64,6 +65,7 @@ async function readPage(file: File): Promise<Page> {
 export default function ExamReviewPage() {
   const router = useRouter();
   const lib = useLibrary();
+  const language = useLanguage();
 
   const [pages, setPages] = useState<Page[]>([]);
   const [title, setTitle] = useState("");
@@ -282,8 +284,8 @@ export default function ExamReviewPage() {
 
   return (
     <PageShell
-      title="Exam review"
-      lede="Photograph your marked paper and the tutor goes through it with you — what went wrong in your working, not just which answers were red."
+      title={language.t("examReview.title")}
+      lede={language.t("examReview.lede")}
       wide
     >
       <div className="grid gap-5 lg:grid-cols-[1fr_320px]">

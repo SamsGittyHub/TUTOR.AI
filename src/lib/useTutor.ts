@@ -572,6 +572,15 @@ export function useTutor() {
     setError(null);
   }, []);
 
+  /** Files the current lesson under a subject, so it's grouped from turn one. */
+  const setSubject = useCallback((courseId: string | null) => {
+    setSession((prev) => ({
+      ...prev,
+      courseId: courseId ?? undefined,
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
   const startFresh = useCallback(() => {
     abort.current?.abort();
     setSession(newSession(settings));
@@ -673,6 +682,7 @@ export function useTutor() {
     toggleMaterial,
     openSession,
     startFresh,
+    setSubject,
     removeSession,
     toggleBoardTheme,
     wipeBoard,

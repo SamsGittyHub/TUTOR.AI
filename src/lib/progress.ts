@@ -135,3 +135,77 @@ export function bucketForecast(cards: ReviewCard[], now: number, days = 7): numb
   }
   return buckets;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Subject ranking                                                             */
+/* -------------------------------------------------------------------------- */
+
+export interface SubjectRank {
+  courseId: string;
+  name: string;
+  color: string;
+  mastery: number;
+  label: MasteryLabel;
+  /** How much evidence is behind the number. */
+  attempts: number;
+  cards: number;
+  dueNow: number;
+  materials: number;
+  /**
+   * False when there's too little history to rank honestly. One quiz is not a
+   * pattern, and telling a student their weakest subject on that basis sends
+   * them to revise the wrong thing.
+   */
+  confident: boolean;
+}
+
+/** Below this, a subject is shown but not ranked. */
+export const RANK_MIN_ATTEMPTS = 2;
+
+export interface SubjectInput {
+  id: string;
+  name: string;
+  color: string;
+  materialIds: string[];
+}
+
+/**
+ * Ranks subjects strongest to weakest.
+ *
+ * Mastery per subject is the same blend as per material — recent quiz accuracy
+ * and card health — pooled across everything filed under it, rather than an
+ * average of per-file averages, which would let one four-question file outvote
+ * a whole term of notes.
+ */
+export function rankSubjects(
+  subjects: SubjectInput[],
+  attempts: AttemptLike[],
+  cards: ReviewCard[],
+  now: number = Date.now(),
+): SubjectRank[] {
+  return subjects
+    .map((subject) => {
+      const ids = new Set(subject.materialIds);
+      const own = attempts.filter((a) => a.materialIds.some((id) => ids.has(id)));
+      const ownCards = cards.filter((c) => c.materialIds.some((id) => ids.has(id)));
+      const mastery = computeMastery(own, ownCards);
+
+      return {
+        courseId: subject.id,
+        name: subject.name,
+        color: subject.color,
+        mastery,
+        label: masteryLabel(mastery, own.length > 0 || ownCards.length > 0),
+        attempts: own.length,
+        cards: ownCards.length,
+        dueNow: ownCards.filter((c) => isDue(c, now)).length,
+        materials: subject.materialIds.length,
+        confident: own.length >= RANK_MIN_ATTEMPTS,
+      };
+    })
+    .sort((a, b) => {
+      // Ranked subjects first, then by mastery; unranked keep a stable order.
+      if (a.confident !== b.confident) return a.confident ? -1 : 1;
+      return b.mastery - a.mastery || a.name.localeCompare(b.name);
+    });
+}

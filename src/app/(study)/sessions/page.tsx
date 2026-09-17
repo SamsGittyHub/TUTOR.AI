@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLanguage } from "@/lib/language";
 import { useMemo, useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
@@ -28,6 +29,7 @@ const SWATCH: Record<string, string> = {
 
 export default function SessionsPage() {
   const lib = useLibrary();
+  const language = useLanguage();
   const [busy, setBusy] = useState<string | null>(null);
 
   /**
@@ -88,8 +90,8 @@ export default function SessionsPage() {
 
   return (
     <PageShell
-      title="Lessons"
-      lede="Every lesson you've taught yourself, board and all. Open one to pick it up exactly where it stopped."
+      title={language.t("lessons.title")}
+      lede={language.t("lessons.lede")}
     >
       {lib.loading ? (
         <Loading what="your lessons" />

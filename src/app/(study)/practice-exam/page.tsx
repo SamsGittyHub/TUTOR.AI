@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useLanguage } from "@/lib/language";
 import { keyFor } from "@/lib/beta";
 import { useEffect, useMemo, useState } from "react";
 
@@ -19,6 +20,7 @@ const SIZES = [10, 20, 30, 40];
 
 export default function PracticeExamPage() {
   const lib = useLibrary();
+  const language = useLanguage();
   const router = useRouter();
 
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -114,7 +116,7 @@ export default function PracticeExamPage() {
   if (exam) {
     return (
       <PageShell
-        title="Practice exam"
+        title={language.t("exam.title")}
         lede={
           result
             ? "Marked. Everything you missed can go straight to the board."
@@ -197,7 +199,7 @@ export default function PracticeExamPage() {
   return (
     <PageShell
       title="Practice exam"
-      lede="Pick the lessons you want examined. The paper is weighted toward the things you actually got stuck on — the questions you asked mid-lesson, the cards you keep forgetting, the quizzes you failed."
+      lede={language.t("exam.lede")}
       wide
     >
       {lib.loading ? (

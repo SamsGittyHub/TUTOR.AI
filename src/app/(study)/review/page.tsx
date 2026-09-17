@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useLanguage } from "@/lib/language";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
@@ -20,6 +21,7 @@ import { useLibrary } from "@/lib/useLibrary";
  */
 export default function ReviewPage() {
   const lib = useLibrary();
+  const language = useLanguage();
   const router = useRouter();
   const [now] = useState(() => Date.now());
   const [snapshot, setSnapshot] = useState<ReviewCard[] | null>(null);
@@ -70,8 +72,8 @@ export default function ReviewPage() {
 
   return (
     <PageShell
-      title="Review"
-      lede="Cards the scheduler says are ripe today. Miss one and it comes back tomorrow; get it right and the gap stretches."
+      title={language.t("review.title")}
+      lede={language.t("review.lede")}
       actions={
         queue && !finished ? (
           <span className="rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim">

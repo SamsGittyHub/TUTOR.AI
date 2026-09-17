@@ -15,6 +15,9 @@ const rawKey =
 
 export const BETA_OPENAI_KEY = rawKey.trim();
 
+/** The model the beta runs on, shared by the gateway and the translator. */
+export const BETA_CHAT_MODEL = "gpt-5.6-terra";
+
 export function hasBetaOpenAiKey(): boolean {
   return BETA_OPENAI_KEY.length > 0;
 }

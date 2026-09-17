@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { DEFAULT_LANGUAGE, isRtl, languageLabel } from "./languages";
+import { sourceHash, STRINGS, type Dict } from "./strings";
 import { readStored } from "./storage-keys";
 
 /**
@@ -28,6 +29,10 @@ interface LanguageState {
   code: string;
   change: (next: string) => void;
   ready: boolean;
+  /** Translate a key. Falls back to English for anything missing. */
+  t: (key: string, vars?: Record<string, string | number>) => string;
+  /** True while a locale is being translated for the first time. */
+  translating: boolean;
 }
 
 /**
@@ -58,6 +63,8 @@ export function useLanguage(): LanguageState {
 function useLanguageState(enabled = true): LanguageState {
   const [code, setCode] = useState(DEFAULT_LANGUAGE);
   const [ready, setReady] = useState(false);
+  const [dict, setDict] = useState<Dict>(STRINGS);
+  const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
     if (!enabled) return;
@@ -110,7 +117,72 @@ function useLanguageState(enabled = true): LanguageState {
     document.documentElement.dir = isRtl(code) ? "rtl" : "ltr";
   }, [code, ready]);
 
-  return useMemo(() => ({ code, change, ready }), [code, change, ready]);
+  /*
+   * Load the dictionary for the chosen locale.
+   *
+   * localStorage first so a returning student sees their language instantly
+   * rather than a flash of English, then the network to pick up any
+   * regeneration. English needs neither — it's compiled in.
+   */
+  useEffect(() => {
+    if (!enabled) return;
+    if (code === DEFAULT_LANGUAGE) {
+      setDict(STRINGS);
+      setTranslating(false);
+      return;
+    }
+
+    let live = true;
+    const cacheKey = `${LANGUAGE_KEY}.dict.${code}.${sourceHash()}`;
+
+    try {
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) setDict(JSON.parse(cached) as Dict);
+      else setTranslating(true);
+    } catch {
+      setTranslating(true);
+    }
+
+    fetch(`/api/translations/${encodeURIComponent(code)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => {
+        if (!live || !body?.dict) return;
+        // A fallback response comes back tagged English; don't cache that as
+        // if it were a translation.
+        if (body.locale === code) {
+          setDict(body.dict as Dict);
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify(body.dict));
+          } catch {
+            /* quota or private mode */
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => live && setTranslating(false));
+
+    return () => {
+      live = false;
+    };
+  }, [code, enabled]);
+
+  const t = useCallback(
+    (key: string, vars?: Record<string, string | number>) => {
+      let value = dict[key] ?? STRINGS[key as keyof typeof STRINGS] ?? key;
+      if (vars) {
+        for (const [name, replacement] of Object.entries(vars)) {
+          value = value.replaceAll(`{${name}}`, String(replacement));
+        }
+      }
+      return value;
+    },
+    [dict],
+  );
+
+  return useMemo(
+    () => ({ code, change, ready, t, translating }),
+    [code, change, ready, t, translating],
+  );
 }
 
 /** Reads the preference outside React — prompts are built in plain functions. */
