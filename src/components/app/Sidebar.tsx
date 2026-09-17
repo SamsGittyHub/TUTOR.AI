@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { NAV_LINKS } from "@/components/shell/nav-links";
+import { NAV_LINKS } from "@/lib/nav";
 import { useLanguage } from "@/lib/language";
 
 import { useRef, useState } from "react";

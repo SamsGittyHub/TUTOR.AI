@@ -34,6 +34,8 @@ const TARGETS = [
       "src/lib/board-image.ts",
       "src/lib/speech.ts",
       "src/lib/learning.ts",
+      "src/lib/nav.ts",
+      "src/lib/tour.ts",
       "src/lib/voice-tools.ts",
       "src/lib/export.ts",
       "src/lib/materials/audio.ts",

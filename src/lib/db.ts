@@ -316,6 +316,16 @@ export async function getSession(id: string): Promise<Session | undefined> {
   return session ?? undefined;
 }
 
+/** Submitted practice exams, for the mastery ranking. Cached like the rest. */
+export async function listExamRows(): Promise<unknown[]> {
+  return cached("exams", async () => {
+    const response = await fetch("/api/exams");
+    if (!response.ok) return [];
+    const body = await response.json().catch(() => ({}));
+    return (body.exams ?? []) as unknown[];
+  });
+}
+
 export async function listSessions(): Promise<Session[]> {
   return cached("sessions", async () =>
     (await api<{ sessions: Session[] }>("/lessons")).sessions,

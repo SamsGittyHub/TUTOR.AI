@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
 import { resetCache } from "@/lib/db";
+import { clearLibrarySnapshot } from "@/lib/useLibrary";
 import { useLanguage } from "@/lib/language";
 import { LANGUAGES, languageByCode } from "@/lib/languages";
 
@@ -73,6 +74,8 @@ export function AccountMenu() {
     try {
       await fetch("/api/auth/logout", { method: "POST" });
       resetCache();
+      // The snapshot outlives the cache, so it has to go too.
+      clearLibrarySnapshot();
       router.replace("/login");
       router.refresh();
     } finally {

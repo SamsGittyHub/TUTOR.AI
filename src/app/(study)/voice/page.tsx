@@ -9,7 +9,9 @@ import type { TutorAction } from "@/lib/actions";
 import { BETA } from "@/lib/beta";
 import { loadKeys, pullAccountKeys } from "@/lib/keys";
 import { loadSettings } from "@/lib/settings";
-import { getChunksFor, type MaterialChunk } from "@/lib/db";
+import { BETA_REALTIME_MODEL } from "@/lib/beta";
+import { BoardExport } from "@/components/board/BoardExport";
+import { getChunksFor, putSession, type MaterialChunk, type Session } from "@/lib/db";
 import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
 import { applyDrawnImage, type ImageRequest } from "@/lib/board-image";
@@ -143,6 +145,63 @@ export default function VoicePage() {
     setActions((list) => [...list, action]);
   }, []);
 
+  /* --- keeping the lesson ------------------------------------------------- */
+
+  /*
+   * A spoken lesson is still a lesson. It used to live only in this tab: close
+   * it and the board it produced was gone, which is a strange thing to do to a
+   * student who just spent twenty minutes being taught. It is now saved like a
+   * typed one — same store, same Lessons list, same export buttons — created
+   * lazily on the first card so an opened-and-abandoned page leaves nothing.
+   */
+  const sessionId = useRef<string | null>(null);
+  const startedAt = useRef(0);
+  const saveTimer = useRef<number | null>(null);
+  const boardRef = useRef({ actions, lines });
+  boardRef.current = { actions, lines };
+
+  useEffect(() => {
+    if (!actions.length) return;
+    if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    saveTimer.current = window.setTimeout(() => {
+      const { actions: cards, lines: said } = boardRef.current;
+      if (!cards.length) return;
+      if (!sessionId.current) {
+        sessionId.current = `s_${crypto.randomUUID()}`;
+        // Fixed once: re-stamping it on every save would make the lesson look
+        // as though it had started the moment it was last touched.
+        startedAt.current = Date.now();
+      }
+
+      const firstAsked = said.find((line) => line.role === "student")?.text;
+      const session: Session = {
+        id: sessionId.current,
+        title: (firstAsked ?? "Live voice lesson").slice(0, 60),
+        createdAt: startedAt.current,
+        updatedAt: Date.now(),
+        materialIds: [],
+        providerId: "openai",
+        model: BETA_REALTIME_MODEL,
+        actions: cards,
+        transcript: said.map((line) => ({
+          role: line.role === "student" ? ("student" as const) : ("tutor" as const),
+          text: line.text,
+          at: Date.now(),
+        })),
+        usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, turns: said.length },
+        boardTheme: theme,
+      };
+      void putSession(session).catch(() => {});
+    }, 1500);
+  }, [actions, lines, theme]);
+
+  // Closing the tab mid-sentence must not lose the board.
+  useEffect(() => {
+    return () => {
+      if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+    };
+  }, []);
+
   /**
    * Puts a picture on the board.
    *
@@ -243,8 +302,18 @@ export default function VoicePage() {
         </div>
 
         <aside className="flex w-full shrink-0 flex-col surface rounded-md lg:w-[340px]">
-          <header className="flex items-center justify-between border-b border-line px-4 py-3">
-            <h2 className="text-[13px] font-semibold text-fg">Live voice</h2>
+          <header className="flex items-center gap-2 border-b border-line px-4 py-3">
+            <h2 className="flex-1 text-[13px] font-semibold text-fg">Live voice</h2>
+            <BoardExport
+              actions={actions}
+              title={
+                lines.find((line) => line.role === "student")?.text.slice(0, 60) ??
+                "Live voice lesson"
+              }
+              materialName={(id) =>
+                lib.materials.find((m) => m.id === id)?.name ?? "material"
+              }
+            />
             <span
               className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${
                 live ? "text-good" : rt.status === "error" ? "text-pink" : "text-dim"

@@ -46,6 +46,8 @@ import {
   briefLearning, describeLearning, emptyProfile, forgetNote, MAX_NOTES,
   MIN_MODE_SHOWN, modeRanking, parseProfile, recordTurn, rememberNote,
 } from "../.test-build/core/learning.js";
+import { isActive, NAV_LINKS } from "../.test-build/core/nav.js";
+import { TOUR_STEPS } from "../.test-build/core/tour.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
   normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
@@ -2177,6 +2179,58 @@ test("a remember never reaches the board or an export", () => {
   });
   assert.equal(isBoardAction(action), false);
   assert.equal(actionToMarkdown(action), "");
+});
+
+console.log("\n— finding your way around —");
+
+test("every tour step points at a page that exists in the nav", () => {
+  // A tour whose "take me there" button 404s is worse than no tour.
+  const destinations = new Set(NAV_LINKS.map((link) => link.href));
+  for (const step of TOUR_STEPS) {
+    assert.ok(destinations.has(step.href), `${step.title} points at ${step.href}`);
+  }
+});
+
+test("the tour actually covers the app, not a corner of it", () => {
+  const covered = new Set(TOUR_STEPS.map((s) => s.href));
+  // Every page a student is expected to use should be spoken for somewhere —
+  // either as its own step or named in another one's instructions.
+  const prose = TOUR_STEPS.map((s) => `${s.what} ${s.how.join(" ")}`).join(" ").toLowerCase();
+  for (const link of NAV_LINKS) {
+    const named = covered.has(link.href) || prose.includes(link.label.toLowerCase());
+    assert.ok(named, `${link.label} is never mentioned anywhere in the tour`);
+  }
+});
+
+test("each step says what it's for and what to do about it", () => {
+  for (const step of TOUR_STEPS) {
+    assert.ok(step.title.length > 2 && step.title.length < 32, step.title);
+    assert.ok(step.what.length > 60, `${step.title} needs a real explanation`);
+    assert.ok(step.how.length >= 2, `${step.title} needs concrete steps`);
+    for (const line of step.how) {
+      assert.ok(line.length > 20, `"${line}" is too thin to act on`);
+    }
+  }
+});
+
+test("no two steps land on the same page", () => {
+  const seen = new Set();
+  for (const step of TOUR_STEPS) {
+    assert.equal(seen.has(step.href), false, `${step.href} appears twice`);
+    seen.add(step.href);
+  }
+});
+
+test("the board is where the tour starts", () => {
+  // It's the page that teaches; everything else supports it.
+  assert.equal(TOUR_STEPS[0].href, "/app");
+});
+
+test("a nav item is active on its own page and on pages below it", () => {
+  assert.equal(isActive("/courses", "/courses"), true);
+  assert.equal(isActive("/courses/abc", "/courses"), true);
+  assert.equal(isActive("/coursework", "/courses"), false, "a prefix is not a parent");
+  assert.equal(isActive("/app", "/materials"), false);
 });
 
 console.log(`\n${passed} checks passed\n`);

@@ -8,6 +8,7 @@ import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
 import { NavLinks } from "./NavLinks";
+import { Tour } from "./Tour";
 
 /** The bar every study page shares. The links themselves live in NavLinks. */
 export function AppNav() {
@@ -23,6 +24,7 @@ export function AppNav() {
         <NavLinks />
 
         <div className="flex shrink-0 items-center gap-1.5">
+          <Tour />
           <Link
             href="/settings"
             aria-label="Settings"

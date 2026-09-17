@@ -6,7 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { useLanguage } from "@/lib/language";
 
-import { isActive, NAV_LINKS } from "./nav-links";
+import { isActive, NAV_LINKS } from "@/lib/nav";
 
 /**
  * Every destination, as one row.

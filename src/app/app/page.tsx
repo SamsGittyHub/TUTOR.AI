@@ -19,6 +19,8 @@ import { findModel, formatCost, getProvider } from "@/lib/providers";
 import { TEACH_REQUEST_KEY } from "@/lib/useQuizLab";
 import { useTutor } from "@/lib/useTutor";
 import { buildQuizReviewMessage } from "@/lib/tutor/prompts";
+import { BoardExport } from "@/components/board/BoardExport";
+import { Tour } from "@/components/shell/Tour";
 import { useVoice } from "@/lib/voice";
 
 type MobileView = "material" | "board" | "chat";
@@ -168,6 +170,15 @@ export default function AppPage() {
               : `${(tutor.session.usage.inputTokens + tutor.session.usage.outputTokens).toLocaleString()} tokens`}
           </span>
         ) : null}
+
+        <Tour compact />
+
+        <BoardExport
+          actions={tutor.session.actions}
+          title={tutor.session.title}
+          date={tutor.session.createdAt}
+          materialName={tutor.materialName}
+        />
 
         <ThemeToggle />
 
