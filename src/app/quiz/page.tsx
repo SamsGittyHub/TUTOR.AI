@@ -23,8 +23,7 @@ export default function QuizPage() {
     <div className="flex h-dvh flex-col bg-ink">
       <header className="flex shrink-0 items-center justify-between px-4 py-2.5">
         <Link href="/" className="flex items-center gap-2">
-          <Logo />
-          <span className="text-sm font-black tracking-tight">Chalk</span>
+          <Logo size={24} />
         </Link>
         <div className="flex items-center gap-2">
           <span className="hidden rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-dim sm:block">

@@ -91,6 +91,9 @@ export function useVoice({ onTranscript }: UseVoiceOptions) {
   const [speaking, setSpeaking] = useState(false);
   const [interim, setInterim] = useState("");
   const [micError, setMicError] = useState<string | null>(null);
+  // Capability probes read `window`, so the server and the first client render
+  // must both see "unsupported" or React throws the whole subtree away.
+  const [mounted, setMounted] = useState(false);
 
   const micOnRef = useRef(false);
   const ttsOnRef = useRef(false);
@@ -221,6 +224,7 @@ export function useVoice({ onTranscript }: UseVoiceOptions) {
 
   // Restore the voice preference once, client-side.
   useEffect(() => {
+    setMounted(true);
     if (ttsSupported() && localStorage.getItem(VOICE_PREF_KEY) === "on") {
       ttsOnRef.current = true;
       setTtsOn(true);
@@ -242,11 +246,11 @@ export function useVoice({ onTranscript }: UseVoiceOptions) {
     speak,
     stopSpeaking,
     speaking,
-    ttsSupported: ttsSupported(),
+    ttsSupported: mounted && ttsSupported(),
     micOn,
     toggleMic,
     interim,
     micError,
-    micSupported: recognizerCtor() !== null,
+    micSupported: mounted && recognizerCtor() !== null,
   };
 }
