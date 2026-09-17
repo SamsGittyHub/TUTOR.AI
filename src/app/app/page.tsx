@@ -9,6 +9,7 @@ import { ProgressPanel } from "@/components/app/ProgressPanel";
 import { ReviewModal } from "@/components/app/ReviewModal";
 import { SettingsModal } from "@/components/app/SettingsModal";
 import { Sidebar } from "@/components/app/Sidebar";
+import { SketchPad } from "@/components/board/SketchPad";
 import { AccountMenu } from "@/components/auth/AccountMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Whiteboard } from "@/components/board/Whiteboard";
@@ -26,6 +27,7 @@ export default function AppPage() {
   const [showSettings, setShowSettings] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
+  const [showSketch, setShowSketch] = useState(false);
   const [mobileView, setMobileView] = useState<MobileView>("board");
 
   const voice = useVoice({ onTranscript: handleTranscript });
@@ -153,6 +155,23 @@ export default function AppPage() {
             "Add your API key"
           )}
         </button>
+        <button
+          type="button"
+          onClick={() => setShowSketch(true)}
+          title="Show your work — sketch it and the tutor reads it"
+          aria-label="Show your work"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-muted transition hover:text-fg"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M12 19h7M3 17l1-4 9.5-9.5a2.1 2.1 0 0 1 3 3L7 16l-4 1Z"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
         <AccountMenu />
       </header>
 
@@ -264,6 +283,16 @@ export default function AppPage() {
           </button>
         ))}
       </nav>
+
+      {showSketch ? (
+        <SketchPad
+          onClose={() => setShowSketch(false)}
+          onSend={(dataUrl) => {
+            setShowSketch(false);
+            tutor.sendSketch(dataUrl);
+          }}
+        />
+      ) : null}
 
       {showSettings ? (
         <SettingsModal

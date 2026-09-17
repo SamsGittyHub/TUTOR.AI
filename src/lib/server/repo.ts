@@ -208,8 +208,9 @@ export async function getChunks(
     locator: string;
     text: string;
     order_index: number;
+    embedding: number[] | null;
   }>(
-    `select c.id, c.material_id, c.locator, c.text, c.order_index
+    `select c.id, c.material_id, c.locator, c.text, c.order_index, c.embedding
        from material_chunks c
        join materials m on m.id = c.material_id
       where c.material_id = any($1) and m.user_id = $2
@@ -222,6 +223,7 @@ export async function getChunks(
     locator: r.locator,
     text: r.text,
     order: r.order_index,
+    embedding: r.embedding ?? undefined,
   }));
 }
 
@@ -651,4 +653,28 @@ export async function setBlockStatus(
     "update study_blocks set status = $3 where id = $1 and user_id = $2",
     [id, userId, status],
   );
+}
+
+/** Writes vectors for chunks the student's provider has embedded. */
+export async function saveEmbeddings(
+  userId: string,
+  model: string,
+  vectors: { chunkId: string; embedding: number[] }[],
+): Promise<number> {
+  if (!vectors.length) return 0;
+  let written = 0;
+  await transaction(async (client) => {
+    for (const { chunkId, embedding } of vectors) {
+      // The join guards ownership: a chunk id alone must not be writable.
+      const result = await client.query(
+        `update material_chunks c
+            set embedding = $3, embedding_model = $4
+           from materials m
+          where c.id = $1 and c.material_id = m.id and m.user_id = $2`,
+        [chunkId, userId, embedding, model],
+      );
+      written += result.rowCount ?? 0;
+    }
+  });
+  return written;
 }

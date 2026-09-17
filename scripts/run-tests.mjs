@@ -26,6 +26,7 @@ const TARGETS = [
       "src/lib/planner.ts",
       "src/lib/export.ts",
       "src/lib/materials/audio.ts",
+      "src/lib/materials/vector.ts",
       "src/lib/materials/chunk.ts",
       "src/lib/materials/retrieve.ts",
     ],

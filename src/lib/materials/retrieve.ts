@@ -1,5 +1,6 @@
 import type { MaterialChunk } from "../db";
 import { estimateTokens } from "./chunk";
+import { cosine, fuseRankings } from "./vector";
 
 /**
  * Retrieval without a vector database.
@@ -31,6 +32,12 @@ export interface RetrievalResult {
   /** True when the whole material fit and nothing was selected away. */
   complete: boolean;
   totalChunks: number;
+  /**
+   * True when BM25 actually matched query terms. False means the ordering is
+   * just "the opening of the material" — a fallback, not a ranking, and it
+   * must not outvote a real semantic hit during fusion.
+   */
+  matched: boolean;
 }
 
 export function retrieve(
@@ -38,18 +45,18 @@ export function retrieve(
   query: string,
   charBudget = 24_000,
 ): RetrievalResult {
-  if (!chunks.length) return { chunks: [], complete: true, totalChunks: 0 };
+  if (!chunks.length) return { chunks: [], complete: true, totalChunks: 0, matched: false };
 
   const totalChars = chunks.reduce((sum, c) => sum + c.text.length, 0);
   if (totalChars <= charBudget) {
-    return { chunks, complete: true, totalChunks: chunks.length };
+    return { chunks, complete: true, totalChunks: chunks.length, matched: false };
   }
 
   const queryTerms = terms(query);
   if (!queryTerms.length) {
     // No usable query (a bare "keep going") — the opening of each material is
     // the least-bad default.
-    return { chunks: fill(chunks, charBudget), complete: false, totalChunks: chunks.length };
+    return { chunks: fill(chunks, charBudget), complete: false, totalChunks: chunks.length, matched: false };
   }
 
   const docTerms = chunks.map((c) => terms(c.text));
@@ -99,12 +106,12 @@ export function retrieve(
     .map((s) => s.chunk);
 
   if (!hits.length) {
-    return { chunks: fill(chunks, charBudget), complete: false, totalChunks: N };
+    return { chunks: fill(chunks, charBudget), complete: false, totalChunks: N, matched: false };
   }
 
   // Keep document order in the prompt so the tutor reads material forwards.
   const picked = fill(hits, charBudget).sort((a, b2) => a.order - b2.order);
-  return { chunks: picked, complete: picked.length === N, totalChunks: N };
+  return { chunks: picked, complete: picked.length === N, totalChunks: N, matched: true };
 }
 
 function fill(chunks: MaterialChunk[], charBudget: number): MaterialChunk[] {
@@ -130,4 +137,51 @@ export function formatContext(
   );
   const tokens = parts.reduce((sum, p) => sum + estimateTokens(p), 0);
   return `${parts.join("\n\n")}\n<!-- ~${tokens} tokens of material -->`;
+}
+
+/**
+ * BM25 and cosine, fused by rank.
+ *
+ * Lexical retrieval wins on locators and exact terminology; semantic wins on
+ * paraphrase. Neither is reliably better, so both vote. Falls back to plain
+ * BM25 when the query or the chunks have no vectors.
+ */
+export function retrieveHybrid(
+  chunks: MaterialChunk[],
+  query: string,
+  queryVector: number[] | null,
+  charBudget = 24_000,
+): RetrievalResult {
+  const lexical = retrieve(chunks, query, charBudget);
+  if (!queryVector?.length) return lexical;
+
+  const embedded = chunks.filter((c) => c.embedding?.length);
+  if (!embedded.length) return lexical;
+
+  // Everything already fit — fusion can only reorder what's all going in anyway.
+  if (lexical.complete && lexical.chunks.length === chunks.length) return lexical;
+
+  const semantic = embedded
+    .map((chunk) => ({ chunk, score: cosine(queryVector, chunk.embedding!) }))
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((s) => s.chunk);
+
+  if (!semantic.length) return lexical;
+
+  // When BM25 matched nothing, its "ranking" is just the opening of the
+  // material. Letting that vote would bury the one chunk the student actually
+  // asked about — which is precisely the paraphrase case semantic search exists
+  // for. So it only joins the fusion when it genuinely matched something.
+  const fused = lexical.matched
+    ? fuseRankings<MaterialChunk>([lexical.chunks, semantic], (chunk) => chunk.id)
+    : semantic;
+
+  const picked = fill(fused, charBudget).sort((a, b) => a.order - b.order);
+  return {
+    chunks: picked,
+    complete: picked.length === chunks.length,
+    totalChunks: chunks.length,
+    matched: true,
+  };
 }

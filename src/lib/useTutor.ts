@@ -13,6 +13,7 @@ import {
   listSessions,
   putCard,
   putMaterial,
+  saveEmbeddings,
   uploadOriginal,
   putSession,
   type Material,
@@ -31,6 +32,7 @@ import {
 } from "./settings";
 import { isDue, schedule, upsertCard, type ReviewCard } from "./srs";
 import { boardSummary, checkAnswer, runTutorTurn, summarizeTurn } from "./tutor/engine";
+import { embedTexts, embedderFor } from "./materials/embed";
 import { buildQuizReviewMessage } from "./tutor/prompts";
 
 export type TutorStatus = "idle" | "thinking" | "teaching" | "error";
@@ -210,7 +212,10 @@ export function useTutor() {
   /* --- turns ------------------------------------------------------------ */
 
   const runTurn = useCallback(
-    async (studentMessage: string, options: { titleFrom?: string } = {}) => {
+    async (
+      studentMessage: string,
+      options: { titleFrom?: string; sketch?: string } = {},
+    ) => {
       const current = sessionRef.current;
       const key = loadKeys()[current.providerId] ?? loadKeys()[settings.providerId];
       if (!key) {
@@ -240,6 +245,24 @@ export function useTutor() {
 
       const collected: TutorAction[] = [];
 
+      // Embed the question too, or there's nothing to compare the chunks against.
+      // One short call, and a failure just means lexical-only retrieval.
+      let queryVector: number[] | null = null;
+      const embedder = embedderFor(loadKeys());
+      if (embedder && chunks.some((chunk) => chunk.embedding?.length)) {
+        try {
+          const [vector] = await embedTexts(
+            [studentMessage],
+            embedder.model,
+            embedder.apiKey,
+            { signal: controller.signal },
+          );
+          queryVector = vector ?? null;
+        } catch {
+          queryVector = null;
+        }
+      }
+
       try {
         const result = await runTutorTurn({
           providerId: current.providerId,
@@ -250,6 +273,16 @@ export function useTutor() {
           materials: materials.filter((m) => current.materialIds.includes(m.id)),
           chunks,
           boardSummary: boardSummary(current.actions),
+          queryVector,
+          // A data URL from the sketch pad, split into the parts providers want.
+          studentImages: options.sketch
+            ? [
+                {
+                  mediaType: options.sketch.slice(5, options.sketch.indexOf(";")),
+                  base64: options.sketch.slice(options.sketch.indexOf(",") + 1),
+                },
+              ]
+            : undefined,
           signal: controller.signal,
           onAction: (action) => {
             collected.push(action);
@@ -336,6 +369,20 @@ export function useTutor() {
     [runTurn, status],
   );
 
+  /** The student's handwriting, with a prompt aimed at their working. */
+  const sendSketch = useCallback(
+    (dataUrl: string, note?: string) => {
+      if (status === "thinking" || status === "teaching") return;
+      void runTurn(
+        note?.trim()
+          ? `Here's my work — ${note.trim()}`
+          : "Here's my work on this. Check it — if a step is wrong, tell me which one and why, don't just give me the answer.",
+        { sketch: dataUrl },
+      );
+    },
+    [runTurn, status],
+  );
+
   const answerBoardQuestion = useCallback(
     (question: string, answer: string) => {
       void runTurn(`(answering "${question}") ${answer}`);
@@ -368,6 +415,37 @@ export function useTutor() {
 
   /* --- materials -------------------------------------------------------- */
 
+  /**
+   * Embeds fresh chunks so retrieval can match paraphrase, not just wording.
+   *
+   * Best-effort and off the critical path: a Claude-only user has no embedding
+   * endpoint at all, and retrieval falls back to BM25 rather than failing the
+   * upload. Nothing here should ever stop a lesson starting.
+   */
+  const embedChunks = useCallback(
+    async (fresh: MaterialChunk[], onStage?: (stage: string) => void) => {
+      const embedder = embedderFor(loadKeys());
+      if (!embedder || !fresh.length) return;
+      try {
+        onStage?.("Indexing for search");
+        const vectors = await embedTexts(
+          fresh.map((chunk) => chunk.text),
+          embedder.model,
+          embedder.apiKey,
+        );
+        await saveEmbeddings(
+          embedder.model.model,
+          fresh
+            .map((chunk, i) => ({ chunkId: chunk.id, embedding: vectors[i] }))
+            .filter((v) => v.embedding?.length),
+        );
+      } catch {
+        // Semantic search is an upgrade, not a requirement.
+      }
+    },
+    [],
+  );
+
   const addFile = useCallback(
     async (file: File) => {
       setUpload({ name: file.name, stage: "Opening file" });
@@ -384,6 +462,7 @@ export function useTutor() {
         // the critical path.
         setUpload({ name: file.name, stage: "Saving to your account" });
         void uploadOriginal(material.id, file);
+        void embedChunks(fresh, (stage) => setUpload({ name: file.name, stage }));
         setMaterials(await listMaterials());
         setSession((prev) =>
           prev.materialIds.includes(material.id)
@@ -552,6 +631,7 @@ export function useTutor() {
     dismissNotice: () => setNotice(null),
     upload,
     send,
+    sendSketch,
     stop,
     startLesson,
     answerBoardQuestion,

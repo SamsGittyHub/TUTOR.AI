@@ -22,7 +22,8 @@ import { buildPlan, describePlan, studyDays } from "../.test-build/core/planner.
 import { actionToMarkdown, exportFilename, lessonToMarkdown } from "../.test-build/core/export.js";
 import { encodeWav, secondsPerChunk, TRANSCRIBE_LIMIT_BYTES } from "../.test-build/core/materials/audio.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
-import { retrieve } from "../.test-build/core/materials/retrieve.js";
+import { retrieve, retrieveHybrid } from "../.test-build/core/materials/retrieve.js";
+import { cosine, fuseRankings } from "../.test-build/core/materials/vector.js";
 
 let passed = 0;
 const pending = [];
@@ -499,5 +500,78 @@ test("a chunk of the advertised length stays under the upload cap", () => {
 
 // Async checks resolve after the synchronous ones have all been queued.
 await Promise.all(pending);
+
+
+console.log("\n— semantic retrieval —");
+
+test("cosine is 1 for parallel, 0 for orthogonal, -1 for opposed", () => {
+  assert.equal(cosine([1, 0], [2, 0]), 1);
+  assert.equal(cosine([1, 0], [0, 3]), 0);
+  assert.equal(cosine([1, 0], [-1, 0]), -1);
+});
+
+test("cosine is 0 rather than NaN for a zero or empty vector", () => {
+  assert.equal(cosine([0, 0], [1, 1]), 0);
+  assert.equal(cosine([], [1, 1]), 0);
+});
+
+test("rank fusion rewards agreement between the two rankers", () => {
+  const a = [{ id: "x" }, { id: "y" }, { id: "z" }];
+  const b = [{ id: "z" }, { id: "x" }, { id: "y" }];
+  const fused = fuseRankings([a, b], (i) => i.id);
+  // x is 1st and 2nd; z is 3rd and 1st. x's combined rank is better.
+  assert.equal(fused[0].id, "x");
+  assert.equal(fused.length, 3, "fusion dropped or duplicated an item");
+});
+
+test("fusion keeps items that only one ranker returned", () => {
+  const fused = fuseRankings([[{ id: "a" }], [{ id: "b" }]], (i) => i.id);
+  assert.deepEqual(fused.map((i) => i.id).sort(), ["a", "b"]);
+});
+
+const chunk = (id, text, order, embedding) => ({
+  id, materialId: "m", locator: `page ${order + 1}`, text, order, embedding,
+});
+
+test("semantic retrieval surfaces a paraphrase BM25 cannot match", () => {
+  // The relevant chunk is LAST in document order, so BM25's no-hit fallback
+  // (which just fills from the top) cannot reach it by accident.
+  const pad = "filler ".repeat(1200);
+  const chunks = [
+    chunk("c1", "Stoichiometry balances reagent ratios. " + pad, 0, [0, 1, 0]),
+    chunk("c2", "Titration finds an unknown concentration. " + pad, 1, [0, 0, 1]),
+    chunk("c3", "The second law states disorder increases. " + pad, 2, [1, 0, 0]),
+  ];
+  const query = "why does entropy always go up";
+  const lexical = retrieve(chunks, query, 4000);
+  assert.ok(!lexical.chunks.some((c) => c.id === "c3"),
+    "BM25 reached the paraphrased chunk; the fixture is not discriminating");
+
+  const hybrid = retrieveHybrid(chunks, query, [0.99, 0.1, 0], 4000);
+  assert.ok(hybrid.chunks.some((c) => c.id === "c3"),
+    "the semantic ranker failed to surface the paraphrased chunk");
+});
+
+test("with no query vector, hybrid is exactly BM25", () => {
+  const pad = "filler ".repeat(1200);
+  const chunks = [
+    chunk("c1", "alkene addition reactions " + pad, 0, [1, 0]),
+    chunk("c2", "aromatic substitution " + pad, 1, [0, 1]),
+  ];
+  const a = retrieve(chunks, "alkene addition", 3000);
+  const b = retrieveHybrid(chunks, "alkene addition", null, 3000);
+  assert.deepEqual(b.chunks.map((c) => c.id), a.chunks.map((c) => c.id));
+});
+
+test("unembedded chunks fall back to BM25 instead of vanishing", () => {
+  const pad = "filler ".repeat(1200);
+  const chunks = [
+    chunk("c1", "alkene addition reactions " + pad, 0, undefined),
+    chunk("c2", "aromatic substitution " + pad, 1, undefined),
+  ];
+  const hybrid = retrieveHybrid(chunks, "alkene addition", [1, 0], 3000);
+  assert.ok(hybrid.chunks.length > 0, "hybrid returned nothing without embeddings");
+  assert.equal(hybrid.chunks[0].id, "c1");
+});
 
 console.log(`\n${passed} checks passed\n`);

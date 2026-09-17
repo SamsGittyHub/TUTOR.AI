@@ -28,6 +28,8 @@ export type MaterialKind =
 export interface MaterialChunk {
   id: string;
   materialId: string;
+  /** Semantic vector, when the student's provider could produce one. */
+  embedding?: number[];
   /** Human-readable position: "page 4", "slide 12", "12:30". */
   locator: string;
   text: string;
@@ -247,6 +249,20 @@ export async function setMaterialCourse(
     body: JSON.stringify({ courseId }),
   });
   invalidate("materials");
+}
+
+/** Persists vectors for chunks; returns how many rows the server accepted. */
+export async function saveEmbeddings(
+  model: string,
+  vectors: { chunkId: string; embedding: number[] }[],
+): Promise<number> {
+  if (!vectors.length) return 0;
+  const { written } = await post<{ written: number }>("/embeddings", {
+    model,
+    vectors,
+  });
+  invalidate("chunks");
+  return written;
 }
 
 export function originalUrl(materialId: string): string {

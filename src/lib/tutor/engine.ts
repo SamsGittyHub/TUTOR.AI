@@ -2,7 +2,7 @@
 
 import { normalizeAction, actionToText, type TutorAction } from "../actions";
 import type { Material, MaterialChunk, QuizQuestion, TranscriptEntry } from "../db";
-import { formatContext, retrieve } from "../materials/retrieve";
+import { formatContext, retrieve, retrieveHybrid } from "../materials/retrieve";
 import { getProvider, type ChatMessage, type ImagePart, type ProviderId, type Usage } from "../providers";
 import { extractFirstJson, JsonObjectStream } from "../stream-json";
 import {
@@ -20,6 +20,10 @@ export interface TurnRequest {
   materials: Material[];
   chunks: MaterialChunk[];
   boardSummary: string;
+  /** The student's question, embedded — enables semantic retrieval when present. */
+  queryVector?: number[] | null;
+  /** The student's own handwriting, when they've worked something out on the board. */
+  studentImages?: ImagePart[];
   onAction: (action: TutorAction) => void;
   onStray?: (text: string) => void;
   signal?: AbortSignal;
@@ -73,7 +77,7 @@ function buildMessages(request: TurnRequest): ChatMessage[] {
   // so "explain that again" still lands on the right passage.
   const lastTutor = [...history].reverse().find((e) => e.role === "tutor")?.text ?? "";
   const query = `${request.studentMessage}\n${lastTutor.slice(0, 400)}`;
-  const result = retrieve(request.chunks, query);
+  const result = retrieveHybrid(request.chunks, query, request.queryVector ?? null);
 
   const nameOf = (id: string) =>
     request.materials.find((m) => m.id === id)?.name ?? "material";
@@ -93,7 +97,12 @@ function buildMessages(request: TurnRequest): ChatMessage[] {
   messages.push({
     role: "user",
     content: blocks.join("\n\n"),
-    images: collectImages(request.materials, result.chunks),
+    // The student's own work goes first: it's what they're asking about, and
+    // burying it behind four pages of slides makes the model answer the slides.
+    images: [
+      ...(request.studentImages ?? []),
+      ...collectImages(request.materials, result.chunks),
+    ].slice(0, MAX_IMAGES),
   });
 
   return messages;
