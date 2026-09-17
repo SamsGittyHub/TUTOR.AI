@@ -175,8 +175,11 @@ export const STRINGS = {
   "quiz.generate": "Generate a quiz",
   "exam.title": "Practice exam",
   "exam.lede":
-    "Pick the lessons you want examined. The paper is weighted toward the things you actually got stuck on.",
+    "Examine a whole subject, or pick individual lessons. The paper is weighted toward the things you actually got stuck on.",
   "exam.generate": "Generate",
+  "exam.wholeSubject": "A whole subject",
+  "exam.orPickLessons": "Or pick lessons",
+  "exam.nothingInIt": "nothing in it yet",
   "exam.submit": "Submit paper",
   "exam.marking": "Marking…",
   "exam.nextSection": "Next section",

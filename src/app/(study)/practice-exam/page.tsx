@@ -33,10 +33,30 @@ export default function PracticeExamPage() {
   const [responses, setResponses] = useState<ExamResponses>({});
   const [result, setResult] = useState<ExamResult | null>(null);
 
-  const chosen = useMemo(
-    () => lib.sessions.filter((s) => picked.has(s.id)),
-    [lib.sessions, picked],
+  /**
+   * Whole subject, or hand-picked lessons.
+   *
+   * Picking a subject is the common case once someone has filed a term's work
+   * — "examine me on Chemistry" — and it pulls in that subject's material as
+   * well as its lessons, so a topic covered by notes but never taught on the
+   * board can still be examined.
+   */
+  const [subjectId, setSubjectId] = useState<string | null>(null);
+
+  const subjectSessions = useMemo(
+    () => (subjectId ? lib.sessions.filter((s) => s.courseId === subjectId) : []),
+    [subjectId, lib.sessions],
   );
+  const subjectMaterials = useMemo(
+    () => (subjectId ? lib.materials.filter((m) => m.courseId === subjectId) : []),
+    [subjectId, lib.materials],
+  );
+
+  const chosen = useMemo(
+    () => (subjectId ? subjectSessions : lib.sessions.filter((s) => picked.has(s.id))),
+    [subjectId, subjectSessions, lib.sessions, picked],
+  );
+
 
   // Previewed live, so the student can see what the paper will target before
   // spending a model call on it.
@@ -53,6 +73,7 @@ export default function PracticeExamPage() {
   );
 
   function toggle(id: string) {
+    setSubjectId(null);
     setPicked((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -62,7 +83,7 @@ export default function PracticeExamPage() {
   }
 
   async function generate() {
-    if (!chosen.length || busy) return;
+    if ((!chosen.length && !subjectMaterials.length) || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -70,8 +91,19 @@ export default function PracticeExamPage() {
       const apiKey = keyFor(loadKeys()[settings.providerId]);
       if (!apiKey) throw new Error("Add an API key in Settings first.");
 
-      const materialIds = [...new Set(chosen.flatMap((s) => s.materialIds))];
+      // A subject brings its whole shelf, not only what happened to be ticked
+      // during a lesson — that's the point of examining a subject.
+      const materialIds = [
+        ...new Set([
+          ...chosen.flatMap((s) => s.materialIds),
+          ...subjectMaterials.map((m) => m.id),
+        ]),
+      ];
       const chunks = await getChunksFor(materialIds);
+
+      if (!chosen.length && !subjectMaterials.length) {
+        throw new Error("Pick a subject or a lesson first.");
+      }
 
       const { exam: generated } = await generateExam({
         providerId: settings.providerId,
@@ -94,7 +126,8 @@ export default function PracticeExamPage() {
         body: JSON.stringify({ exam: generated }),
       });
 
-      setExam(generated);
+      const subject = lib.courses.find((c) => c.id === subjectId);
+      setExam(subject ? { ...generated, title: `Practice exam — ${subject.name}` } : generated);
       setResponses({});
       setResult(null);
     } catch (caught) {
@@ -214,8 +247,58 @@ export default function PracticeExamPage() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
           <div>
+            {lib.courses.length > 0 && (
+              <section className="mb-6">
+                <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
+                  {language.t("exam.wholeSubject")}
+                </h2>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {lib.courses.map((course) => {
+                    const lessons = lib.sessions.filter((s) => s.courseId === course.id);
+                    const files = lib.materials.filter((m) => m.courseId === course.id);
+                    // Nothing filed under it means nothing to examine.
+                    const empty = !lessons.length && !files.length;
+                    const on = subjectId === course.id;
+                    return (
+                      <li key={course.id}>
+                        <button
+                          type="button"
+                          disabled={empty}
+                          title={
+                            empty
+                              ? "Add material or lessons to this subject first"
+                              : undefined
+                          }
+                          onClick={() => {
+                            setSubjectId(on ? null : course.id);
+                            setPicked(new Set());
+                          }}
+                          className={`tx press rounded-full px-4 py-2 text-left text-[13px] font-medium disabled:pointer-events-none disabled:opacity-40 ${
+                            on
+                              ? "grad text-white"
+                              : "bg-[var(--tint)] text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] hover:text-fg"
+                          }`}
+                        >
+                          {course.name}
+                          <span
+                            className={`ml-2 text-[11.5px] ${on ? "text-white/75" : "text-dim"}`}
+                          >
+                            {empty
+                              ? language.t("exam.nothingInIt")
+                              : `${files.length} file${files.length === 1 ? "" : "s"} · ${lessons.length} lesson${lessons.length === 1 ? "" : "s"}`}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+            )}
+
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-              Lessons to examine
+              {lib.courses.length > 0
+                ? language.t("exam.orPickLessons")
+                : language.t("exam.title")}
             </h2>
             <ul className="mt-3 flex flex-col gap-2">
               {lib.sessions.map((session) => {
@@ -311,14 +394,16 @@ export default function PracticeExamPage() {
             <button
               type="button"
               onClick={generate}
-              disabled={!chosen.length || busy}
+              disabled={(!chosen.length && !subjectMaterials.length) || busy}
               className="rounded-full grad px-5 py-3 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
             >
               {busy
                 ? "Writing your exam…"
-                : chosen.length
-                  ? `Generate from ${chosen.length} lesson${chosen.length === 1 ? "" : "s"}`
-                  : "Pick a lesson first"}
+                : subjectId
+                  ? `Examine ${lib.courses.find((c) => c.id === subjectId)?.name ?? "subject"}`
+                  : chosen.length
+                    ? `Generate from ${chosen.length} lesson${chosen.length === 1 ? "" : "s"}`
+                    : "Pick a subject or a lesson"}
             </button>
           </aside>
         </div>

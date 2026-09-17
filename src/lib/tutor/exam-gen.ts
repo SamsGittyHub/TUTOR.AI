@@ -151,13 +151,35 @@ export async function generateExam(
     cards: request.cards,
     attempts: request.attempts,
   });
-  if (!weakPoints.length) {
+
+  /*
+   * A subject can be examined on its material alone.
+   *
+   * Weak points come from lessons — where the student interrupted, what they
+   * forgot — so a subject with notes filed but nothing taught yet has none.
+   * That shouldn't be a dead end: fall back to the material itself, evenly
+   * weighted, which is an ordinary exam rather than a targeted one.
+   */
+  const topics: { topic: string; count: number; reasons: string[] }[] =
+    weakPoints.length
+      ? allocateQuestions(weakPoints, request.questionCount)
+      : allocateQuestions(
+          request.materials.map((material) => ({
+            topic: material.name.replace(/\.[^.]+$/, ""),
+            weight: 1,
+            reasons: ["covered in your material"],
+            materialIds: [material.id],
+          })),
+          request.questionCount,
+        );
+
+  if (!topics.length) {
     throw new Error(
-      "Those lessons have nothing to build an exam from yet — teach a bit more first.",
+      "There's nothing to build an exam from yet — add some material or teach a lesson first.",
     );
   }
 
-  const allocation = allocateQuestions(weakPoints, request.questionCount);
+  const allocation = topics;
 
   // Retrieve against the weak topics, not the whole corpus, so the excerpts in
   // the prompt are about the things the paper is meant to test.
