@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
@@ -149,13 +150,26 @@ export default function VoicePage() {
             ) : (
               <ul className="flex flex-col gap-3">
                 {lines.map((line, i) => (
-                  <li key={i}>
-                    <p className="text-[11px] font-medium text-dim">
-                      {line.role === "student" ? "you" : "tutor"}
-                    </p>
-                    <p className="mt-0.5 text-[13px] leading-relaxed text-fg">
-                      {line.text}
-                    </p>
+                  <li key={i} className="flex min-w-0 gap-2">
+                    {line.role === "tutor" ? (
+                      <Image
+                        src="/tutor-avatar.png"
+                        alt=""
+                        width={22}
+                        height={22}
+                        className="mt-0.5 h-[22px] w-[22px] shrink-0 rounded-full"
+                      />
+                    ) : (
+                      <span className="mt-0.5 h-[22px] w-[22px] shrink-0 rounded-full bg-[var(--tint-strong)]" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[11px] font-medium text-dim">
+                        {line.role === "student" ? "you" : "tutor"}
+                      </p>
+                      <p className="mt-0.5 text-[13px] leading-relaxed text-fg [overflow-wrap:anywhere] whitespace-pre-wrap">
+                        {line.text}
+                      </p>
+                    </div>
                   </li>
                 ))}
               </ul>

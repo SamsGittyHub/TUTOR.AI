@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TutorAction } from "@/lib/actions";
 import type { TranscriptEntry } from "@/lib/db";
@@ -135,15 +136,29 @@ export function ChatRail({
         ) : (
           items.map((item) =>
             item.who === "student" ? (
-              <div key={item.key} className="flex justify-end">
-                <p className="max-w-[85%] rounded-lg rounded-br-xs grad px-3.5 py-2 text-[13.5px] font-semibold leading-relaxed text-white">
+              <div key={item.key} className="flex min-w-0 justify-end">
+                {/*
+                 * overflow-wrap:anywhere rather than break-words: a pasted URL
+                 * or a long unbroken token is one "word", and break-word only
+                 * helps once a line has already started. min-w-0 lets the
+                 * bubble actually shrink inside the flex row — without it the
+                 * text sets a min-content floor and pushes out of the rail.
+                 */}
+                <p className="min-w-0 max-w-[85%] overflow-hidden rounded-lg rounded-br-xs grad px-3.5 py-2 text-[13.5px] font-semibold leading-relaxed text-white [overflow-wrap:anywhere] whitespace-pre-wrap">
                   {item.text.replace(/^\(answering "(.*)"\)\s*/, "")}
                 </p>
               </div>
             ) : (
-              <div key={item.key} className="flex gap-2.5">
-                <span className="mt-1 h-6 w-6 shrink-0 rounded-full grad" />
-                <p className="max-w-[88%] text-[13.5px] leading-relaxed text-fg/90">
+              <div key={item.key} className="flex min-w-0 gap-2.5">
+                <Image
+                  src="/tutor-avatar.png"
+                  alt=""
+                  width={26}
+                  height={26}
+                  className="mt-0.5 h-6 w-6 shrink-0 rounded-full"
+                  priority={false}
+                />
+                <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-fg/90 [overflow-wrap:anywhere] whitespace-pre-wrap">
                   {item.text}
                 </p>
               </div>
