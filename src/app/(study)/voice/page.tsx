@@ -12,7 +12,8 @@ import { loadSettings } from "@/lib/settings";
 import { getChunksFor, type MaterialChunk } from "@/lib/db";
 import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
-import type { ImageRequest } from "@/lib/board-image";
+import { applyDrawnImage, type ImageRequest } from "@/lib/board-image";
+import { requestImage } from "@/lib/draw-image";
 import { buildBriefing, runVoiceTool, type VoiceContext } from "@/lib/voice-tools";
 
 /**
@@ -149,32 +150,9 @@ export default function VoicePage() {
       ...list,
       { type: "show_image", id, prompt: request.prompt, caption: request.caption },
     ]);
-
-    const settle = (patch: Partial<Extract<TutorAction, { type: "show_image" }>>) =>
-      setActions((list) =>
-        list.map((a) => (a.id === id && a.type === "show_image" ? { ...a, ...patch } : a)),
-      );
-
-    void (async () => {
-      try {
-        const response = await fetch("/api/images", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            ...request,
-            apiKey: BETA ? undefined : (loadKeys().openai ?? ""),
-          }),
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok || !body.src) {
-          settle({ error: body.error ?? "That drawing didn't come through." });
-          return;
-        }
-        settle({ src: body.src, width: body.width, height: body.height });
-      } catch {
-        settle({ error: "That drawing didn't come through." });
-      }
-    })();
+    void requestImage(request).then((result) =>
+      setActions((list) => applyDrawnImage(list, id, result)),
+    );
   }, []);
 
   const onTranscript = useCallback((role: "student" | "tutor", text: string) => {

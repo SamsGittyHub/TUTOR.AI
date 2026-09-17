@@ -4,6 +4,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { hasUsableKey, keyFor } from "./beta";
 import type { TutorAction } from "./actions";
 import {
+  applyDrawnImage,
+  settleUnfinishedImages,
+  type ImageRequest,
+} from "./board-image";
+import { requestImage } from "./draw-image";
+import {
   deleteMaterial as dbDeleteMaterial,
   deleteSession as dbDeleteSession,
   getChunksFor,
@@ -216,6 +222,25 @@ export function useTutor() {
     [applyCards],
   );
 
+  /* --- pictures ---------------------------------------------------------- */
+
+  /**
+   * Draws a picture the tutor asked for, into whichever card is waiting.
+   *
+   * By the time the image model answers, the turn has usually finished and the
+   * board has moved on — so the card is found by id rather than assumed to be
+   * the last one. The patched session autosaves like any other change, which
+   * is what makes the picture still be there tomorrow.
+   */
+  const drawIntoSession = useCallback(async (id: string, request: ImageRequest) => {
+    const result = await requestImage(request);
+    setSession((prev) => ({
+      ...prev,
+      actions: applyDrawnImage(prev.actions, id, result),
+      updatedAt: Date.now(),
+    }));
+  }, []);
+
   /* --- turns ------------------------------------------------------------ */
 
   const runTurn = useCallback(
@@ -319,6 +344,17 @@ export function useTutor() {
           onAction: (action) => {
             collected.push(action);
             setStatus("teaching");
+            // A picture card arrives with nothing in it: the tutor has asked
+            // for one and the drawing takes seconds the lesson doesn't wait
+            // for. It fills itself in while the rest of the turn streams.
+            if (action.type === "show_image" && !action.src && !action.error) {
+              void drawIntoSession(action.id, {
+                prompt: action.prompt,
+                caption: action.caption,
+                style: action.style ?? "diagram",
+                shape: action.shape ?? "wide",
+              });
+            }
             setSession((prev) => {
               const next: Session = { ...prev, actions: [...prev.actions, action] };
               if (action.type === "lesson_plan") {
@@ -385,7 +421,7 @@ export function useTutor() {
         setStatus("error");
       }
     },
-    [chunks, materials, settings.providerId],
+    [chunks, drawIntoSession, materials, settings.providerId],
   );
 
   const stop = useCallback(() => {
@@ -566,7 +602,9 @@ export function useTutor() {
     const found = await getSession(id);
     if (!found) return;
     abort.current?.abort();
-    setSession(found);
+    // A picture still drawing when the lesson was closed is never coming; say
+    // so rather than showing a skeleton that spins for ever.
+    setSession({ ...found, actions: settleUnfinishedImages(found.actions) });
     setChunks(await getChunksFor(found.materialIds));
     setStatus("idle");
     setError(null);

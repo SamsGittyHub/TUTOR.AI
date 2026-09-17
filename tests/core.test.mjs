@@ -35,7 +35,8 @@ import {
 } from "../.test-build/core/realtime-events.js";
 import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
 import {
-  buildImagePrompt, dimensionsFor, normalizeImageRequest, sizeFor,
+  applyDrawnImage, buildImagePrompt, dimensionsFor, normalizeImageRequest,
+  settleUnfinishedImages, sizeFor,
 } from "../.test-build/core/board-image.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
@@ -1614,10 +1615,68 @@ test("a picture card survives being stored and read back", () => {
   assert.equal(action.error, undefined);
 });
 
-test("a picture that never arrived reads as unfinished, not as still drawing", () => {
-  // Otherwise reopening the lesson shows a skeleton that spins for ever.
+test("a freshly asked-for picture is still drawing, not already failed", () => {
+  // The typed tutor emits this card mid-stream, seconds before the image
+  // exists. Marking it failed here would mean no picture ever appeared.
   const action = normalizeAction({ type: "show_image", id: "i2", prompt: "a cell" });
-  assert.match(action.error, /didn't finish/);
+  assert.equal(action.error, undefined);
+  assert.equal(action.src, undefined);
+});
+
+test("style and shape survive so the request can be made from the card", () => {
+  const action = normalizeAction({
+    type: "show_image", id: "i4", prompt: "a real heart", style: "realistic", shape: "tall",
+  });
+  assert.equal(action.style, "realistic");
+  assert.equal(action.shape, "tall");
+  const invented = normalizeAction({
+    type: "show_image", id: "i5", prompt: "a cell", style: "anime", shape: "panorama",
+  });
+  assert.equal(invented.style, undefined, "the caller falls back, rather than storing nonsense");
+  assert.equal(invented.shape, undefined);
+});
+
+test("a picture still drawing when the lesson closed is settled on reopening", () => {
+  const settled = settleUnfinishedImages([
+    { id: "a", type: "write_text" },
+    { id: "b", type: "show_image", prompt: "a cell" },
+    { id: "c", type: "show_image", prompt: "a leaf", src: "/api/images/x" },
+    { id: "d", type: "show_image", prompt: "a map", error: "refused" },
+  ]);
+  assert.match(settled[1].error, /didn't finish/);
+  assert.equal(settled[0].error, undefined, "other cards are left alone");
+  assert.equal(settled[2].error, undefined, "one that arrived is left alone");
+  assert.equal(settled[3].error, "refused", "an existing reason isn't overwritten");
+});
+
+test("a drawing lands in its own card, however far the board has moved on", () => {
+  // The turn keeps streaming while the image generates, so the waiting card is
+  // rarely the last one by the time it comes back.
+  const before = [
+    { id: "im1", type: "show_image", prompt: "a leaf" },
+    { id: "t1", type: "write_text", text: "meanwhile" },
+    { id: "im2", type: "show_image", prompt: "a cell" },
+  ];
+  const after = applyDrawnImage(before, "im2", { src: "/api/images/z", width: 1536, height: 1024 });
+  assert.equal(after[2].src, "/api/images/z");
+  assert.equal(after[0].src, undefined, "the other picture is untouched");
+  assert.deepEqual(after[1], before[1]);
+  assert.notEqual(after, before, "a new list, so React sees the change");
+});
+
+test("a drawing that failed is recorded on the card, not thrown away", () => {
+  const after = applyDrawnImage(
+    [{ id: "im1", type: "show_image", prompt: "a leaf" }],
+    "im1",
+    { error: "The image model refused that description." },
+  );
+  assert.match(after[0].error, /refused/);
+});
+
+test("a drawing whose card is gone changes nothing", () => {
+  // The student wiped the board mid-generation. Nothing should reappear.
+  const before = [{ id: "t1", type: "write_text", text: "still here" }];
+  assert.deepEqual(applyDrawnImage(before, "im1", { src: "/x" }), before);
 });
 
 test("a picture card with nothing in it at all is dropped", () => {

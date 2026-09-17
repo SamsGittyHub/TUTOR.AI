@@ -7,6 +7,8 @@
  * deliberate: cheap models fall apart when a schema has thirty branches.
  */
 
+import { isShape, isStyle, type ImageShape, type ImageStyle } from "./board-image";
+
 export type PenColor = "ink" | "cyan" | "pink" | "amber" | "green" | "violet";
 
 export const PEN_COLORS: PenColor[] = [
@@ -139,6 +141,9 @@ export interface ImageAction extends Common {
   /** What was asked for. Kept so the card can say what it is while it draws. */
   prompt: string;
   caption?: string;
+  /** How it should be drawn. Read when the request goes out, then irrelevant. */
+  style?: ImageStyle;
+  shape?: ImageShape;
   src?: string;
   width?: number;
   height?: number;
@@ -560,20 +565,20 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       const prompt = prose(r.prompt ?? r.description ?? r.subject);
       const src = str(r.src ?? r.url);
       if (!prompt && !src) return null;
-      const error = prose(r.error);
       return {
         ...base,
         type: "show_image",
         prompt,
         caption: prose(r.caption ?? r.label) || undefined,
+        style: isStyle(r.style) ? r.style : undefined,
+        shape: isShape(r.shape) ? r.shape : undefined,
         src: src || undefined,
         width: r.width === undefined ? undefined : num(r.width, 0) || undefined,
         height: r.height === undefined ? undefined : num(r.height, 0) || undefined,
-        // A stored card with no picture and no explanation is one whose
-        // session ended mid-draw. Say that, rather than rendering a skeleton
-        // that spins for ever.
-        error:
-          error || (src ? undefined : "That drawing didn't finish."),
+        // No src yet is the normal case here: the tutor has just asked for the
+        // picture and it is still being drawn. A card left waiting because a
+        // lesson was closed is settled on reopening, not here.
+        error: prose(r.error) || undefined,
       };
     }
 

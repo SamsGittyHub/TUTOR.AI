@@ -107,3 +107,56 @@ const RULES =
 export function buildImagePrompt(request: ImageRequest): string {
   return `${STYLE_PREAMBLE[request.style]}\n\nSubject: ${request.prompt}\n\n${RULES}`;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Landing a picture on the board                                              */
+/* -------------------------------------------------------------------------- */
+
+/** What comes back once the image model has been asked. */
+export interface DrawnImage {
+  src?: string;
+  width?: number;
+  height?: number;
+  error?: string;
+}
+
+/** The shape of a board card, as far as this module needs to know. */
+interface ImageCardLike {
+  id: string;
+  type: string;
+  src?: string;
+  error?: string;
+}
+
+/**
+ * Fills in the picture card that was waiting for this drawing.
+ *
+ * Kept separate from the fetch so the awkward part — finding one card in a
+ * list that has grown since the request went out — is testable. The tutor
+ * carries on writing while an image generates, so by the time it lands the
+ * card is rarely the last one.
+ */
+export function applyDrawnImage<T extends ImageCardLike>(
+  actions: T[],
+  id: string,
+  result: DrawnImage,
+): T[] {
+  return actions.map((action) =>
+    action.id === id && action.type === "show_image" ? { ...action, ...result } : action,
+  );
+}
+
+/**
+ * Marks pictures that were still drawing when the lesson was put away.
+ *
+ * Applied when a saved lesson is reopened. Without it a card whose generation
+ * never came back renders as permanently in progress, and the student waits
+ * for something that stopped being on its way days ago.
+ */
+export function settleUnfinishedImages<T extends ImageCardLike>(actions: T[]): T[] {
+  return actions.map((action) =>
+    action.type === "show_image" && !action.src && !action.error
+      ? { ...action, error: "That drawing didn't finish." }
+      : action,
+  );
+}
