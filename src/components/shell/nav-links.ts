@@ -17,7 +17,7 @@ export interface NavLink {
 export const NAV_LINKS: NavLink[] = [
   { href: "/app", label: "Board", blurb: "The live whiteboard lesson" },
   { href: "/materials", label: "Material", blurb: "Everything you've uploaded" },
-  { href: "/courses", label: "Courses", blurb: "Group material by class" },
+  { href: "/courses", label: "Subjects", blurb: "Folders for each subject" },
   { href: "/calendar", label: "Calendar", blurb: "Exams and your study plan" },
   { href: "/quiz", label: "Flashcards", blurb: "Quick quizzes from your notes" },
   { href: "/practice-exam", label: "Practice exam", blurb: "A full paper on your weak spots" },

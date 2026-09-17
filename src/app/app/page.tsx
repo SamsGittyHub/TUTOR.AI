@@ -13,7 +13,6 @@ import { SettingsModal } from "@/components/app/SettingsModal";
 import { Sidebar } from "@/components/app/Sidebar";
 import { SketchPad } from "@/components/board/SketchPad";
 import { AccountMenu } from "@/components/auth/AccountMenu";
-import { NavLinks } from "@/components/shell/NavLinks";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Whiteboard } from "@/components/board/Whiteboard";
 import { findModel, formatCost, getProvider } from "@/lib/providers";
@@ -120,10 +119,12 @@ export default function AppPage() {
           <Logo size={24} />
         </Link>
 
-        <NavLinks />
-
-        {/* The lesson title moved off the header: it was competing with the
-            nav for the same row, and the board already names the lesson. */}
+        {/* The board's destinations live in the Material panel instead, so
+            the header stays out of the way of the board itself. Every other
+            page keeps them along the top. */}
+        <span className="hidden min-w-0 flex-1 truncate text-sm font-semibold text-muted sm:block">
+          {tutor.session.title}
+        </span>
         <span className="flex-1 sm:hidden" />
 
         {tutor.session.usage.turns > 0 ? (

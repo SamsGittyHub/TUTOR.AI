@@ -165,7 +165,10 @@ below.
 - **Show your work** — sketch your attempt on the board with a pen or stylus and
   the tutor reads it, marking up the step that went wrong instead of handing you
   the answer.
-- **Courses & calendar** — group material by class; add an exam with the topics
+- **Subjects** — folders for Maths, English, Science. File material *and* past
+  lessons into one, and a lesson in that folder can draw on everything in it:
+  ask about last week's topic mid-lesson and the tutor already has the notes.
+- **Calendar** — group material by class; add an exam with the topics
   it covers, or import them from your syllabus, and get a study plan worked
   backwards from the date: every topic twice, then a full review the day before.
 - **Live voice** — a speech-to-speech session (OpenAI Realtime over WebRTC)

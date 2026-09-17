@@ -41,15 +41,15 @@ export default function CoursesPage() {
   }
 
   async function remove(id: string, label: string) {
-    if (!confirm(`Delete "${label}"? Its material stays, just ungrouped.`)) return;
+    if (!confirm(`Delete "${label}"? Its material and lessons stay — they just come out of the folder.`)) return;
     await deleteCourse(id);
     lib.reload();
   }
 
   return (
     <PageShell
-      title="Courses"
-      lede="Group material by class so finals week is one page per subject instead of thirty loose files."
+      title="Subjects"
+      lede="Folders for a subject — Maths, Chemistry, whatever you study. Put your material and your past lessons in one, and the tutor draws on everything in it."
     >
       <form
         onSubmit={add}
@@ -57,12 +57,12 @@ export default function CoursesPage() {
       >
         <label className="flex min-w-[180px] flex-1 flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-            Course
+            Subject
           </span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Organic Chemistry II"
+            placeholder="Maths"
             className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-[13px] text-fg outline-none transition placeholder:text-dim focus:border-line-2"
           />
         </label>
@@ -96,7 +96,7 @@ export default function CoursesPage() {
           disabled={busy || !name.trim()}
           className="rounded-full grad px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
         >
-          {busy ? "Adding…" : "Add course"}
+          {busy ? "Adding…" : "Add subject"}
         </button>
       </form>
 
@@ -106,14 +106,16 @@ export default function CoursesPage() {
         ) : lib.error ? (
           <LoadError message={lib.error} />
         ) : !lib.courses.length ? (
-          <Empty title="No courses yet">
-            Add one above, then assign material to it. Mastery and the study
-            plan both roll up per course.
+          <Empty title="No subjects yet">
+            Add one above — Maths, English, Science — then file material and
+            past lessons into it from those pages. Mastery and the study plan
+            roll up per subject too.
           </Empty>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">
             {lib.courses.map((course) => {
               const materials = lib.materials.filter((m) => m.courseId === course.id);
+              const lessons = lib.sessions.filter((s) => s.courseId === course.id);
               const rollups = materials.map((m) =>
                 masteryForMaterial(m.id, lib.attempts, lib.cards, now),
               );
@@ -134,7 +136,9 @@ export default function CoursesPage() {
                         {course.name}
                       </p>
                       <p className="mt-0.5 text-[12px] text-dim">
-                        {course.term ?? "no term"} · {materials.length} files ·{" "}
+                        {course.term ?? "no term"} · {materials.length} file
+                        {materials.length === 1 ? "" : "s"} · {lessons.length} lesson
+                        {lessons.length === 1 ? "" : "s"} ·{" "}
                         {masteryLabel(avg, rollups.length > 0)}
                       </p>
                     </div>

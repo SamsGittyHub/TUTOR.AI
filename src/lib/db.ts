@@ -107,6 +107,8 @@ export interface QuizAttempt {
 
 export interface Session {
   id: string;
+  /** The subject folder this lesson is filed under, if any. */
+  courseId?: string;
   title: string;
   createdAt: number;
   updatedAt: number;
@@ -318,6 +320,18 @@ export async function listSessions(): Promise<Session[]> {
   return cached("sessions", async () =>
     (await api<{ sessions: Session[] }>("/lessons")).sessions,
   );
+}
+
+/** File a lesson under a subject, or pass null to unfile it. */
+export async function setSessionCourse(
+  sessionId: string,
+  courseId: string | null,
+): Promise<void> {
+  await api(`/lessons/${encodeURIComponent(sessionId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ courseId }),
+  });
+  invalidate("sessions", `session:${sessionId}`);
 }
 
 export async function deleteSession(id: string): Promise<void> {

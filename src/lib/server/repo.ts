@@ -270,6 +270,7 @@ export async function deleteMaterial(userId: string, id: string): Promise<void> 
 
 interface LessonRow {
   id: string;
+  course_id: string | null;
   title: string;
   material_ids: string[];
   provider_id: string;
@@ -286,6 +287,7 @@ interface LessonRow {
 const toSession = (r: LessonRow): Session =>
   ({
     id: r.id,
+    courseId: r.course_id ?? undefined,
     title: r.title,
     createdAt: ms(r.created_at),
     updatedAt: ms(r.updated_at),
@@ -299,8 +301,9 @@ const toSession = (r: LessonRow): Session =>
     boardTheme: r.board_theme,
   }) as Session;
 
-const LESSON_COLUMNS = `id, title, material_ids, provider_id, model, actions,
-                        transcript, plan, usage, board_theme, created_at, updated_at`;
+const LESSON_COLUMNS = `id, course_id, title, material_ids, provider_id, model,
+                        actions, transcript, plan, usage, board_theme,
+                        created_at, updated_at`;
 
 export async function listSessions(userId: string): Promise<Session[]> {
   const rows = await query<LessonRow>(
@@ -325,11 +328,12 @@ export async function putSession(userId: string, s: Session): Promise<void> {
   const wrote = await query(
     `insert into lessons
        (id, user_id, title, material_ids, provider_id, model, actions,
-        transcript, plan, usage, board_theme, created_at, updated_at)
+        transcript, plan, usage, board_theme, created_at, updated_at, course_id)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-             to_timestamp($12 / 1000.0), to_timestamp($13 / 1000.0))
+             to_timestamp($12 / 1000.0), to_timestamp($13 / 1000.0), $14)
      on conflict (id) do update set
        title = excluded.title,
+       course_id = excluded.course_id,
        material_ids = excluded.material_ids,
        provider_id = excluded.provider_id,
        model = excluded.model,
@@ -357,6 +361,7 @@ export async function putSession(userId: string, s: Session): Promise<void> {
       s.boardTheme,
       s.createdAt || Date.now(),
       s.updatedAt || Date.now(),
+      s.courseId ?? null,
     ],
   );
   assertWrote(wrote, "lesson");

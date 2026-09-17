@@ -1,5 +1,9 @@
 "use client";
 
+import Link from "next/link";
+
+import { NAV_LINKS } from "@/components/shell/nav-links";
+
 import { useRef, useState } from "react";
 import type { Material, Session } from "@/lib/db";
 import { formatCost } from "@/lib/providers";
@@ -36,6 +40,9 @@ const KIND_ICON: Record<Material["kind"], string> = {
   audio: "◍",
   video: "▶",
 };
+
+/** The board is where you already are, so it isn't offered here. */
+const BOARD_LINKS = NAV_LINKS.filter((l) => l.href !== "/app");
 
 export function Sidebar(props: Props) {
   const [tab, setTab] = useState<"material" | "history">("material");
@@ -238,20 +245,6 @@ export function Sidebar(props: Props) {
             >
               Start the lesson
             </button>
-            <button
-              type="button"
-              onClick={props.onOpenQuiz}
-              className="mt-1.5 w-full rounded-full border border-line py-2 text-[13.5px] font-bold text-muted transition hover:border-pink/50 hover:text-fg"
-            >
-              Quiz & flashcards →
-            </button>
-            <button
-              type="button"
-              onClick={props.onOpenExam}
-              className="mt-1.5 w-full rounded-full border border-line py-2 text-[13.5px] font-bold text-muted transition hover:border-pink/50 hover:text-fg"
-            >
-              Practice exam →
-            </button>
             {props.dueCount > 0 ? (
               <button
                 type="button"
@@ -261,13 +254,26 @@ export function Sidebar(props: Props) {
                 Review {props.dueCount} due card{props.dueCount === 1 ? "" : "s"}
               </button>
             ) : null}
-            <button
-              type="button"
-              onClick={props.onOpenProgress}
-              className="mt-1.5 w-full rounded-full border border-line py-2 text-[13.5px] font-bold text-muted transition hover:border-line-2 hover:text-fg"
-            >
-              Progress
-            </button>
+
+            {/* On the board the destinations live here rather than in the
+                header: the board wants its full width, and this panel is where
+                a student is already deciding what to do next. */}
+            <div className="mt-4 border-t border-line pt-3">
+              <p className="text-[12px] font-semibold uppercase tracking-wider text-dim">
+                Go to
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-1.5">
+                {BOARD_LINKS.map((link) => (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="tx press rounded-full bg-[var(--tint)] px-3 py-2 text-center text-[13px] font-medium text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] hover:text-fg"
+                  >
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       ) : (

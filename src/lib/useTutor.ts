@@ -252,6 +252,29 @@ export function useTutor() {
 
       const collected: TutorAction[] = [];
 
+      /*
+       * A lesson filed under a subject can draw on everything in that folder,
+       * not only the files ticked for this session. That is the practical
+       * point of subjects: ask about last week's topic mid-lesson and the
+       * tutor has the notes for it, without you going to find them.
+       *
+       * Retrieval still decides what actually reaches the prompt, so a wider
+       * pool costs nothing when it isn't relevant.
+       */
+      const subjectMaterials = current.courseId
+        ? materials.filter((m) => m.courseId === current.courseId)
+        : [];
+      const inScope = [
+        ...new Set([
+          ...current.materialIds,
+          ...subjectMaterials.map((m) => m.id),
+        ]),
+      ];
+      const scopedChunks =
+        inScope.length > current.materialIds.length
+          ? await getChunksFor(inScope).catch(() => chunks)
+          : chunks;
+
       // Embed the question too, or there's nothing to compare the chunks against.
       // One short call, and a failure just means lexical-only retrieval.
       let queryVector: number[] | null = null;
@@ -279,8 +302,8 @@ export function useTutor() {
           apiKey: key,
           studentMessage,
           transcript: current.transcript,
-          materials: materials.filter((m) => current.materialIds.includes(m.id)),
-          chunks,
+          materials: materials.filter((m) => inScope.includes(m.id)),
+          chunks: scopedChunks,
           boardSummary: boardSummary(current.actions),
           queryVector,
           // A data URL from the sketch pad, split into the parts providers want.
