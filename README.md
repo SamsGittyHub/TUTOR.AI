@@ -9,38 +9,46 @@ Built from [`PRD-ai-tutor.md`](./PRD-ai-tutor.md).
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm test         # 44 checks: parser, action repair, math, retrieval, SRS, progress, providers
+docker run -d --name chalk-pg -e POSTGRES_PASSWORD=chalk -e POSTGRES_USER=chalk \
+  -e POSTGRES_DB=chalk -p 55432:5432 postgres:16-alpine
+cp .env.example .env          # DATABASE_URL, CHALK_STORAGE_DIR
+npm run migrate               # applies migrations/*.sql once each
+npm run dev                   # http://localhost:3000
+npm test                      # 72 checks
 npm run build
 ```
 
-No environment variables. No database to provision. Nothing to deploy but static
-output — `next build` produces two prerendered routes.
+Needs Node 20+ and a Postgres. On Railway, set `DATABASE_URL` from the Postgres
+service and point `CHALK_STORAGE_DIR` at a mounted volume.
 
 ---
 
-## The one architectural decision
+## The split: your account holds the work, your browser holds the key
 
-The PRD left it open: **server-side key storage, or client-side only?** This
-build is client-side only, and everything else follows from that.
+The PRD left key storage open. This build splits it, and the split is the whole
+architecture:
 
-| | What it means here |
+| | Where it lives |
 |---|---|
-| **Keys** | Held in browser storage, sent only to the provider you picked. There is no backend to breach and no log to leak. |
-| **Material** | Parsed in the browser (pdf.js, mammoth, JSZip) and stored in IndexedDB. Nothing is uploaded anywhere. |
-| **Retrieval** | BM25 over the chunks, in memory. No embedding calls, no vector database. |
-| **Deployment** | Static. Push it anywhere that serves files. |
+| **Your API key** | Browser storage only. It goes straight to the provider — the server never sees it, never logs it, never stores it. |
+| **Your material, lessons, cards, calendar** | Postgres, under your account, so a lesson started on a laptop resumes on a phone. |
+| **Original files** | A mounted volume, one directory per material. |
+| **Parsing** | Still the browser — pdf.js, mammoth, JSZip. Files are uploaded to be kept, not to be read. |
 
-The honest cost: browser storage is readable by any script running on the
-origin, so Settings says so plainly and offers session-only storage for shared
-machines. Server-side retrieval augmentation is off the table too — which is why
-retrieval is lexical rather than semantic (see below).
+The one exception is live voice: WebRTC can't carry a raw key safely, so it is
+posted once to mint a ~60-second session token and is never written down.
+
+The honest costs. Browser storage is readable by any script on the origin, so
+Settings says so and offers session-only storage for shared machines. And your
+coursework now sits on a server — which is what makes cross-device study work,
+and is why deleting a material or an account is a cascade that leaves nothing
+behind.
 
 ## How a lesson works
 
 ```
 student message
-   → retrieve.ts        BM25 over chunks → the excerpts that matter, with locators
+   → retrieve.ts        BM25 + cosine, fused by rank → the excerpts that matter
    → prompts.ts         system prompt: the action protocol + how to teach
    → providers/*        stream from the browser, straight to the vendor
    → stream-json.ts     pull complete JSON objects out of the token stream
@@ -96,36 +104,58 @@ below.
   review card (SM-2-lite scheduling), "teach me this one" hands the question
   to the live board, and a Progress panel tracks per-material mastery, quiz
   history, and the due forecast.
-- **Sessions** — saved, resumable, board and all.
+- **Sessions** — saved to your account, resumable on any device, board and all,
+  and exportable as Markdown notes (display math, real tables, mermaid diagrams,
+  source citations) so a lesson survives the tab closing.
+- **Show your work** — sketch your attempt on the board with a pen or stylus and
+  the tutor reads it, marking up the step that went wrong instead of handing you
+  the answer.
+- **Courses & calendar** — group material by class; add an exam with the topics
+  it covers, or import them from your syllabus, and get a study plan worked
+  backwards from the date: every topic twice, then a full review the day before.
+- **Live voice** — a speech-to-speech session (OpenAI Realtime over WebRTC)
+  where you talk and it explains out loud while writing on the board.
+- **Accounts** — email and password, scrypt-hashed, opaque session tokens.
 - **Light / dark chrome** — a sun/moon toggle on every page; follows the OS
   until you choose, applies before first paint (no flash), and the whiteboard
   keeps its own paper/chalk look regardless.
 
-### Where this deviates from the PRD
+### Retrieval, in two rankers
 
-**Embeddings → BM25.** Client-side embedding means a paid call per upload and a
-second index to maintain. Over the few hundred chunks one course produces, BM25
-finds the same passages in a millisecond for free. Locator matches are weighted
-by rarity, so "explain page 17 again" pulls page 17 rather than every chunk that
-contains the word "page".
+BM25 handles locators and exact terminology — "explain page 17 again" pulls page
+17, because locator matches are weighted by rarity. It fails on paraphrase: "why
+does entropy always go up" matches nothing in notes that say "the second law",
+and not knowing the vocabulary is the reason a student is asking.
 
-**Video → transcription API.** Browsers can't transcode media, so audio and
-video are sent to OpenAI's transcription endpoint (25 MB cap) and need an OpenAI
-key even if your tutor runs on another provider. Timestamped segments become
-`14:20`-style locators.
+So chunks are also embedded, through *your* provider (about $0.00002 a page)
+rather than by shipping a 25 MB transformer to the browser. The two rankings are
+fused by reciprocal rank, not by blending scores — those are on different
+scales. Anthropic has no embedding endpoint, so a Claude-only user gets BM25:
+worse at paraphrase, not broken.
+
+**Video → transcription API.** Browsers can't transcode, but they *can* decode.
+A recording is decoded, the video track dropped, downmixed to 16 kHz mono
+(Whisper resamples there anyway), and cut into chunks that each fit under the
+25 MB cap — transcribed in sequence with timestamps shifted back onto the
+original clock. Needs an OpenAI key even if your tutor runs elsewhere.
 
 ## Layout
 
 ```
 src/lib/
   actions.ts          the twelve actions + the forgiving normalizer
+  planner.ts          exam date → study plan (pure, unit-tested)
+  export.ts           lesson → Markdown notes (pure, unit-tested)
+  server/             db pool, auth, repository, volume storage
+  materials/embed.ts  embeddings via the student's own provider
+  materials/audio.ts  video → 16 kHz mono WAV chunks under the cap
   stream-json.ts      incremental JSON object extraction from a token stream
   expr.ts             sandboxed math parser for draw_plot (never eval)
   srs.ts              SM-2-lite review scheduling (pure, unit-tested)
   progress.ts         mastery blend + due forecast (pure, unit-tested)
   voice.ts            tutor TTS + student mic (Web Speech API, no keys)
   settings.ts         shared provider/model choice for board + flashcards
-  keys.ts  db.ts      browser key vault, IndexedDB stores
+  keys.ts  db.ts      browser key vault, API client for the account's data
   providers/          anthropic · openai · google · openrouter, one interface
   materials/          extract → chunk → retrieve
   tutor/              prompts (the teaching contract) + engine (a turn)
@@ -141,7 +171,6 @@ src/components/
 
 ## Not built
 
-No accounts, no sync across devices, no teacher dashboard, no native app — all
-non-goals in the PRD. Review cards come from quizzes you actually took; there's
+No teacher dashboard, no native app, no OAuth or password reset yet. Review cards come from quizzes you actually took; there's
 no streak counter and no daily-goal gamification. Voice runs on whatever the
 browser ships (Chrome/Edge are best); there's no premium TTS provider option.
