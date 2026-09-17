@@ -147,7 +147,12 @@ export default function AppPage() {
 
   return (
     <div className="flex h-dvh flex-col bg-ink">
-      <header className="chrome hair flex shrink-0 items-center gap-3 px-3 py-2 sm:px-4">
+      {/*
+        min-w-0 and overflow-hidden are load-bearing: without them this row's
+        min-content width became the whole page's, and on a phone the board
+        scrolled sideways under a header running off the right edge.
+      */}
+      <header className="chrome hair flex w-full min-w-0 shrink-0 items-center gap-2 overflow-hidden px-3 py-2 sm:gap-3 sm:px-4">
         <Link href="/" className="shrink-0">
           <Logo size={24} />
         </Link>
@@ -209,7 +214,9 @@ export default function AppPage() {
         <button
           type="button"
           onClick={() => setShowSettings(true)}
-          className={`flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
+          // Which model is running matters on a desktop and not at all on a
+          // phone, where it was pushing everything else off the screen.
+          className={`${tutor.hasKey ? "hidden md:flex" : "flex"} shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
             tutor.hasKey
               ? "border-line text-muted hover:border-line-2 hover:text-fg"
               : "border-transparent grad text-white"
@@ -230,7 +237,7 @@ export default function AppPage() {
           onClick={() => setShowSketch(true)}
           title="Show your work — sketch it and the tutor reads it"
           aria-label="Show your work"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-muted transition hover:text-fg"
+          className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line text-muted transition hover:text-fg sm:flex"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
             <path
@@ -267,7 +274,7 @@ export default function AppPage() {
           ["--side-w" as string]: `${sidebarWidth}px`,
         }}
       >
-        <div className={`min-h-0 ${mobileView === "material" ? "block" : "hidden"} lg:block`}>
+        <div className={`min-h-0 min-w-0 ${mobileView === "material" ? "block" : "hidden"} lg:block`}>
           <Sidebar
             materials={tutor.materials}
             selectedIds={tutor.session.materialIds}
@@ -307,7 +314,7 @@ export default function AppPage() {
           anchor="left"
         />
 
-        <div className={`min-h-0 ${mobileView === "board" ? "block" : "hidden"} lg:block`}>
+        <div className={`min-h-0 min-w-0 ${mobileView === "board" ? "block" : "hidden"} lg:block`}>
           <Whiteboard
             actions={tutor.session.actions}
             theme={tutor.session.boardTheme}
@@ -341,7 +348,7 @@ export default function AppPage() {
           label="Resize the chat panel"
         />
 
-        <div className={`min-h-0 ${mobileView === "chat" ? "block" : "hidden"} lg:block`}>
+        <div className={`min-h-0 min-w-0 ${mobileView === "chat" ? "block" : "hidden"} lg:block`}>
           <ChatRail
             actions={tutor.session.actions}
             transcript={tutor.session.transcript}
