@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { PROVIDERS, estimateCost, formatCost } from "../.test-build/providers/index.js";
+import { PROVIDERS, estimateCost, formatCost } from "../.test-build/core/providers/index.js";
 
 let passed = 0;
 const test = async (name, fn) => {
@@ -45,6 +45,19 @@ const collect = async (provider, frames, opts = {}) => {
     }),
   );
   return { text, usage };
+};
+
+/**
+ * The payload the provider actually sent, and how it sent it.
+ *
+ * In the free beta the OpenAI request goes to our own gateway wrapped in an
+ * envelope, because the key lives on the server. Unwrapping here keeps the
+ * wire-format checks about the wire format rather than about which mode is on.
+ */
+const viaGateway = () => lastRequest.url.endsWith("/api/llm");
+const sentPayload = () => {
+  const body = JSON.parse(lastRequest.init.body);
+  return viaGateway() ? body.body : body;
 };
 
 console.log("\n— Anthropic —");
@@ -128,21 +141,29 @@ await test("decodes chat-completions deltas and usage", async () => {
   assert.equal(usage.outputTokens, 120);
 });
 
-await test("system prompt is the first message; bearer auth is set", async () => {
+await test("system prompt is the first message, and the key goes where it should", async () => {
   await collect(PROVIDERS.openai, OPENAI_FRAMES);
-  const body = JSON.parse(lastRequest.init.body);
+  const body = sentPayload();
   assert.equal(body.messages[0].role, "system");
   assert.equal(body.stream_options.include_usage, true);
-  assert.equal(lastRequest.init.headers.authorization, "Bearer test-key");
+
+  if (viaGateway()) {
+    // Beta: the shared key is the server's. A key travelling from the browser
+    // here would mean the gateway had been bypassed.
+    assert.equal(JSON.parse(lastRequest.init.body).providerId, "openai");
+    assert.equal(lastRequest.init.headers.authorization, undefined);
+  } else {
+    assert.equal(lastRequest.init.headers.authorization, "Bearer test-key");
+  }
 });
 
 await test("reasoning models get reasoning_effort, not temperature", async () => {
   await collect(PROVIDERS.openai, OPENAI_FRAMES, { model: "o4-mini" });
-  const body = JSON.parse(lastRequest.init.body);
-  assert.equal(body.reasoning_effort, "low");
-  assert.equal(body.temperature, undefined);
+  const reasoning = sentPayload();
+  assert.equal(reasoning.reasoning_effort, "low");
+  assert.equal(reasoning.temperature, undefined);
   await collect(PROVIDERS.openai, OPENAI_FRAMES, { model: "gpt-4.1" });
-  assert.equal(JSON.parse(lastRequest.init.body).temperature, 0.4);
+  assert.equal(sentPayload().temperature, 0.4);
 });
 
 await test("OpenRouter rides the same decoder on its own endpoint", async () => {

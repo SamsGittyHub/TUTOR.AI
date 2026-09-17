@@ -31,14 +31,18 @@ const TARGETS = [
       "src/lib/sanitize.ts",
       "src/lib/exam-review.ts",
       "src/lib/realtime-events.ts",
+      "src/lib/voice-tools.ts",
       "src/lib/export.ts",
       "src/lib/materials/audio.ts",
       "src/lib/materials/vector.ts",
       "src/lib/materials/chunk.ts",
       "src/lib/materials/retrieve.ts",
+      // Pulls beta.ts in with it, which is why everything lives under one
+      // root: tsc widens rootDir to the common ancestor of what it emits, and
+      // a second target would silently move these files around.
+      "src/lib/providers/index.ts",
     ],
   },
-  { dir: "providers", files: ["src/lib/providers/index.ts"] },
 ];
 
 rmSync(out, { recursive: true, force: true });

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { TutorAction } from "./actions";
-import { handleRealtimeEvent, toolResultMessage } from "./realtime-events";
+import { handleRealtimeEvent, toolResultMessages } from "./realtime-events";
 
 /**
  * A live speech-to-speech tutor session over WebRTC.
@@ -28,9 +28,19 @@ export interface UseRealtimeOptions {
   onAction: (action: TutorAction) => void;
   /** Transcript lines, for the rail beside the board. */
   onTranscript: (role: "student" | "tutor", text: string) => void;
+  /**
+   * Answers a lookup the tutor made into the student's own work. Runs in the
+   * browser, where the material already is — nothing round-trips to a server
+   * mid-sentence.
+   */
+  runTool?: (name: string, args: Record<string, unknown>) => string;
 }
 
-export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
+export function useRealtime({
+  onAction,
+  onTranscript,
+  runTool,
+}: UseRealtimeOptions) {
   const [status, setStatus] = useState<RealtimeStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
@@ -41,8 +51,10 @@ export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const actionRef = useRef(onAction);
   const transcriptRef = useRef(onTranscript);
+  const toolRef = useRef(runTool);
   actionRef.current = onAction;
   transcriptRef.current = onTranscript;
+  toolRef.current = runTool;
 
   const stop = useCallback(() => {
     channelRef.current?.close();
@@ -113,9 +125,12 @@ export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
             onSpeaking: setSpeaking,
             // Acknowledging a tool call matters: without an output item the
             // model waits on it and the conversation stalls mid-sentence.
-            onToolResult: (callId) => {
-              if (channel.readyState === "open") {
-                channel.send(toolResultMessage(callId));
+            runTool: (name, args) =>
+              toolRef.current?.(name, args) ?? `Unknown tool: ${name}`,
+            onToolResult: (callId, output) => {
+              if (channel.readyState !== "open") return;
+              for (const message of toolResultMessages(callId, output)) {
+                channel.send(message);
               }
             },
             onError: (detail) => transcriptRef.current("tutor", `[${detail}]`),

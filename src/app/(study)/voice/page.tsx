@@ -2,14 +2,17 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Whiteboard } from "@/components/board/Whiteboard";
 import type { TutorAction } from "@/lib/actions";
 import { BETA } from "@/lib/beta";
 import { loadKeys, pullAccountKeys } from "@/lib/keys";
 import { loadSettings } from "@/lib/settings";
+import { getChunksFor, type MaterialChunk } from "@/lib/db";
+import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
+import { buildBriefing, runVoiceTool, type VoiceContext } from "@/lib/voice-tools";
 
 /**
  * Live voice: talk to the tutor, watch it write.
@@ -29,16 +32,54 @@ listen; being interrupted is the point of talking rather than reading.
 You have a whiteboard the student is looking at. Call write_on_board to put
 something on it — an equation, a title, the steps of a worked example — while
 you carry on speaking. Never read the JSON aloud and never mention the board
-tool; from their side, things simply appear as you explain them.
+tool; from their side, things simply appear as you explain them. At most one or
+two cards per reply: the board supports what you're saying, it isn't a
+transcript of it.
 
-Write at most one or two cards per reply. The board supports what you're
-saying; it isn't a transcript of it.`;
+You can also see their work. Call search_material before answering anything
+that touches their own notes, slides or lecture transcripts — teach from what
+they actually have, name the file it came from, and don't fall back on general
+knowledge when their material covers it. get_progress tells you where they're
+strong and weak; list_lessons tells you what they've already been taught, so
+you can build on it rather than repeat it.
+
+Look things up quietly. Say "let me check your notes", not "I am calling the
+search_material function".`;
 
 export default function VoicePage() {
   const [actions, setActions] = useState<TutorAction[]>([]);
   const [lines, setLines] = useState<{ role: "student" | "tutor"; text: string }[]>([]);
   const [theme, setTheme] = useState<"paper" | "chalk">("paper");
   const [keyMissing, setKeyMissing] = useState(false);
+
+  // Everything the tutor is allowed to know about this student. Loaded up
+  // front so a lookup mid-sentence is a local search, not a round trip.
+  const lib = useLibrary();
+  const [chunks, setChunks] = useState<MaterialChunk[]>([]);
+
+  useEffect(() => {
+    if (!lib.materials.length) return;
+    let live = true;
+    getChunksFor(lib.materials.map((m) => m.id))
+      .then((loaded) => live && setChunks(loaded))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [lib.materials]);
+
+  const context: VoiceContext = useMemo(
+    () => ({
+      materials: lib.materials,
+      chunks,
+      sessions: lib.sessions,
+      courses: lib.courses,
+      cards: lib.cards,
+      attempts: lib.attempts,
+      papers: lib.papers,
+    }),
+    [lib.materials, chunks, lib.sessions, lib.courses, lib.cards, lib.attempts, lib.papers],
+  );
 
   const onAction = useCallback((action: TutorAction) => {
     setActions((list) => [...list, action]);
@@ -48,7 +89,17 @@ export default function VoicePage() {
     setLines((list) => [...list, { role, text }]);
   }, []);
 
-  const rt = useRealtime({ onAction, onTranscript });
+  const contextRef = useRef(context);
+  contextRef.current = context;
+
+  const rt = useRealtime({
+    onAction,
+    onTranscript,
+    // Read through a ref: the session is opened once, and a tool called twenty
+    // minutes in should see the material as it is then, not as it was at
+    // connect time.
+    runTool: (name, args) => runVoiceTool(name, args, contextRef.current),
+  });
 
   // Live voice can be the first page someone opens; pull the stored key so
   // "Start talking" doesn't bounce them to Settings for a key they already have.
@@ -65,7 +116,7 @@ export default function VoicePage() {
       return;
     }
     setKeyMissing(false);
-    void rt.start(openaiKey, INSTRUCTIONS);
+    void rt.start(openaiKey, INSTRUCTIONS + buildBriefing(context));
   }
 
   const live = rt.status === "live";

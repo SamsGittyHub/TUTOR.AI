@@ -17,8 +17,16 @@ export interface RealtimeHandlers {
   onAction: (action: TutorAction) => void;
   onTranscript: (role: "student" | "tutor", text: string) => void;
   onSpeaking: (speaking: boolean) => void;
-  /** Tool calls must be answered or the model waits and the turn stalls. */
-  onToolResult: (callId: string) => void;
+  /**
+   * Answers a tool call. Must always be called, or the model waits on the
+   * output item and the turn stalls mid-sentence.
+   */
+  onToolResult: (callId: string, output: string) => void;
+  /**
+   * Runs a tool the tutor called to look something up. Returns what it should
+   * hear back. Board cards are handled here too, via onAction.
+   */
+  runTool?: (name: string, args: Record<string, unknown>) => string;
   onError?: (message: string) => void;
 }
 
@@ -94,15 +102,31 @@ export function handleRealtimeEvent(
     if (text) handlers.onTranscript("tutor", text);
   }
 
-  // Board cards arrive as a tool call while the tutor talks.
+  // Tool calls: board cards, and lookups into the student's own work.
   if (type === "response.function_call_arguments.done") {
-    if (String(message.name ?? "") === "write_on_board") {
-      for (const action of actionsFromToolCall(message)) handlers.onAction(action);
-    }
+    const name = String(message.name ?? "");
     const callId = String(message.call_id ?? "");
+    let output = "ok";
+
+    if (name === "write_on_board") {
+      const actions = actionsFromToolCall(message);
+      for (const action of actions) handlers.onAction(action);
+      output = actions.length ? "Written on the board." : "That card wasn't usable.";
+    } else if (handlers.runTool) {
+      try {
+        const args = JSON.parse(String(message.arguments ?? "{}")) as Record<
+          string,
+          unknown
+        >;
+        output = handlers.runTool(name, args);
+      } catch {
+        output = "That lookup failed — the arguments weren't readable.";
+      }
+    }
+
     // Answered even for a tool we don't know: an unanswered call stalls the
-    // conversation, and silence is a worse outcome than a useless ack.
-    if (callId) handlers.onToolResult(callId);
+    // conversation, and silence is a worse outcome than a useless answer.
+    if (callId) handlers.onToolResult(callId, output);
   }
 
   if (TEXT_DONE.has(type)) {
@@ -119,14 +143,23 @@ export function handleRealtimeEvent(
   }
 }
 
-/** The message that answers a tool call. */
-export function toolResultMessage(callId: string): string {
-  return JSON.stringify({
-    type: "conversation.item.create",
-    item: {
-      type: "function_call_output",
-      call_id: callId,
-      output: '{"ok":true}',
-    },
-  });
+/**
+ * The message that answers a tool call, plus the nudge to carry on.
+ *
+ * The output item alone doesn't resume the turn — without response.create the
+ * tutor goes quiet after looking something up, which reads as the call having
+ * failed.
+ */
+export function toolResultMessages(callId: string, output: string): string[] {
+  return [
+    JSON.stringify({
+      type: "conversation.item.create",
+      item: {
+        type: "function_call_output",
+        call_id: callId,
+        output,
+      },
+    }),
+    JSON.stringify({ type: "response.create" }),
+  ];
 }

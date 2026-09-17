@@ -30,7 +30,8 @@ import {
   blocksToXml, contentTypesXml, documentRelsXml, documentXml, esc, pxToEmu,
 } from "../.test-build/core/docx.js";
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
-import { handleRealtimeEvent, toolResultMessage } from "../.test-build/core/realtime-events.js";
+import { handleRealtimeEvent, toolResultMessages } from "../.test-build/core/realtime-events.js";
+import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
   normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
@@ -1178,13 +1179,17 @@ test("a subject with no material at all still appears", () => {
 
 console.log("\n— live voice events —");
 
-function collect(message) {
-  const seen = { actions: [], lines: [], speaking: [], acks: [], errors: [] };
+function collect(message, runTool) {
+  const seen = { actions: [], lines: [], speaking: [], acks: [], outputs: [], errors: [] };
   handleRealtimeEvent(message, {
     onAction: (a) => seen.actions.push(a),
     onTranscript: (role, text) => seen.lines.push([role, text]),
     onSpeaking: (v) => seen.speaking.push(v),
-    onToolResult: (id) => seen.acks.push(id),
+    onToolResult: (id, output) => {
+      seen.acks.push(id);
+      seen.outputs.push(output);
+    },
+    runTool,
     onError: (m) => seen.errors.push(m),
   });
   return seen;
@@ -1281,10 +1286,222 @@ test("server errors are surfaced, not swallowed", () => {
 });
 
 test("the tool answer is a function_call_output for that call", () => {
-  const msg = JSON.parse(toolResultMessage("call_9"));
-  assert.equal(msg.type, "conversation.item.create");
-  assert.equal(msg.item.type, "function_call_output");
-  assert.equal(msg.item.call_id, "call_9");
+  const [first] = toolResultMessages("call_9", "Written on the board.").map(JSON.parse);
+  assert.equal(first.type, "conversation.item.create");
+  assert.equal(first.item.type, "function_call_output");
+  assert.equal(first.item.call_id, "call_9");
+  assert.equal(first.item.output, "Written on the board.");
+});
+
+test("the answer is followed by a response.create, or the tutor goes quiet", () => {
+  const messages = toolResultMessages("call_9", "ok").map(JSON.parse);
+  assert.equal(messages.length, 2);
+  assert.equal(messages[1].type, "response.create");
+});
+
+test("a lookup tool is routed to runTool and its prose is sent back", () => {
+  const calls = [];
+  const seen = collect(
+    {
+      type: "response.function_call_arguments.done",
+      name: "search_material",
+      call_id: "call_10",
+      arguments: JSON.stringify({ query: "titration" }),
+    },
+    (name, args) => {
+      calls.push([name, args]);
+      return "From Chem notes, p.4:\nAdd the acid slowly.";
+    },
+  );
+  assert.deepEqual(calls, [["search_material", { query: "titration" }]]);
+  assert.deepEqual(seen.acks, ["call_10"]);
+  assert.match(seen.outputs[0], /Add the acid slowly/);
+});
+
+test("a lookup with unreadable arguments still answers the call", () => {
+  const seen = collect(
+    {
+      type: "response.function_call_arguments.done",
+      name: "get_progress",
+      call_id: "call_11",
+      arguments: "{not json",
+    },
+    () => "never reached",
+  );
+  assert.deepEqual(seen.acks, ["call_11"]);
+  assert.match(seen.outputs[0], /lookup failed/);
+});
+
+test("write_on_board never reaches runTool", () => {
+  // The board is handled locally; sending it out to a lookup would draw nothing.
+  let reached = false;
+  const seen = collect(
+    {
+      type: "response.function_call_arguments.done",
+      name: "write_on_board",
+      call_id: "call_12",
+      arguments: JSON.stringify({
+        action: { type: "write_text", id: "t9", text: "Hi", style: "body", color: "ink" },
+      }),
+    },
+    () => {
+      reached = true;
+      return "";
+    },
+  );
+  assert.equal(reached, false);
+  assert.equal(seen.actions.length, 1);
+});
+
+console.log("\n— what the live tutor knows —");
+
+const NOW = Date.UTC(2026, 0, 15);
+
+/** A context with one strong subject, one weak one, and material in both. */
+function voiceContext(overrides = {}) {
+  const base = {
+    courses: [
+      { id: "c-maths", name: "Maths", color: "cyan" },
+      { id: "c-chem", name: "Chemistry", color: "amber" },
+    ],
+    materials: [
+      { id: "m1", courseId: "c-maths", name: "Calculus notes.pdf" },
+      { id: "m2", courseId: "c-chem", name: "Titration handout.pdf" },
+      { id: "m3", name: "Loose scan.jpg" },
+    ],
+    chunks: [
+      { id: "k1", materialId: "m1", locator: "page 2", order: 0,
+        text: "The derivative of a product uses the product rule." },
+      { id: "k2", materialId: "m2", locator: "page 5", order: 0,
+        text: "Add the acid slowly to the burette during a titration." },
+    ],
+    sessions: [
+      { id: "s1", courseId: "c-maths", title: "Product rule", updatedAt: NOW - DAY_MS,
+        plan: { steps: ["differentiate", "check"] } },
+      { id: "s2", courseId: "c-chem", title: "Titration curves", updatedAt: NOW - 2 * DAY_MS },
+    ],
+    cards: [],
+    attempts: [
+      att(["m1"], 10, 10, NOW - DAY_MS), att(["m1"], 9, 10, NOW - DAY_MS),
+      att(["m2"], 2, 10, NOW - DAY_MS), att(["m2"], 3, 10, NOW - DAY_MS),
+    ],
+    now: NOW,
+  };
+  return { ...base, ...overrides };
+}
+
+test("the briefing names the subjects and which way round they rank", () => {
+  const brief = buildBriefing(voiceContext());
+  assert.match(brief, /Maths/);
+  assert.match(brief, /Chemistry/);
+  assert.match(brief, /Strongest right now: Maths/);
+  assert.match(brief, /Weakest: Chemistry/);
+});
+
+test("the briefing lists recent lessons and unfiled material", () => {
+  const brief = buildBriefing(voiceContext());
+  assert.match(brief, /Product rule/);
+  assert.match(brief, /Loose scan\.jpg/);
+});
+
+test("the briefing counts the cards due today", () => {
+  const due = {
+    ...newCard("r1", { prompt: "What is 2+2?", answer: "4" }, ["m1"], true, NOW),
+    dueAt: NOW - DAY_MS,
+  };
+  const brief = buildBriefing(voiceContext({ cards: [due] }));
+  assert.match(brief, /1 review card is due today/);
+});
+
+test("a brand-new student gets an opening, not an empty briefing", () => {
+  const brief = buildBriefing({
+    courses: [], materials: [], chunks: [], sessions: [], cards: [], attempts: [], now: NOW,
+  });
+  assert.match(brief, /haven't uploaded anything/);
+  assert.doesNotMatch(brief, /Subjects:/);
+});
+
+test("search_material quotes the student's own file and says where from", () => {
+  const out = runVoiceTool("search_material", { query: "titration burette" }, voiceContext());
+  assert.match(out, /Titration handout\.pdf/);
+  assert.match(out, /page 5/);
+  assert.match(out, /Add the acid slowly/);
+});
+
+test("a file with no pages isn't announced as 'from notes.txt, notes.txt'", () => {
+  const context = voiceContext({
+    chunks: [{ id: "k3", materialId: "m3", locator: "Loose scan.jpg", order: 0,
+               text: "Ohm's law relates voltage, current and resistance." }],
+  });
+  const out = runVoiceTool("search_material", { query: "ohm law resistance" }, context);
+  assert.match(out, /^From Loose scan\.jpg:/);
+});
+
+test("search_material narrowed to a subject ignores the others", () => {
+  const out = runVoiceTool(
+    "search_material", { query: "titration burette", subject: "Maths" }, voiceContext(),
+  );
+  assert.doesNotMatch(out, /Add the acid slowly/, "Chemistry material isn't filed under Maths");
+});
+
+test("a subject name is matched loosely, not exactly", () => {
+  // The tutor hears "chemistry" and has no way to know the folder's exact case.
+  const out = runVoiceTool(
+    "search_material", { query: "titration", subject: "  chem " }, voiceContext(),
+  );
+  assert.match(out, /Add the acid slowly/);
+});
+
+test("searching a subject with nothing in it says so rather than answering blind", () => {
+  const context = voiceContext({ chunks: [] });
+  const out = runVoiceTool("search_material", { query: "anything", subject: "Maths" }, context);
+  assert.match(out, /Nothing is filed under Maths/);
+});
+
+test("an empty query is refused instead of returning arbitrary passages", () => {
+  assert.match(runVoiceTool("search_material", { query: "   " }, voiceContext()), /No query/);
+});
+
+test("get_progress ranks strongest to weakest with the counts behind it", () => {
+  const out = runVoiceTool("get_progress", {}, voiceContext());
+  const lines = out.split("\n");
+  assert.match(lines[0], /^Maths:/);
+  assert.match(lines[1], /^Chemistry:/);
+  assert.match(out, /19 of 20 answered right/);
+});
+
+test("get_progress says so when a subject hasn't been quizzed enough to rank", () => {
+  const context = voiceContext({ attempts: [att(["m1"], 1, 2, NOW - DAY_MS)] });
+  assert.match(runVoiceTool("get_progress", {}, context), /too early to rank/);
+});
+
+test("list_lessons is newest first and filters by subject", () => {
+  const all = runVoiceTool("list_lessons", {}, voiceContext()).split("\n");
+  assert.match(all[0], /Product rule/, "the most recent lesson comes first");
+  assert.match(all[0], /covered differentiate, check/);
+
+  const chem = runVoiceTool("list_lessons", { subject: "Chemistry" }, voiceContext());
+  assert.match(chem, /Titration curves/);
+  assert.doesNotMatch(chem, /Product rule/);
+});
+
+test("list_lessons on an empty subject doesn't invent one", () => {
+  const out = runVoiceTool("list_lessons", { subject: "Maths" },
+                           voiceContext({ sessions: [] }));
+  assert.match(out, /No lessons filed under Maths/);
+});
+
+test("an unknown tool name comes back as prose, not a thrown error", () => {
+  assert.match(runVoiceTool("teleport", {}, voiceContext()), /Unknown tool/);
+});
+
+test("every declared tool is one the runner or the board actually handles", () => {
+  const handled = new Set(["write_on_board", "search_material", "get_progress", "list_lessons"]);
+  for (const tool of VOICE_TOOLS) {
+    assert.equal(tool.type, "function");
+    assert.ok(handled.has(tool.name), `${tool.name} is declared but nothing answers it`);
+    assert.ok(tool.description.length > 20, `${tool.name} needs a usable description`);
+  }
 });
 
 console.log(`\n${passed} checks passed\n`);

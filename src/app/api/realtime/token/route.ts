@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { BETA, BETA_REALTIME_MODEL, BETA_REALTIME_VOICE } from "@/lib/beta";
 import { currentUser } from "@/lib/server/auth";
+import { VOICE_TOOLS } from "@/lib/voice-tools";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
 
 /**
@@ -74,32 +75,11 @@ export async function POST(request: NextRequest) {
           output: { voice },
         },
         /*
-         * Board cards arrive as a tool call, not as text.
-         *
-         * A speech-to-speech session's output is audio; asking it to also emit
-         * a stream of JSON in the same turn fights the modality and produces a
-         * model that sometimes reads the JSON aloud. A function call is the
-         * channel built for structured output while it talks.
+         * The tutor can write on the board and look things up in the student's
+         * own work. Declared server-side so a page can't quietly widen what
+         * the session is able to ask for.
          */
-        tools: [
-          {
-            type: "function",
-            name: "write_on_board",
-            description:
-              "Write one card onto the whiteboard the student is looking at. Call this while you talk — never say the JSON out loud.",
-            parameters: {
-              type: "object",
-              properties: {
-                action: {
-                  type: "string",
-                  description:
-                    'One board action as a JSON object, e.g. {"type":"write_equation","id":"e1","latex":"\\int u\\,dv = uv - \\int v\\,du","color":"cyan"} or {"type":"write_text","id":"t1","text":"Integration by parts","style":"title","color":"ink"}. Raw LaTeX only, no $ delimiters.',
-                },
-              },
-              required: ["action"],
-            },
-          },
-        ],
+        tools: VOICE_TOOLS,
         tool_choice: "auto",
       },
     }),
