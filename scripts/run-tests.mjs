@@ -31,6 +31,7 @@ const TARGETS = [
       "src/lib/sanitize.ts",
       "src/lib/exam-review.ts",
       "src/lib/realtime-events.ts",
+      "src/lib/board-image.ts",
       "src/lib/voice-tools.ts",
       "src/lib/export.ts",
       "src/lib/materials/audio.ts",

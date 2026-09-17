@@ -20,10 +20,19 @@ export const BETA_MODEL = "gpt-5.6-terra";
  * directly rather than transcribing, which is what makes barge-in feel like
  * interrupting a person instead of cancelling a playback.
  */
-export const BETA_REALTIME_MODEL = "gpt-realtime-2.1";
+export const BETA_REALTIME_MODEL = "gpt-realtime-2.1-mini";
 
 /** Output voice. Fixed for now; a picker is a settings question, not a code one. */
 export const BETA_REALTIME_VOICE = "alloy";
+
+/**
+ * Pictures on the board.
+ *
+ * The live tutor draws its own illustrations — a labelled cross-section, a
+ * free-body diagram, the thing the student can't picture — rather than only
+ * the shapes the board can render from JSON. Same shared key, same daily cap.
+ */
+export const BETA_IMAGE_MODEL = "gpt-image-2.5-flare-2026-09-08";
 
 /**
  * The key a call should use.

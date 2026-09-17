@@ -167,6 +167,27 @@ export function boardToBlocks(
         break;
       }
 
+      case "show_image": {
+        const caption = action.caption ?? undefined;
+        if (canRaster?.has(action.id)) {
+          pending.push({ actionId: action.id, caption });
+          blocks.push({
+            kind: "image",
+            image: { data: new Uint8Array(), widthPx: 0, heightPx: 0, caption },
+          });
+        } else {
+          // The picture couldn't be captured. Say what it showed rather than
+          // leaving a gap where the student remembers a drawing.
+          blocks.push({
+            kind: "paragraph",
+            italic: true,
+            text: `[a drawing of ${action.prompt}]`,
+          });
+        }
+        cite(action);
+        break;
+      }
+
       case "ask_question": {
         blocks.push({ kind: "paragraph", text: `Check yourself: ${action.question}` });
         if (action.choices?.length) {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { TutorAction } from "./actions";
+import { BETA_REALTIME_MODEL } from "./beta";
 import { handleRealtimeEvent, toolResultMessages } from "./realtime-events";
 
 /**
@@ -90,7 +91,9 @@ export function useRealtime({
         if (!tokenResponse.ok) throw new Error(tokenBody.error ?? "Couldn't start.");
 
         const clientSecret: string | undefined = tokenBody.clientSecret;
-        const model: string = tokenBody.model ?? "gpt-realtime-2.1";
+        // The route always names the model it actually minted the secret for;
+        // this fallback only matters if that field ever goes missing.
+        const model: string = tokenBody.model ?? BETA_REALTIME_MODEL;
         if (!clientSecret) throw new Error("No session credential came back.");
 
         const pc = new RTCPeerConnection();

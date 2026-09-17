@@ -48,21 +48,38 @@ const TUTOR_TRANSCRIPT = new Set([
 
 const TEXT_DONE = new Set(["response.output_text.done", "response.text.done"]);
 
-/** Pulls board actions out of one `write_on_board` tool call. */
+/**
+ * Pulls board actions out of one `write_on_board` tool call.
+ *
+ * One call may carry several cards — a title, the working, and the result go
+ * up together rather than as three round trips through a spoken turn — so
+ * `action` and `actions` are both read, and either may arrive as a JSON string
+ * or as the object itself. Models send all four shapes; dropping a card
+ * because of which one turned up is a board that mysteriously stays empty.
+ */
 function actionsFromToolCall(message: Record<string, unknown>): TutorAction[] {
+  const parse = (value: unknown): unknown => {
+    if (typeof value !== "string") return value;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return null;
+    }
+  };
+
+  let args: { action?: unknown; actions?: unknown };
   try {
-    const args = JSON.parse(String(message.arguments ?? "{}")) as {
-      action?: unknown;
-    };
-    // The argument is documented as a JSON string, but a model will sometimes
-    // send the object directly. Accept both rather than dropping the card.
-    const raw =
-      typeof args.action === "string" ? JSON.parse(args.action) : args.action;
-    const action = normalizeAction(raw);
-    return action ? [action] : [];
+    args = JSON.parse(String(message.arguments ?? "{}"));
   } catch {
     return [];
   }
+
+  const raw = parse(args.actions ?? args.action);
+  const list = Array.isArray(raw) ? raw : [raw];
+
+  return list
+    .map((item) => normalizeAction(parse(item)))
+    .filter((a): a is TutorAction => a !== null);
 }
 
 /** Pulls board actions out of a text turn — the pre-tool-call arrangement. */
@@ -111,7 +128,9 @@ export function handleRealtimeEvent(
     if (name === "write_on_board") {
       const actions = actionsFromToolCall(message);
       for (const action of actions) handlers.onAction(action);
-      output = actions.length ? "Written on the board." : "That card wasn't usable.";
+      output = actions.length
+        ? `Written on the board (${actions.length} card${actions.length === 1 ? "" : "s"}).`
+        : "That card wasn't usable.";
     } else if (handlers.runTool) {
       try {
         const args = JSON.parse(String(message.arguments ?? "{}")) as Record<

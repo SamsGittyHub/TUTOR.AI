@@ -1,3 +1,4 @@
+import { normalizeImageRequest, type ImageRequest } from "./board-image";
 import type { Material, MaterialChunk, QuizAttempt, Session } from "./db";
 import { rankSubjects, type GradedPaper, type SubjectInput } from "./progress";
 import { retrieve } from "./materials/retrieve";
@@ -29,6 +30,15 @@ export interface VoiceContext {
   attempts: QuizAttempt[];
   papers?: GradedPaper[];
   now?: number;
+  /**
+   * Starts a drawing on the board.
+   *
+   * An image takes several seconds and this runs inside a spoken turn, so the
+   * tool hands the request over and returns at once — the picture lands on the
+   * board later, while the tutor is still talking. Injected rather than done
+   * here so the tool routing stays a pure function.
+   */
+  drawImage?: (request: ImageRequest) => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -146,17 +156,50 @@ export const VOICE_TOOLS = [
     type: "function" as const,
     name: "write_on_board",
     description:
-      "Write one card onto the whiteboard the student is looking at. Call this while you talk — never say the JSON out loud.",
+      "Write on the whiteboard the student is looking at. Send as many cards in one call as the point needs — a title, the working, a diagram and a summary table can all go up together. Call this constantly while you talk; never say the JSON out loud.",
     parameters: {
       type: "object",
       properties: {
-        action: {
-          type: "string",
+        actions: {
+          type: "array",
           description:
-            'One board action as a JSON object, e.g. {"type":"write_equation","id":"e1","latex":"a^2+b^2=c^2","color":"cyan"}. Raw LaTeX only, no $ delimiters.',
+            "The cards to write, in the order they should appear. See the board schema in your instructions for every card type.",
+          items: { type: "string", description: "One board action as a JSON object." },
         },
       },
-      required: ["action"],
+      required: ["actions"],
+    },
+  },
+  {
+    type: "function" as const,
+    name: "draw_image",
+    description:
+      "Draw a picture on the whiteboard — an illustration, a labelled cross-section, an apparatus setup, a map, anything the board's shapes and equations can't show. Takes a few seconds and appears on its own, so keep talking after you call it. Use it whenever a student would understand faster from seeing the thing.",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description:
+            "What to draw, described fully: the subject, the parts that must be visible, and what each should be labelled. 'A labelled cross-section of a leaf showing cuticle, palisade mesophyll, spongy mesophyll, stomata and guard cells' — not 'a leaf'.",
+        },
+        caption: {
+          type: "string",
+          description: "Short line to write under the picture on the board.",
+        },
+        style: {
+          type: "string",
+          enum: ["diagram", "sketch", "realistic"],
+          description:
+            "diagram for a clean labelled figure (the usual choice), sketch for a hand-drawn marker look, realistic for a photograph of a real object.",
+        },
+        shape: {
+          type: "string",
+          enum: ["square", "wide", "tall"],
+          description: "wide by default; tall for something upright like a tower or a column.",
+        },
+      },
+      required: ["prompt"],
     },
   },
   {
@@ -225,6 +268,18 @@ export function runVoiceTool(
   context: VoiceContext,
 ): string {
   const now = context.now ?? Date.now();
+
+  if (name === "draw_image") {
+    const request = normalizeImageRequest(args);
+    if ("error" in request) return request.error;
+    if (!context.drawImage) return "The board can't take a drawing right now.";
+
+    context.drawImage(request);
+    // Said back to a model that is mid-sentence: it needs to know the picture
+    // is coming without waiting for it, and to keep the student's attention on
+    // the board rather than on a pause.
+    return `Drawing it now — the picture appears on the board in a few seconds. Keep talking while it comes up, then walk them through what they're looking at.`;
+  }
 
   if (name === "search_material") {
     const query = String(args.query ?? "").trim();

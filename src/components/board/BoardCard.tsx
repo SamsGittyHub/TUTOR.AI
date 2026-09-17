@@ -217,9 +217,81 @@ function Body({
         </div>
       );
 
+    case "show_image":
+      return <ImageCard action={action} theme={theme} bodyInk={bodyInk} subtle={subtle} />;
+
     case "ask_question":
       return <AskCard action={action} theme={theme} bodyInk={bodyInk} subtle={subtle} onAnswer={onAnswer} />;
   }
+}
+
+/**
+ * A generated picture, in three states.
+ *
+ * The drawing takes a few seconds and the tutor keeps talking through them, so
+ * the card goes up immediately saying what is coming. Reserving the space up
+ * front also stops the board jumping under the student when the image lands.
+ */
+function ImageCard({
+  action,
+  theme,
+  bodyInk,
+  subtle,
+}: {
+  action: Extract<BoardAction, { type: "show_image" }>;
+  theme: BoardTheme;
+  bodyInk: string;
+  subtle: string;
+}) {
+  const frame = theme === "paper" ? "border-black/10" : "border-white/15";
+  const ratio =
+    action.width && action.height ? `${action.width} / ${action.height}` : "3 / 2";
+
+  return (
+    <figure>
+      {action.src ? (
+        // A plain img: the source is behind the session cookie, and the
+        // intrinsic size is whatever the image model returned.
+        <img
+          src={action.src}
+          alt={action.caption || action.prompt}
+          className={`w-full rounded-sm border ${frame} bg-white`}
+          style={{ aspectRatio: ratio }}
+        />
+      ) : action.error ? (
+        <div
+          className={`flex items-center justify-center rounded-sm border border-dashed ${frame} px-6 py-8`}
+          style={{ aspectRatio: ratio }}
+        >
+          <p className={`hand max-w-sm text-center text-[17px] ${subtle}`}>{action.error}</p>
+        </div>
+      ) : (
+        <div
+          className={`flex flex-col items-center justify-center gap-3 rounded-sm border border-dashed ${frame} px-6 py-8`}
+          style={{ aspectRatio: ratio }}
+        >
+          <span className="flex gap-1.5" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className="h-2 w-2 animate-pulse rounded-full bg-current opacity-40"
+                style={{ animationDelay: `${i * 160}ms` }}
+              />
+            ))}
+          </span>
+          <p className={`hand max-w-sm text-center text-[17px] ${subtle}`}>
+            drawing {action.prompt}…
+          </p>
+        </div>
+      )}
+
+      {action.caption ? (
+        <figcaption className={`hand mt-2 text-center text-[17px] ${bodyInk} opacity-80`}>
+          {action.caption}
+        </figcaption>
+      ) : null}
+    </figure>
+  );
 }
 
 function AskCard({

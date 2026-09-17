@@ -12,36 +12,100 @@ import { loadSettings } from "@/lib/settings";
 import { getChunksFor, type MaterialChunk } from "@/lib/db";
 import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
+import type { ImageRequest } from "@/lib/board-image";
 import { buildBriefing, runVoiceTool, type VoiceContext } from "@/lib/voice-tools";
 
 /**
  * Live voice: talk to the tutor, watch it write.
  *
  * This is the one place the board is driven by speech rather than a typed
- * turn. The instructions below are a trimmed version of the streaming
- * protocol — a realtime model has to keep talking while it emits JSON, so it
- * is asked for far fewer board actions per turn than the text tutor.
+ * turn. The tutor gets the same board vocabulary as the text one plus an image
+ * model, and is pushed to use all of it: a spoken explanation vanishes as it's
+ * said, so the board has to hold everything the student will want to re-read.
  */
 
-const INSTRUCTIONS = `You are a patient tutor talking with one student out loud.
+const BOARD_SCHEMA = `## The board
+
+Call write_on_board with an "actions" array of JSON objects. Every object needs
+a short unique "id". These are the card types:
+
+{"type":"write_text","id":"h1","text":"Integration by parts","style":"title","color":"ink"}
+  style: "title" | "body" | "note". color: ink | cyan | pink | amber | green | violet.
+
+{"type":"write_equation","id":"eq1","latex":"\\\\int u\\\\,dv = uv - \\\\int v\\\\,du","label":"the formula","color":"cyan"}
+  Raw LaTeX only — no $ or \\\\[ delimiters, they render as literal characters.
+
+{"type":"write_steps","id":"w1","title":"Worked example","color":"ink","steps":[
+  {"text":"Choose u and dv","latex":"u = x,\\\\quad dv = e^x dx","note":"pick u so du is simpler"},
+  {"text":"Differentiate and integrate","latex":"du = dx,\\\\quad v = e^x"}]}
+  Each step may carry text, latex, note — any combination. This is where the
+  real work goes: one line per move, never a jump to the answer.
+
+{"type":"write_table","id":"tb1","title":"Comparison","headers":["Method","Use when"],"rows":[["Substitution","one function inside another"],["By parts","a product of two kinds"]]}
+
+{"type":"draw_diagram","id":"d1","title":"Cell respiration","layout":"flow","nodes":[
+  {"id":"a","label":"Glucose","shape":"round","color":"cyan"},
+  {"id":"b","label":"Pyruvate","shape":"box","color":"ink"}],
+ "edges":[{"from":"a","to":"b","label":"glycolysis"}]}
+  layout: "flow" (top to bottom) | "row" (left to right) | "cycle" | "tree".
+  shape: box | round | circle | diamond.
+
+{"type":"draw_plot","id":"p1","title":"f(x) = x² - 3x","xRange":[-2,5],"curves":[{"expr":"x^2 - 3*x","label":"f(x)","color":"cyan"}],"points":[{"x":1.5,"y":-2.25,"label":"vertex","color":"pink"}]}
+  expr is plain math in x: + - * / ^ ( ), and sin cos tan sqrt abs exp ln log.
+  No LaTeX in expr.
+
+{"type":"ask_question","id":"q1","question":"What should u be here?","choices":["x","e^x"],"answer":"x","explanation":"du = dx is simpler than what we started with."}
+  A check for understanding. Omit "choices" for an open question.
+
+{"type":"highlight","id":"hl1","targetId":"eq1","note":"this is the part that flips sign"}
+  Marks something already up there. targetId must be an id you wrote earlier.
+  Use it constantly — pointing at the board is most of teaching at one.
+
+{"type":"erase","id":"er1","targetId":"w1"}
+  Clears a card when it has served its purpose or was wrong.
+
+For a picture — anything the shapes above can't draw — call draw_image instead.`;
+
+const INSTRUCTIONS = `You are a patient tutor talking with one student out loud,
+at a whiteboard you are both looking at.
 
 Speak naturally and briefly — two or three sentences at a time, then stop and
 let them respond. Never lecture for a minute straight. If they cut in, stop and
 listen; being interrupted is the point of talking rather than reading.
 
-You have a whiteboard the student is looking at. Call write_on_board to put
-something on it — an equation, a title, the steps of a worked example — while
-you carry on speaking. Never read the JSON aloud and never mention the board
-tool; from their side, things simply appear as you explain them. At most one or
-two cards per reply: the board supports what you're saying, it isn't a
-transcript of it.
+${BOARD_SCHEMA}
 
-You can also see their work. Call search_material before answering anything
-that touches their own notes, slides or lecture transcripts — teach from what
-they actually have, name the file it came from, and don't fall back on general
-knowledge when their material covers it. get_progress tells you where they're
-strong and weak; list_lessons tells you what they've already been taught, so
-you can build on it rather than repeat it.
+## Fill the board
+
+Your voice is short. The board is not. Everything you say out loud should have
+something written under it, and a student who looks away for a minute should be
+able to catch up from the board alone.
+
+- **Write constantly.** A card for the topic, a card for the idea, the working
+  line by line, the result, and a summary at the end. Several cards per call,
+  several calls per explanation. A board that has one equation on it after five
+  minutes of talking is a failure.
+- **Show the whole working.** write_steps with every line, not the first and
+  last. The student cannot rewind your voice; they can re-read the board.
+- **Draw the thing.** A diagram for a process, a plot for a shape, a table for a
+  comparison, draw_image for anything real — apparatus, anatomy, a map, a
+  mechanism, a photograph of the object you're describing. If the student would
+  understand faster from seeing it, draw it before explaining it.
+- **Point at what you wrote.** highlight the line you're talking about as you
+  talk about it, and erase a worked example before starting a new one.
+- **Ask early.** ask_question every few minutes, right after a new idea, not at
+  the end.
+
+Never read the JSON aloud and never mention the board, the tools or the cards;
+from the student's side, things simply appear as you explain them.
+
+## Their own work
+
+Call search_material before answering anything that touches their notes, slides
+or lecture transcripts — teach from what they actually have, name the file it
+came from, and don't fall back on general knowledge when their material covers
+it. get_progress tells you where they're strong and weak; list_lessons tells you
+what they've already been taught, so you build on it rather than repeat it.
 
 Look things up quietly. Say "let me check your notes", not "I am calling the
 search_material function".`;
@@ -68,6 +132,55 @@ export default function VoicePage() {
     };
   }, [lib.materials]);
 
+  const onAction = useCallback((action: TutorAction) => {
+    setActions((list) => [...list, action]);
+  }, []);
+
+  /**
+   * Puts a picture on the board.
+   *
+   * The card goes up empty straight away and fills in when the image model
+   * comes back, because generation takes seconds the conversation can't wait
+   * for — the tutor carries on talking over a card that says what's coming.
+   */
+  const drawImage = useCallback((request: ImageRequest) => {
+    const id = `img-${crypto.randomUUID()}`;
+    setActions((list) => [
+      ...list,
+      { type: "show_image", id, prompt: request.prompt, caption: request.caption },
+    ]);
+
+    const settle = (patch: Partial<Extract<TutorAction, { type: "show_image" }>>) =>
+      setActions((list) =>
+        list.map((a) => (a.id === id && a.type === "show_image" ? { ...a, ...patch } : a)),
+      );
+
+    void (async () => {
+      try {
+        const response = await fetch("/api/images", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...request,
+            apiKey: BETA ? undefined : (loadKeys().openai ?? ""),
+          }),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok || !body.src) {
+          settle({ error: body.error ?? "That drawing didn't come through." });
+          return;
+        }
+        settle({ src: body.src, width: body.width, height: body.height });
+      } catch {
+        settle({ error: "That drawing didn't come through." });
+      }
+    })();
+  }, []);
+
+  const onTranscript = useCallback((role: "student" | "tutor", text: string) => {
+    setLines((list) => [...list, { role, text }]);
+  }, []);
+
   const context: VoiceContext = useMemo(
     () => ({
       materials: lib.materials,
@@ -77,17 +190,10 @@ export default function VoicePage() {
       cards: lib.cards,
       attempts: lib.attempts,
       papers: lib.papers,
+      drawImage,
     }),
-    [lib.materials, chunks, lib.sessions, lib.courses, lib.cards, lib.attempts, lib.papers],
+    [lib.materials, chunks, lib.sessions, lib.courses, lib.cards, lib.attempts, lib.papers, drawImage],
   );
-
-  const onAction = useCallback((action: TutorAction) => {
-    setActions((list) => [...list, action]);
-  }, []);
-
-  const onTranscript = useCallback((role: "student" | "tutor", text: string) => {
-    setLines((list) => [...list, { role, text }]);
-  }, []);
 
   const contextRef = useRef(context);
   contextRef.current = context;

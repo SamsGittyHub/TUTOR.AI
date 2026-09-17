@@ -124,7 +124,11 @@ async function exportDocx(
 ) {
   // Only cards actually present in the rendered board can be rasterised.
   const visual = actions.filter(
-    (a) => a.type === "draw_diagram" || a.type === "draw_plot",
+    (a) =>
+      a.type === "draw_diagram" ||
+      a.type === "draw_plot" ||
+      // A generated picture only counts once it has actually arrived.
+      (a.type === "show_image" && Boolean(a.src)),
   );
   const rasterisable = new Set(
     visual.filter((a) => node.querySelector(`[data-action-id="${a.id}"]`)).map((a) => a.id),

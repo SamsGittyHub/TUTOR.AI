@@ -127,6 +127,25 @@ export interface PlotAction extends Common {
   yLabel?: string;
 }
 
+/**
+ * A generated picture.
+ *
+ * Unlike every other card, this one arrives in two parts: the tutor asks for
+ * it mid-sentence and the image lands a few seconds later, so a card with
+ * neither `src` nor `error` is one still being drawn.
+ */
+export interface ImageAction extends Common {
+  type: "show_image";
+  /** What was asked for. Kept so the card can say what it is while it draws. */
+  prompt: string;
+  caption?: string;
+  src?: string;
+  width?: number;
+  height?: number;
+  /** Set when the drawing failed, so the card explains itself instead of spinning. */
+  error?: string;
+}
+
 /** Marker over a card already on the board. */
 export interface HighlightAction extends Common {
   type: "highlight";
@@ -165,6 +184,7 @@ export type TutorAction =
   | TableAction
   | DiagramAction
   | PlotAction
+  | ImageAction
   | HighlightAction
   | EraseAction
   | AskAction
@@ -182,6 +202,7 @@ export const BOARD_TYPES = new Set([
   "write_table",
   "draw_diagram",
   "draw_plot",
+  "show_image",
   "ask_question",
 ]);
 
@@ -533,6 +554,29 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       };
     }
 
+    case "show_image":
+    case "draw_image":
+    case "image": {
+      const prompt = prose(r.prompt ?? r.description ?? r.subject);
+      const src = str(r.src ?? r.url);
+      if (!prompt && !src) return null;
+      const error = prose(r.error);
+      return {
+        ...base,
+        type: "show_image",
+        prompt,
+        caption: prose(r.caption ?? r.label) || undefined,
+        src: src || undefined,
+        width: r.width === undefined ? undefined : num(r.width, 0) || undefined,
+        height: r.height === undefined ? undefined : num(r.height, 0) || undefined,
+        // A stored card with no picture and no explanation is one whose
+        // session ended mid-draw. Say that, rather than rendering a skeleton
+        // that spins for ever.
+        error:
+          error || (src ? undefined : "That drawing didn't finish."),
+      };
+    }
+
     case "highlight":
     case "circle":
     case "underline": {
@@ -612,6 +656,12 @@ export function actionToText(action: TutorAction): string {
         .join(", ")}`;
     case "draw_plot":
       return `[board:${action.id}] plot ${action.curves.map((c) => c.expr).join(", ")}`;
+    case "show_image":
+      // Described, not linked: a model reading the transcript back needs to
+      // know what the student is looking at, and can't open the PNG.
+      return `[board:${action.id}] picture of ${action.prompt}${
+        action.caption ? ` — "${action.caption}"` : ""
+      }`;
     case "highlight":
       return `[highlighted ${action.targetId}]`;
     case "erase":

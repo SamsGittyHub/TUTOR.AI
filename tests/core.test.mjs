@@ -32,6 +32,9 @@ import {
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
 import { handleRealtimeEvent, toolResultMessages } from "../.test-build/core/realtime-events.js";
 import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
+import {
+  buildImagePrompt, dimensionsFor, normalizeImageRequest, sizeFor,
+} from "../.test-build/core/board-image.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
   normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
@@ -1496,12 +1499,175 @@ test("an unknown tool name comes back as prose, not a thrown error", () => {
 });
 
 test("every declared tool is one the runner or the board actually handles", () => {
-  const handled = new Set(["write_on_board", "search_material", "get_progress", "list_lessons"]);
+  const handled = new Set([
+    "write_on_board", "draw_image", "search_material", "get_progress", "list_lessons",
+  ]);
   for (const tool of VOICE_TOOLS) {
     assert.equal(tool.type, "function");
     assert.ok(handled.has(tool.name), `${tool.name} is declared but nothing answers it`);
     assert.ok(tool.description.length > 20, `${tool.name} needs a usable description`);
   }
+});
+
+console.log("\n— pictures on the board —");
+
+test("a description becomes a request with sane defaults", () => {
+  const req = normalizeImageRequest({ prompt: "  a labelled   leaf cross-section " });
+  assert.equal(req.prompt, "a labelled leaf cross-section", "whitespace is collapsed");
+  assert.equal(req.style, "diagram", "a teaching figure is the common case");
+  assert.equal(req.shape, "wide", "the board card is wider than it is tall");
+  assert.equal(req.caption, undefined);
+});
+
+test("style and shape are honoured when the tutor picks them", () => {
+  const req = normalizeImageRequest({
+    prompt: "the Eiffel tower", style: "realistic", shape: "tall", caption: "1889",
+  });
+  assert.equal(req.style, "realistic");
+  assert.equal(req.shape, "tall");
+  assert.equal(req.caption, "1889");
+});
+
+test("a style or shape the model invented falls back rather than failing", () => {
+  const req = normalizeImageRequest({ prompt: "a cell", style: "anime", shape: "panorama" });
+  assert.equal(req.style, "diagram");
+  assert.equal(req.shape, "wide");
+});
+
+test("an empty or near-empty description is refused in words", () => {
+  assert.match(normalizeImageRequest({}).error, /nothing to draw/);
+  assert.match(normalizeImageRequest({ prompt: "   " }).error, /nothing to draw/);
+  assert.match(normalizeImageRequest({ prompt: "ab" }).error, /too short/);
+});
+
+test("a runaway description is cut, not rejected", () => {
+  const req = normalizeImageRequest({ prompt: "cell ".repeat(500) });
+  assert.ok(req.prompt.length <= 900);
+  assert.ok(req.prompt.startsWith("cell cell"));
+});
+
+test("each shape has a size the image API accepts and matching dimensions", () => {
+  for (const shape of ["square", "wide", "tall"]) {
+    const size = sizeFor(shape);
+    assert.match(size, /^\d+x\d+$/);
+    const { width, height } = dimensionsFor(shape);
+    assert.equal(size, `${width}x${height}`, "the card's aspect ratio must match the file's");
+  }
+  assert.ok(dimensionsFor("wide").width > dimensionsFor("wide").height);
+  assert.ok(dimensionsFor("tall").height > dimensionsFor("tall").width);
+});
+
+test("the built prompt carries the style, the subject and the legibility rules", () => {
+  const prompt = buildImagePrompt(normalizeImageRequest({ prompt: "a voltaic cell" }));
+  assert.match(prompt, /Subject: a voltaic cell/);
+  assert.match(prompt, /flat vector/, "the default is a teaching figure");
+  assert.match(prompt, /spelled correctly/);
+  assert.match(prompt, /No title bar, frame, border/, "a framed image wastes half the card");
+});
+
+test("a realistic request doesn't ask for a vector diagram", () => {
+  const prompt = buildImagePrompt(
+    normalizeImageRequest({ prompt: "a real human heart", style: "realistic" }),
+  );
+  assert.match(prompt, /photograph/);
+  assert.doesNotMatch(prompt, /flat vector/);
+});
+
+test("draw_image hands the request over and answers at once", () => {
+  const drawn = [];
+  const out = runVoiceTool(
+    "draw_image",
+    { prompt: "a labelled leaf cross-section", caption: "the leaf" },
+    voiceContext({ drawImage: (r) => drawn.push(r) }),
+  );
+  assert.equal(drawn.length, 1);
+  assert.equal(drawn[0].prompt, "a labelled leaf cross-section");
+  assert.equal(drawn[0].caption, "the leaf");
+  // The tutor is mid-sentence: it must be told to keep talking, not to wait.
+  assert.match(out, /Keep talking/);
+});
+
+test("a bad draw_image call is explained, and nothing is drawn", () => {
+  const drawn = [];
+  const out = runVoiceTool("draw_image", { prompt: "" },
+                           voiceContext({ drawImage: (r) => drawn.push(r) }));
+  assert.equal(drawn.length, 0);
+  assert.match(out, /nothing to draw/);
+});
+
+test("draw_image on a board that can't take one says so instead of throwing", () => {
+  const out = runVoiceTool("draw_image", { prompt: "a cell" }, voiceContext());
+  assert.match(out, /can't take a drawing/);
+});
+
+test("a picture card survives being stored and read back", () => {
+  const action = normalizeAction({
+    type: "show_image", id: "i1", prompt: "a voltaic cell",
+    caption: "zinc and copper", src: "/api/images/abc", width: 1536, height: 1024,
+  });
+  assert.equal(action.type, "show_image");
+  assert.equal(action.src, "/api/images/abc");
+  assert.equal(action.width, 1536);
+  assert.equal(action.error, undefined);
+});
+
+test("a picture that never arrived reads as unfinished, not as still drawing", () => {
+  // Otherwise reopening the lesson shows a skeleton that spins for ever.
+  const action = normalizeAction({ type: "show_image", id: "i2", prompt: "a cell" });
+  assert.match(action.error, /didn't finish/);
+});
+
+test("a picture card with nothing in it at all is dropped", () => {
+  assert.equal(normalizeAction({ type: "show_image", id: "i3" }), null);
+});
+
+test("write_on_board takes a whole board's worth of cards in one call", () => {
+  // The point of the array: a title, the working and the result go up
+  // together rather than as three round trips through a spoken turn.
+  const seen = collect({
+    type: "response.function_call_arguments.done",
+    name: "write_on_board", call_id: "call_20",
+    arguments: JSON.stringify({
+      actions: [
+        JSON.stringify({ type: "write_text", id: "t1", text: "Ohm's law", style: "title", color: "ink" }),
+        JSON.stringify({ type: "write_equation", id: "e1", latex: "V = IR", color: "cyan" }),
+        JSON.stringify({ type: "write_text", id: "t2", text: "so R = V/I", style: "body", color: "ink" }),
+      ],
+    }),
+  });
+  assert.equal(seen.actions.length, 3);
+  assert.deepEqual(seen.actions.map((a) => a.id), ["t1", "e1", "t2"]);
+  assert.match(seen.outputs[0], /3 cards/);
+});
+
+test("an array of plain objects works as well as an array of strings", () => {
+  const seen = collect({
+    type: "response.function_call_arguments.done",
+    name: "write_on_board", call_id: "call_21",
+    arguments: JSON.stringify({
+      actions: [
+        { type: "write_text", id: "t3", text: "One", style: "body", color: "ink" },
+        { type: "write_text", id: "t4", text: "Two", style: "body", color: "ink" },
+      ],
+    }),
+  });
+  assert.equal(seen.actions.length, 2);
+});
+
+test("one bad card in a batch doesn't take the good ones down with it", () => {
+  const seen = collect({
+    type: "response.function_call_arguments.done",
+    name: "write_on_board", call_id: "call_22",
+    arguments: JSON.stringify({
+      actions: [
+        { type: "write_text", id: "t5", text: "Fine", style: "body", color: "ink" },
+        { type: "nonsense", id: "x1" },
+        "{not json",
+      ],
+    }),
+  });
+  assert.equal(seen.actions.length, 1);
+  assert.match(seen.outputs[0], /1 card\)/);
 });
 
 console.log(`\n${passed} checks passed\n`);

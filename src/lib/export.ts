@@ -114,6 +114,17 @@ export function actionToMarkdown(
       ].join("\n")}${cite}`;
     }
 
+    case "show_image": {
+      // Markdown image syntax, so it renders in a viewer that can still reach
+      // the app and degrades to the alt text in one that can't.
+      const alt = (action.caption || action.prompt).replace(/[[\]]/g, "");
+      const body = action.src
+        ? `![${alt}](${action.src})`
+        : `*[a drawing of ${action.prompt}, which didn't finish]*`;
+      const caption = action.caption ? `\n\n*${action.caption}*` : "";
+      return `${body}${caption}${cite}`;
+    }
+
     case "ask_question": {
       const choices = action.choices?.length
         ? `\n${action.choices.map((c) => `- ${c}`).join("\n")}`
