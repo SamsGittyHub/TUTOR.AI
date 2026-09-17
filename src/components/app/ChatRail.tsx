@@ -17,6 +17,7 @@ interface Props {
   micSupported?: boolean;
   micOn?: boolean;
   speaking?: boolean;
+  /** What the microphone is doing right now — "listening…", "thinking…". */
   interim?: string;
   micError?: string | null;
   onToggleMic?: () => void;
@@ -202,7 +203,7 @@ export function ChatRail({
         className="shrink-0 border-t border-line p-3"
       >
         {micOn && interim ? (
-          <p className="mb-1.5 truncate px-1 text-[11.5px] italic text-cyan">“{interim}…”</p>
+          <p className="mb-1.5 truncate px-1 text-[11.5px] italic text-cyan">{interim}</p>
         ) : null}
         {micError ? (
           <p className="mb-1.5 px-1 text-[11px] font-semibold text-pink">{micError}</p>

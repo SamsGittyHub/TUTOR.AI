@@ -35,6 +35,19 @@ export const BETA_REALTIME_VOICE = "alloy";
 export const BETA_IMAGE_MODEL = "gpt-image-2.5-flare-2026-09-08";
 
 /**
+ * The typed board's voice, both directions.
+ *
+ * It used to run on the browser's own speechSynthesis and SpeechRecognition:
+ * free, but a robot reading in Chrome and Edge and silence everywhere else,
+ * and no idea what language the lesson was in. These are the same models the
+ * live session uses, on the same shared key, so the typed board sounds like
+ * the spoken one and works in any browser.
+ */
+export const BETA_TTS_MODEL = "gpt-4o-mini-tts-2025-12-15";
+export const BETA_TTS_VOICE = "alloy";
+export const BETA_STT_MODEL = "gpt-realtime-whisper";
+
+/**
  * The key a call should use.
  *
  * In beta there is nothing to send — the gateway injects the real one — so a

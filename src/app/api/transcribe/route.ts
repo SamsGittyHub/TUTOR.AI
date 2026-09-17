@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 
+import { BETA_STT_MODEL } from "@/lib/beta";
 import { currentUser } from "@/lib/server/auth";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
 
@@ -27,6 +28,10 @@ export async function POST(request: NextRequest) {
       { status: 503 },
     );
   }
+
+  // Clamp the model, the way the chat gateway does: the shared key should only
+  // ever be spendable on what the beta chose, whatever a page asks for.
+  form.set("model", BETA_STT_MODEL);
 
   const upstream = await fetch(TRANSCRIPTIONS, {
     method: "POST",

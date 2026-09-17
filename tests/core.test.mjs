@@ -38,6 +38,10 @@ import {
   applyDrawnImage, buildImagePrompt, dimensionsFor, normalizeImageRequest,
   settleUnfinishedImages, sizeFor,
 } from "../.test-build/core/board-image.js";
+import {
+  advanceListening, IDLE_LISTENING, levelOf, LISTEN_DEFAULTS,
+  stripForSpeech, worthSpeaking,
+} from "../.test-build/core/speech.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
   normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
@@ -1851,6 +1855,121 @@ test("the session update carries the instructions and the tools", () => {
     message.session.tools.map((t) => t.name),
     ["write_on_board", "draw_image", "search_material", "get_progress", "list_lessons"],
   );
+});
+
+console.log("\n— the board's voice —");
+
+test("LaTeX is named, not spelled out one backslash at a time", () => {
+  assert.equal(stripForSpeech("So $x^2 + 1$ is always positive."),
+               "So formula is always positive.");
+  assert.equal(stripForSpeech("Recall $$\\int u\\,dv = uv$$ here."),
+               "Recall formula here.");
+  assert.match(stripForSpeech("Use \\alpha for the angle."), /^Use formula for the angle\.$/);
+});
+
+test("markdown punctuation doesn't get read aloud", () => {
+  assert.equal(stripForSpeech("## The **key** idea is `x`"), "The key idea is x");
+  assert.equal(stripForSpeech("> A quoted line"), "A quoted line");
+  assert.equal(stripForSpeech("See [the notes](https://x.test) for more"),
+               "See the notes for more");
+});
+
+test("ordinary speech comes through untouched", () => {
+  const line = "Divide both sides by two, then check the sign.";
+  assert.equal(stripForSpeech(line), line);
+});
+
+test("a line that is only notation isn't worth playing audio for", () => {
+  // Otherwise every equation card costs a round trip to say "formula".
+  assert.equal(worthSpeaking("$$x^2$$"), false);
+  assert.equal(worthSpeaking("   "), false);
+  assert.equal(worthSpeaking("Now look at the graph."), true);
+});
+
+test("a very long line is cut rather than sent whole", () => {
+  assert.ok(stripForSpeech("word ".repeat(2000)).length <= 1200);
+});
+
+test("the level of silence is zero and of a full-scale tone is near one", () => {
+  assert.equal(levelOf([0, 0, 0, 0]), 0);
+  assert.equal(levelOf([]), 0);
+  assert.ok(levelOf([1, -1, 1, -1]) > 0.99);
+});
+
+console.log("\n— knowing when the student has stopped —");
+
+const LOUD = 0.2;
+const QUIET = 0.001;
+
+/** Feeds a script of [level, msSinceStart] through and collects the actions. */
+function listen(script, settings = LISTEN_DEFAULTS) {
+  let state = IDLE_LISTENING;
+  const actions = [];
+  for (const [level, at] of script) {
+    const step = advanceListening(state, level, at, settings);
+    state = step.state;
+    if (step.action !== "none") actions.push([step.action, at]);
+  }
+  return actions;
+}
+
+test("recording starts on the first sound and stops after the silence gap", () => {
+  const actions = listen([
+    [QUIET, 0], [QUIET, 100],
+    [LOUD, 200], [LOUD, 1000], [LOUD, 1800],
+    [QUIET, 1900], [QUIET, 2400], [QUIET, 2750],
+  ]);
+  assert.deepEqual(actions.map((a) => a[0]), ["start", "stop"]);
+  assert.equal(actions[0][1], 200, "starts on the first loud frame");
+  assert.ok(actions[1][1] >= 1800 + LISTEN_DEFAULTS.silenceMs);
+});
+
+test("a pause in the middle of a sentence doesn't cut the student off", () => {
+  // The single most annoying failure: thinking mid-answer and being sent.
+  const actions = listen([
+    [LOUD, 0], [LOUD, 500],
+    [QUIET, 600], [QUIET, 900], [QUIET, 1200],  // 700ms of thinking
+    [LOUD, 1300], [LOUD, 2000],
+    [QUIET, 2100], [QUIET, 3100],
+  ]);
+  assert.deepEqual(actions.map((a) => a[0]), ["start", "stop"]);
+  assert.ok(actions[1][1] > 2900, "the cut comes after the second half, not the first");
+});
+
+test("a cough is recorded and then thrown away, not transcribed", () => {
+  const actions = listen([
+    [LOUD, 0], [LOUD, 80],
+    [QUIET, 200], [QUIET, 1200],
+  ]);
+  assert.deepEqual(actions.map((a) => a[0]), ["start", "discard"]);
+});
+
+test("someone who doesn't stop talking is still cut and sent", () => {
+  const script = [];
+  for (let at = 0; at <= 31_000; at += 500) script.push([LOUD, at]);
+  script.push([QUIET, 31_500]);
+  const actions = listen(script);
+  assert.deepEqual(actions.map((a) => a[0]), ["start", "stop"]);
+});
+
+test("after a cut it listens again from scratch", () => {
+  const actions = listen([
+    [LOUD, 0], [LOUD, 600], [QUIET, 700], [QUIET, 1700],
+    [LOUD, 3000], [LOUD, 3600], [QUIET, 3700], [QUIET, 4700],
+  ]);
+  assert.deepEqual(actions.map((a) => a[0]), ["start", "stop", "start", "stop"]);
+});
+
+test("room noise below the threshold never starts a recording", () => {
+  const script = [];
+  for (let at = 0; at < 10_000; at += 100) script.push([LISTEN_DEFAULTS.threshold * 0.5, at]);
+  assert.deepEqual(listen(script), []);
+});
+
+test("the thresholds can be tightened without touching the logic", () => {
+  const strict = { ...LISTEN_DEFAULTS, silenceMs: 200, minSpeechMs: 50 };
+  const actions = listen([[LOUD, 0], [LOUD, 100], [QUIET, 200], [QUIET, 350]], strict);
+  assert.deepEqual(actions.map((a) => a[0]), ["start", "stop"]);
 });
 
 console.log(`\n${passed} checks passed\n`);

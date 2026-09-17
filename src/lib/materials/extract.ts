@@ -2,7 +2,7 @@
 
 import type { Material, MaterialChunk, MaterialImage, MaterialKind } from "../db";
 import { toTranscribableChunks } from "./audio";
-import { BETA } from "../beta";
+import { BETA, BETA_STT_MODEL } from "../beta";
 import { sanitizeText } from "../sanitize";
 import { chunkUnits, type SourceUnit } from "./chunk";
 
@@ -215,24 +215,32 @@ async function transcribe(input: ExtractInput): Promise<SourceUnit[]> {
       chunks.length > 1 ? index / chunks.length : undefined,
     );
 
-    const form = new FormData();
-    form.append("file", chunk.blob, `part-${index + 1}.wav`);
-    form.append("model", "whisper-1");
-    form.append("response_format", "verbose_json");
-    form.append("timestamp_granularities[]", "segment");
+    /*
+     * Segment timestamps are what turn a lecture into something a student can
+     * scrub to — a citation reading "14:20" rather than "somewhere in part 2".
+     * Not every transcription model offers them, so the richer format is asked
+     * for first and a plain one retried if it's refused; segmentsToUnits
+     * already falls back to chunk-level locators when they don't arrive.
+     */
+    const send = async (verbose: boolean) => {
+      const form = new FormData();
+      form.append("file", chunk.blob, `part-${index + 1}.wav`);
+      form.append("model", BETA_STT_MODEL);
+      form.append("response_format", verbose ? "verbose_json" : "json");
+      if (verbose) form.append("timestamp_granularities[]", "segment");
 
-    const response = BETA
-      ? await fetch("/api/transcribe", {
-          method: "POST",
-          body: form,
-          signal: input.signal,
-        })
-      : await fetch("https://api.openai.com/v1/audio/transcriptions", {
-          method: "POST",
-          headers: { authorization: `Bearer ${input.openaiKey}` },
-          body: form,
-          signal: input.signal,
-        });
+      return BETA
+        ? fetch("/api/transcribe", { method: "POST", body: form, signal: input.signal })
+        : fetch("https://api.openai.com/v1/audio/transcriptions", {
+            method: "POST",
+            headers: { authorization: `Bearer ${input.openaiKey}` },
+            body: form,
+            signal: input.signal,
+          });
+    };
+
+    let response = await send(true);
+    if (response.status === 400) response = await send(false);
 
     if (!response.ok) {
       const detail = await response.text();
