@@ -105,8 +105,16 @@ export interface QuizAttempt {
   total: number;
 }
 
+export type LessonMode = "typed" | "voice";
+
 export interface Session {
   id: string;
+  /**
+   * How it was taught. A spoken lesson reopened on the typed board is not the
+   * lesson the student remembers having, so Lessons sends them back to the
+   * right place.
+   */
+  mode?: LessonMode;
   /** The subject folder this lesson is filed under, if any. */
   courseId?: string;
   title: string;

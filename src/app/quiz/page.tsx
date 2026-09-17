@@ -11,6 +11,8 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuizLab } from "@/lib/useQuizLab";
 import { findModel, formatCost } from "@/lib/providers";
 import { loadKeys } from "@/lib/keys";
+import { Allowance } from "@/components/shell/Allowance";
+import { Feedback } from "@/components/shell/Feedback";
 import { Tour } from "@/components/shell/Tour";
 import { useVoice } from "@/lib/voice";
 
@@ -25,15 +27,19 @@ export default function QuizPage() {
 
   return (
     <div className="flex h-dvh flex-col bg-ink">
-      <header className="chrome hair flex shrink-0 items-center gap-3 px-4 py-2.5">
+      {/* min-w-0 + overflow-hidden, same as the board: without them this row's
+          min-content width becomes the page's and a phone scrolls sideways. */}
+      <header className="chrome hair flex w-full min-w-0 shrink-0 items-center gap-2 overflow-hidden px-3 py-2.5 sm:gap-3 sm:px-4">
         <Link href="/" className="flex items-center gap-2">
           <Logo size={24} />
         </Link>
 
         <NavLinks />
         <div className="flex items-center gap-2">
+          <Allowance />
+          <Feedback compact />
           <Tour compact />
-          <span className="hidden rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-dim sm:block">
+          <span className="hidden shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-dim md:block">
             {findModel(lab.settings.providerId, lab.settings.model)?.label ?? lab.settings.model}
           </span>
           <ThemeToggle />

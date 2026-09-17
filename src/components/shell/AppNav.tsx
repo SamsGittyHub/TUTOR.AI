@@ -7,6 +7,8 @@ import { AccountMenu } from "@/components/auth/AccountMenu";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
+import { Allowance } from "./Allowance";
+import { Feedback } from "./Feedback";
 import { NavLinks } from "./NavLinks";
 import { Tour } from "./Tour";
 
@@ -24,6 +26,8 @@ export function AppNav() {
         <NavLinks />
 
         <div className="flex shrink-0 items-center gap-1.5">
+          <Allowance />
+          <Feedback />
           <Tour />
           <Link
             href="/settings"

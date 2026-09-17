@@ -280,6 +280,7 @@ interface LessonRow {
   plan: unknown;
   usage: unknown;
   board_theme: "paper" | "chalk";
+  mode: "typed" | "voice";
   created_at: Date;
   updated_at: Date;
 }
@@ -299,10 +300,11 @@ const toSession = (r: LessonRow): Session =>
     plan: (r.plan ?? undefined) as Session["plan"],
     usage: (r.usage ?? {}) as Session["usage"],
     boardTheme: r.board_theme,
+    mode: r.mode ?? "typed",
   }) as Session;
 
 const LESSON_COLUMNS = `id, course_id, title, material_ids, provider_id, model,
-                        actions, transcript, plan, usage, board_theme,
+                        actions, transcript, plan, usage, board_theme, mode,
                         created_at, updated_at`;
 
 export async function listSessions(userId: string): Promise<Session[]> {
@@ -328,9 +330,10 @@ export async function putSession(userId: string, s: Session): Promise<void> {
   const wrote = await query(
     `insert into lessons
        (id, user_id, title, material_ids, provider_id, model, actions,
-        transcript, plan, usage, board_theme, created_at, updated_at, course_id)
+        transcript, plan, usage, board_theme, created_at, updated_at, course_id,
+        mode)
      values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,
-             to_timestamp($12 / 1000.0), to_timestamp($13 / 1000.0), $14)
+             to_timestamp($12 / 1000.0), to_timestamp($13 / 1000.0), $14, $15)
      on conflict (id) do update set
        title = excluded.title,
        course_id = excluded.course_id,
@@ -342,6 +345,7 @@ export async function putSession(userId: string, s: Session): Promise<void> {
        plan = excluded.plan,
        usage = excluded.usage,
        board_theme = excluded.board_theme,
+       mode = excluded.mode,
        updated_at = excluded.updated_at
      where lessons.user_id = $2
      returning id`,
@@ -362,6 +366,7 @@ export async function putSession(userId: string, s: Session): Promise<void> {
       s.createdAt || Date.now(),
       s.updatedAt || Date.now(),
       s.courseId ?? null,
+      s.mode === "voice" ? "voice" : "typed",
     ],
   );
   assertWrote(wrote, "lesson");

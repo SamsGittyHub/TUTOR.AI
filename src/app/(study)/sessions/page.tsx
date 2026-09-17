@@ -130,13 +130,17 @@ export default function SessionsPage() {
                 className="flex items-start gap-4 surface rounded-md px-4 py-3.5"
               >
                 <div className="min-w-0 flex-1">
+                  {/* A spoken lesson reopens where it was taught. Dropping
+                      someone onto the typed board hands them a lesson they
+                      don't recognise as the one they had. */}
                   <Link
-                    href={`/app?session=${encodeURIComponent(s.id)}`}
+                    href={`${s.mode === "voice" ? "/voice" : "/app"}?session=${encodeURIComponent(s.id)}`}
                     className="truncate text-[14px] font-semibold text-fg transition hover:text-cyan"
                   >
                     {s.title}
                   </Link>
                   <p className="mt-0.5 text-[12px] text-dim">
+                    {s.mode === "voice" ? "spoken · " : ""}
                     {when(s.updatedAt)}
                     {boardCards ? ` · ${boardCards} board cards` : ""}
                     {s.plan ? ` · step ${s.plan.currentIndex + 1}/${s.plan.steps.length}` : ""}

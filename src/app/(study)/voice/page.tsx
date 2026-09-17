@@ -11,7 +11,10 @@ import { loadKeys, pullAccountKeys } from "@/lib/keys";
 import { loadSettings } from "@/lib/settings";
 import { BETA_REALTIME_MODEL } from "@/lib/beta";
 import { BoardExport } from "@/components/board/BoardExport";
-import { getChunksFor, putSession, type MaterialChunk, type Session } from "@/lib/db";
+import {
+  getChunksFor, getSession, putSession,
+  type MaterialChunk, type Session,
+} from "@/lib/db";
 import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
 import { applyDrawnImage, type ImageRequest } from "@/lib/board-image";
@@ -190,6 +193,7 @@ export default function VoicePage() {
         })),
         usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, turns: said.length },
         boardTheme: theme,
+        mode: "voice",
       };
       void putSession(session).catch(() => {});
     }, 1500);
@@ -200,6 +204,36 @@ export default function VoicePage() {
     return () => {
       if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
     };
+  }, []);
+
+  /*
+   * Reopening a spoken lesson. Lessons links here rather than to the typed
+   * board for anything taught out loud: the board comes back as it was, and
+   * saving continues into the same record instead of forking a second copy of
+   * the same lesson.
+   */
+  const resumed = useRef(false);
+  useEffect(() => {
+    if (resumed.current) return;
+    const id = new URLSearchParams(window.location.search).get("session");
+    if (!id) return;
+    resumed.current = true;
+    window.history.replaceState(null, "", "/voice");
+    void getSession(id)
+      .then((found) => {
+        if (!found) return;
+        sessionId.current = found.id;
+        startedAt.current = found.createdAt;
+        setActions(found.actions);
+        setLines(
+          found.transcript.map((entry) => ({
+            role: entry.role === "student" ? ("student" as const) : ("tutor" as const),
+            text: entry.text,
+          })),
+        );
+        setTheme(found.boardTheme);
+      })
+      .catch(() => {});
   }, []);
 
   /**
