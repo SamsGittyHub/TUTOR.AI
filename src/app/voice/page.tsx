@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { AppNav } from "@/components/shell/AppNav";
 import { Whiteboard } from "@/components/board/Whiteboard";
 import type { TutorAction } from "@/lib/actions";
-import { loadKeys } from "@/lib/keys";
+import { loadKeys, pullAccountKeys } from "@/lib/keys";
 import { loadSettings } from "@/lib/settings";
 import { useRealtime } from "@/lib/useRealtime";
 
@@ -50,6 +50,12 @@ export default function VoicePage() {
   }, []);
 
   const rt = useRealtime({ onAction, onTranscript });
+
+  // Live voice can be the first page someone opens; pull the stored key so
+  // "Start talking" doesn't bounce them to Settings for a key they already have.
+  useEffect(() => {
+    void pullAccountKeys();
+  }, []);
 
   function begin() {
     const keys = loadKeys();

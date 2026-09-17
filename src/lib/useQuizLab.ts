@@ -15,7 +15,7 @@ import {
   type QuizAttempt,
   type QuizQuestion,
 } from "./db";
-import { loadKeys } from "./keys";
+import { loadKeys, pullAccountKeys } from "./keys";
 import { estimateCost, ProviderError } from "./providers";
 import { loadSettings, saveSettings } from "./settings";
 import { upsertCard, type ReviewCard } from "./srs";
@@ -57,10 +57,13 @@ export function useQuizLab() {
   useEffect(() => {
     void (async () => {
       try {
+        // Someone can land here without ever opening the board, so the
+        // account's keys have to be pulled on this route too.
         const [allMaterials, allAttempts, allCards] = await Promise.all([
           listMaterials(),
           listAttempts(),
           listCards(),
+          pullAccountKeys(),
         ]);
         setMaterials(allMaterials);
         setAttempts(allAttempts);

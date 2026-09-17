@@ -1,16 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   PROVIDER_LIST,
   getProvider,
   type ProviderId,
 } from "@/lib/providers";
 import {
+  clearAccountKeys,
   clearAllKeys,
   getStorageMode,
   loadKeys,
   maskKey,
+  pullAccountKeys,
+  setAccountSync,
   setKey,
   setStorageMode,
   type KeyStorageMode,
@@ -42,6 +45,17 @@ export function SettingsModal({
     typeof window === "undefined" ? "local" : getStorageMode(),
   );
   const [customModel, setCustomModel] = useState("");
+  // null until the account's preference has been read.
+  const [sync, setSync] = useState<boolean | null>(null);
+  const [vaultAvailable, setVaultAvailable] = useState(true);
+
+  useEffect(() => {
+    void pullAccountKeys().then((state) => {
+      setVaultAvailable(state.available);
+      setSync(state.sync);
+      if (state.added) onKeysChanged();
+    });
+  }, [onKeysChanged]);
 
   const keys = loadKeys();
   const provider = getProvider(active);
@@ -272,17 +286,55 @@ export function SettingsModal({
             </div>
             <p className="mt-2.5 text-[11px] leading-relaxed text-dim">
               Stored obfuscated in browser storage, not encrypted — anything that can
-              run scripts on this page could read it. That is the honest tradeoff for
-              never sending your key to a server of ours. On a shared computer, use
+              run scripts on this page could read it. On a shared computer, use
               &ldquo;this tab only&rdquo;.
             </p>
+
+            {vaultAvailable && (
+              <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-md border border-line p-2.5">
+                <input
+                  type="checkbox"
+                  checked={sync ?? false}
+                  disabled={sync === null}
+                  onChange={async (event) => {
+                    const next = event.target.checked;
+                    setSync(next);
+                    await setAccountSync(next);
+                    // Turning it off deletes the stored copy server-side; say so
+                    // by refreshing what the UI thinks it has.
+                    if (next) {
+                      const keys = loadKeys();
+                      for (const [id, value] of Object.entries(keys)) {
+                        if (value) await setKey(id as ProviderId, value);
+                      }
+                    }
+                    onKeysChanged();
+                  }}
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-cyan)]"
+                />
+                <span>
+                  <span className="block text-xs font-bold">
+                    Remember my key on my account
+                  </span>
+                  <span className="mt-0.5 block text-[10.5px] leading-relaxed text-dim">
+                    So you don&rsquo;t paste it again on every device. We hold it
+                    encrypted (AES-256-GCM) and it still goes straight from your
+                    browser to the provider — but we do hold a copy. Untick to
+                    delete it from the server.
+                  </span>
+                </span>
+              </label>
+            )}
           </div>
 
           <div className="flex flex-wrap gap-2 border-t border-line pt-4">
             <button
               type="button"
-              onClick={() => {
+              onClick={async () => {
                 clearAllKeys();
+                // Clearing only locally would let the next page load pull them
+                // straight back from the account.
+                await clearAccountKeys();
                 onKeysChanged();
                 setResults({});
               }}

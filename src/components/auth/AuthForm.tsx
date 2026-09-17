@@ -86,7 +86,7 @@ export function AuthForm({ mode }: Props) {
           </h1>
           <p className="mx-auto mt-3 max-w-xs text-center text-[13.5px] leading-relaxed text-muted">
             {signup
-              ? "Free account. Your material, lessons, and review queue follow you everywhere — your API key still never leaves your browser."
+              ? "Free account. Your material, lessons, and review queue follow you everywhere — and your API key can too, encrypted, if you want it to."
               : "Sign in to pick up where you left off."}
           </p>
 
@@ -158,8 +158,9 @@ export function AuthForm({ mode }: Props) {
           </p>
 
           <p className="mt-8 text-center text-[11.5px] leading-relaxed text-dim">
-            Your uploaded material syncs to our server so it's there on every
-            device. Your provider API key does not — it stays in this browser.
+            Your material syncs so it&rsquo;s on every device. Your API key stays
+            in this browser unless you ask us to remember it, and calls always go
+            straight from here to your provider.
           </p>
         </div>
       </div>

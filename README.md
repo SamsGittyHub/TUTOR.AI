@@ -11,7 +11,7 @@ Built from [`PRD-ai-tutor.md`](./PRD-ai-tutor.md).
 npm install
 docker run -d --name tutorai-pg -e POSTGRES_PASSWORD=tutorai \
   -e POSTGRES_USER=tutorai -e POSTGRES_DB=tutorai -p 55432:5432 postgres:16-alpine
-cp .env.example .env          # DATABASE_URL, TUTOR_AI_STORAGE_DIR
+cp .env.example .env          # DATABASE_URL, storage dir, key secret
 npm run migrate               # applies migrations/*.sql once each
 npm run dev                   # http://localhost:3000
 npm test                      # 72 checks
@@ -19,7 +19,10 @@ npm run build
 ```
 
 Needs Node 20+ and a Postgres. On Railway, set `DATABASE_URL` from the Postgres
-service and point `TUTOR_AI_STORAGE_DIR` at a mounted volume.
+service, point `TUTOR_AI_STORAGE_DIR` at a mounted volume, and set
+`TUTOR_AI_KEY_SECRET` to a long random string (`openssl rand -base64 48`).
+Without that last one the server refuses to store keys and the option
+disappears from Settings — it will never fall back to storing them in plaintext.
 
 ---
 
@@ -30,19 +33,22 @@ architecture:
 
 | | Where it lives |
 |---|---|
-| **Your API key** | Browser storage only. It goes straight to the provider — the server never sees it, never logs it, never stores it. |
+| **Your API key** | Used straight from your browser to the provider — no server in the request path. Optionally also kept on your account, AES-256-GCM encrypted, so you aren't pasting it again on every device. That's a checkbox in Settings, and unticking it deletes the stored copy. |
 | **Your material, lessons, cards, calendar** | Postgres, under your account, so a lesson started on a laptop resumes on a phone. |
 | **Original files** | A mounted volume, one directory per material. |
 | **Parsing** | Still the browser — pdf.js, mammoth, JSZip. Files are uploaded to be kept, not to be read. |
 
-The one exception is live voice: WebRTC can't carry a raw key safely, so it is
-posted once to mint a ~60-second session token and is never written down.
+Live voice is the one place a key must reach the server regardless: WebRTC
+can't carry a raw key safely, so it is posted once to mint a ~60-second session
+token and is never written down.
 
-The honest costs. Browser storage is readable by any script on the origin, so
-Settings says so and offers session-only storage for shared machines. And your
-coursework now sits on a server — which is what makes cross-device study work,
-and is why deleting a material or an account is a cascade that leaves nothing
-behind.
+The honest costs, all three stated in the UI. Browser storage is readable by any
+script on the origin, so Settings says so and offers session-only storage for
+shared machines. Your coursework sits on a server — which is what makes
+cross-device study work, and why deleting a material or an account is a cascade
+that leaves nothing behind. And if you turn on key syncing, we hold your
+provider key: encrypted under a secret that lives in the environment rather than
+the database, so a stolen dump decrypts nothing, but held all the same.
 
 ## How a lesson works
 
@@ -115,7 +121,9 @@ below.
   backwards from the date: every topic twice, then a full review the day before.
 - **Live voice** — a speech-to-speech session (OpenAI Realtime over WebRTC)
   where you talk and it explains out loud while writing on the board.
-- **Accounts** — email and password, scrypt-hashed, opaque session tokens.
+- **Accounts** — email and password, scrypt-hashed, opaque session tokens, and
+  an optional encrypted key vault so your provider key follows you between
+  devices.
 - **Light / dark chrome** — a sun/moon toggle on every page; follows the OS
   until you choose, applies before first paint (no flash), and the whiteboard
   keeps its own paper/chalk look regardless.

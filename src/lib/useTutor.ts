@@ -23,7 +23,7 @@ import {
 } from "./db";
 import { extractMaterial, materialFromText, ExtractionError } from "./materials/extract";
 import { estimateCost, ProviderError, type ProviderId } from "./providers";
-import { loadKeys, type KeyMap } from "./keys";
+import { loadKeys, pullAccountKeys, type KeyMap } from "./keys";
 import {
   DEFAULT_SETTINGS,
   loadSettings,
@@ -111,6 +111,11 @@ export function useTutor() {
     const stored = loadSettings();
     setSettings(stored);
     setKeys(loadKeys());
+    // Pull the account's keys on every load, so signing in on a new device
+    // brings the key with it instead of asking for it again.
+    void pullAccountKeys().then(({ added }) => {
+      if (added) setKeys(loadKeys());
+    });
     void (async () => {
       try {
         const [allMaterials, allSessions, allCards, allAttempts] = await Promise.all([

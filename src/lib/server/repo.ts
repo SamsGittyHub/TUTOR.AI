@@ -10,6 +10,7 @@ import type {
 import type { CalendarEvent, EventKind, StudyBlock } from "@/lib/calendar";
 import type { ReviewCard } from "@/lib/srs";
 
+import { hintFor, open, seal } from "./crypto";
 import { query, transaction } from "./db";
 import { deleteMaterialFiles, deleteUserFiles } from "./storage";
 
@@ -677,4 +678,94 @@ export async function saveEmbeddings(
     }
   });
   return written;
+}
+
+/* -------------------------------------------------------------------------- */
+/* The key vault                                                               */
+/* -------------------------------------------------------------------------- */
+
+
+export interface StoredKey {
+  providerId: string;
+  key: string;
+  hint: string;
+}
+
+/** Whether this account wants its keys kept server-side at all. */
+export async function keySyncEnabled(userId: string): Promise<boolean> {
+  const row = await query<{ sync_keys: boolean }>(
+    "select sync_keys from users where id = $1",
+    [userId],
+  );
+  return row[0]?.sync_keys ?? true;
+}
+
+export async function setKeySync(userId: string, enabled: boolean): Promise<void> {
+  await query("update users set sync_keys = $2, updated_at = now() where id = $1", [
+    userId,
+    enabled,
+  ]);
+  // Turning sync off has to remove what's already stored, or "don't keep my
+  // keys" would leave the existing ones sitting there.
+  if (!enabled) {
+    await query("delete from user_api_keys where user_id = $1", [userId]);
+  }
+}
+
+export async function listKeys(userId: string): Promise<StoredKey[]> {
+  const rows = await query<{
+    provider_id: string;
+    ciphertext: Buffer;
+    nonce: Buffer;
+    auth_tag: Buffer;
+    hint: string;
+  }>(
+    `select provider_id, ciphertext, nonce, auth_tag, hint
+       from user_api_keys where user_id = $1`,
+    [userId],
+  );
+
+  const out: StoredKey[] = [];
+  for (const row of rows) {
+    const key = open({
+      ciphertext: row.ciphertext,
+      nonce: row.nonce,
+      authTag: row.auth_tag,
+    });
+    // A row that won't decrypt means the secret was rotated; skip it rather
+    // than handing a provider garbage and blaming the student's key.
+    if (key) out.push({ providerId: row.provider_id, key, hint: row.hint });
+  }
+  return out;
+}
+
+export async function putKey(
+  userId: string,
+  providerId: string,
+  key: string,
+): Promise<void> {
+  const sealed = seal(key);
+  await query(
+    `insert into user_api_keys
+       (user_id, provider_id, ciphertext, nonce, auth_tag, hint)
+     values ($1,$2,$3,$4,$5,$6)
+     on conflict (user_id, provider_id) do update set
+       ciphertext = excluded.ciphertext,
+       nonce = excluded.nonce,
+       auth_tag = excluded.auth_tag,
+       hint = excluded.hint,
+       updated_at = now()`,
+    [userId, providerId, sealed.ciphertext, sealed.nonce, sealed.authTag, hintFor(key)],
+  );
+}
+
+export async function deleteKey(userId: string, providerId: string): Promise<void> {
+  await query("delete from user_api_keys where user_id = $1 and provider_id = $2", [
+    userId,
+    providerId,
+  ]);
+}
+
+export async function deleteAllKeys(userId: string): Promise<void> {
+  await query("delete from user_api_keys where user_id = $1", [userId]);
 }

@@ -12,12 +12,16 @@ import {
 /**
  * Key storage.
  *
- * The PRD left server-side-vs-client-side open; this build answers it
- * client-side. Keys never leave the browser except in requests to the
- * provider's own API, there is no backend to breach, and nothing to log. The
- * cost is honest and stated in the UI: localStorage is readable by any script
- * that runs on this origin, so we obfuscate at rest rather than pretending to
- * encrypt, and offer session-only storage for shared machines.
+ * Two layers. The browser copy is what every request actually reads — calls
+ * still go straight from here to the provider, with no server in the path.
+ * The account copy exists so a student isn't re-pasting their key on every
+ * device and after every cache clear; it's AES-256-GCM at rest, under a secret
+ * that lives outside the database.
+ *
+ * The honest costs, both stated in Settings. localStorage is readable by any
+ * script on this origin, so the browser copy is obfuscated rather than
+ * pretend-encrypted. And syncing means we hold a copy at all — which is why it
+ * can be turned off, and why turning it off deletes what's already stored.
  */
 
 const STORAGE_KEY = KEYS_STORAGE;
@@ -103,6 +107,9 @@ export function setKey(id: ProviderId, value: string): KeyMap {
   if (value.trim()) keys[id] = value.trim();
   else delete keys[id];
   saveKeys(keys);
+  // Mirror to the account in the background. The local copy is what this
+  // browser reads, so nothing waits on the network.
+  void pushAccountKey(id, value.trim());
   return keys;
 }
 
@@ -115,4 +122,86 @@ export function clearAllKeys(): void {
 export function maskKey(value: string): string {
   if (value.length <= 12) return "•".repeat(value.length);
   return `${value.slice(0, 7)}…${value.slice(-4)}`;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Account sync                                                                */
+/* -------------------------------------------------------------------------- */
+
+export interface AccountKeyState {
+  /** False when the server has no TUTOR_AI_KEY_SECRET configured. */
+  available: boolean;
+  /** Whether this account wants keys kept server-side. */
+  sync: boolean;
+}
+
+interface KeysResponse {
+  keys: { providerId: ProviderId; key: string; hint: string }[];
+  sync: boolean;
+  available: boolean;
+}
+
+/**
+ * Pulls the account's keys into this browser.
+ *
+ * Local wins on conflict: a key just pasted here shouldn't be clobbered by an
+ * older one from another device. Returns whether anything new arrived, so the
+ * caller can re-render.
+ */
+export async function pullAccountKeys(): Promise<AccountKeyState & { added: number }> {
+  if (typeof window === "undefined") {
+    return { available: false, sync: false, added: 0 };
+  }
+  try {
+    const response = await fetch("/api/keys");
+    if (!response.ok) return { available: false, sync: false, added: 0 };
+    const body = (await response.json()) as KeysResponse;
+
+    const local = loadKeys();
+    let added = 0;
+    for (const entry of body.keys ?? []) {
+      if (!local[entry.providerId] && entry.key) {
+        local[entry.providerId] = entry.key;
+        added += 1;
+      }
+    }
+    if (added) saveKeys(local);
+
+    return { available: body.available, sync: body.sync, added };
+  } catch {
+    return { available: false, sync: false, added: 0 };
+  }
+}
+
+/** Mirrors one key up to the account. Silent on failure — the local copy works. */
+export async function pushAccountKey(
+  id: ProviderId,
+  value: string,
+): Promise<void> {
+  try {
+    await fetch("/api/keys", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ providerId: id, key: value }),
+    });
+  } catch {
+    // Syncing is a convenience; never let it fail a key the student just set.
+  }
+}
+
+export async function setAccountSync(enabled: boolean): Promise<void> {
+  await fetch("/api/keys", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ sync: enabled }),
+  });
+}
+
+/** "Forget all keys" has to clear the account copy too, or they come back. */
+export async function clearAccountKeys(): Promise<void> {
+  try {
+    await fetch("/api/keys", { method: "DELETE" });
+  } catch {
+    // Local keys are cleared regardless by clearAllKeys().
+  }
 }
