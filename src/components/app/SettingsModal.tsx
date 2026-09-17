@@ -93,14 +93,14 @@ export function SettingsModal({
         onClick={page ? undefined : (event) => event.stopPropagation()}
         className={
           page
-            ? "overflow-hidden rounded-md border border-line bg-panel"
+            ? "overflow-hidden surface rounded-md"
             : "my-8 w-full max-w-2xl overflow-hidden rounded-lg border border-line bg-panel"
         }
       >
         {!page && (
           <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
             <div>
-              <h2 className="text-base font-extrabold">Your key, your model</h2>
+              <h2 className="text-base font-semibold">Your key, your model</h2>
               <p className="text-xs text-dim">
                 Keys stay in this browser and go straight to the provider. There is no
                 server in the middle.
@@ -138,7 +138,7 @@ export function SettingsModal({
           <p className="text-[13px] leading-relaxed text-muted">{provider.blurb}</p>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-dim">
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-dim">
               API key
             </label>
             {stored ? (
@@ -170,7 +170,7 @@ export function SettingsModal({
                 type="button"
                 disabled={!drafts[active]?.trim() || checking === active}
                 onClick={() => void saveKey(drafts[active] ?? "")}
-                className="grad rounded-md px-4 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+                className="grad rounded-md px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
               >
                 {checking === active ? "checking…" : "Save & test"}
               </button>
@@ -195,7 +195,7 @@ export function SettingsModal({
           </div>
 
           <div>
-            <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-dim">
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-dim">
               Model for this session
             </label>
             <div className="grid gap-1.5 sm:grid-cols-2">
@@ -213,7 +213,7 @@ export function SettingsModal({
                         : "border-line bg-panel-2 hover:border-line-2"
                     }`}
                   >
-                    <span className="block text-xs font-extrabold">{model.label}</span>
+                    <span className="block text-xs font-semibold">{model.label}</span>
                     {model.inputPrice !== undefined ? (
                       <span className="block text-[10.5px] text-dim">
                         ${model.inputPrice}/M in · ${model.outputPrice}/M out
@@ -255,7 +255,7 @@ export function SettingsModal({
           </div>
 
           <div className="rounded-md border border-line bg-panel-2 p-3">
-            <p className="text-[11px] font-extrabold uppercase tracking-wide text-dim">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-dim">
               Where keys live
             </p>
             <div className="mt-2 flex gap-2">

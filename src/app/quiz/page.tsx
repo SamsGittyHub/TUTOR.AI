@@ -65,7 +65,7 @@ export default function QuizPage() {
           </button>
           <Link
             href="/app"
-            className="rounded-full grad px-3.5 py-1.5 text-[11.5px] font-extrabold text-white"
+            className="rounded-full grad px-3.5 py-1.5 text-[11.5px] font-semibold text-white"
           >
             Back to the board
           </Link>
@@ -131,7 +131,7 @@ function Setup({
   return (
     <div className="space-y-5 py-6">
       <div>
-        <h1 className="text-2xl font-black tracking-tight">Flashcards</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Flashcards</h1>
         <p className="mt-1 text-[13px] leading-relaxed text-muted">
           Unlimited quizzes, straight from your material. Every question you
           answer becomes a review card on the board&apos;s schedule.
@@ -139,7 +139,7 @@ function Setup({
       </div>
 
       <section>
-        <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-dim">
+        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
           Material
         </h2>
         {lab.materials.length ? (
@@ -175,19 +175,19 @@ function Setup({
       </section>
 
       <section>
-        <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-dim">
+        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
           Topic (optional)
         </h2>
         <input
           value={topic}
           onChange={(event) => setTopic(event.target.value)}
           placeholder="chapter 4, the Calvin cycle, integration by parts…"
-          className="w-full rounded-md border border-line bg-panel px-3 py-2 text-[13px] outline-none focus:border-cyan/60"
+          className="w-full surface rounded-md px-3 py-2 text-[13px] outline-none focus:border-cyan/60"
         />
       </section>
 
       <section>
-        <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-dim">
+        <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
           Questions
         </h2>
         <div className="flex flex-wrap items-center gap-1.5">
@@ -211,7 +211,7 @@ function Setup({
             max={lab.maxQuestions}
             value={count}
             onChange={(event) => setCount(Number(event.target.value))}
-            className="w-20 rounded-md border border-line bg-panel px-2.5 py-1.5 text-[12px] outline-none focus:border-cyan/60"
+            className="w-20 surface rounded-md px-2.5 py-1.5 text-[12px] outline-none focus:border-cyan/60"
           />
         </div>
       </section>
@@ -220,7 +220,7 @@ function Setup({
         type="button"
         disabled={lab.busy}
         onClick={() => void lab.generate(topic, count)}
-        className="w-full rounded-full grad py-3 text-sm font-extrabold text-white disabled:opacity-40"
+        className="w-full rounded-full grad py-3 text-sm font-semibold text-white disabled:opacity-40"
       >
         {lab.busy ? "Writing questions…" : "Generate a quiz"}
       </button>
@@ -236,14 +236,14 @@ function Setup({
 
       {lab.attempts.length ? (
         <section>
-          <h2 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-dim">
+          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
             Recent quizzes
           </h2>
           <ul className="space-y-1">
             {lab.attempts.slice(0, 8).map((attempt) => (
               <li
                 key={attempt.id}
-                className="flex items-center gap-2 rounded-md border border-line bg-panel px-3 py-2 text-[12px]"
+                className="flex items-center gap-2 surface rounded-md px-3 py-2 text-[12px]"
               >
                 <span className="min-w-0 flex-1 truncate font-semibold text-muted">
                   {attempt.title}
@@ -291,7 +291,7 @@ function FlashcardRun({ lab, voice }: { lab: Lab; voice: Voice }) {
     <div className="flex min-h-0 flex-1 flex-col py-5">
       <div className="mb-3 flex shrink-0 items-center justify-between">
         <div>
-          <p className="text-sm font-extrabold">{run.title}</p>
+          <p className="text-sm font-semibold">{run.title}</p>
           <p className="text-[11px] text-dim">
             Question {progress + (answered ? 0 : 1)} of {run.questions.length}
             {run.costUsd > 0 ? ` · ${formatCost(run.costUsd)} of context used` : ""}
@@ -377,7 +377,7 @@ function FlashcardRun({ lab, voice }: { lab: Lab; voice: Voice }) {
               <button
                 type="submit"
                 disabled={answered}
-                className="rounded-md grad px-4 py-2 text-xs font-extrabold text-white disabled:opacity-40"
+                className="rounded-md grad px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
               >
                 answer
               </button>
@@ -403,7 +403,7 @@ function FlashcardRun({ lab, voice }: { lab: Lab; voice: Voice }) {
                   <button
                     type="button"
                     onClick={() => lab.teach(question)}
-                    className="rounded-full grad px-3.5 py-1.5 text-[11.5px] font-extrabold text-white"
+                    className="rounded-full grad px-3.5 py-1.5 text-[11.5px] font-semibold text-white"
                   >
                     Teach me this one
                   </button>
@@ -435,7 +435,7 @@ function ScoreCard({ lab, run }: { lab: Lab; run: NonNullable<Lab["run"]> }) {
   const missed = run.questions.filter((q) => !q.correct);
   return (
     <div className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-lg border border-line bg-panel p-8 text-center">
-      <p className="text-4xl font-black grad-text">
+      <p className="text-4xl font-bold grad-text">
         {score}/{run.questions.length}
       </p>
       <p className="mt-2 max-w-sm text-[12.5px] leading-relaxed text-muted">
@@ -447,7 +447,7 @@ function ScoreCard({ lab, run }: { lab: Lab; run: NonNullable<Lab["run"]> }) {
         <button
           type="button"
           onClick={lab.reset}
-          className="rounded-full grad px-5 py-2 text-[12.5px] font-extrabold text-white"
+          className="rounded-full grad px-5 py-2 text-[12.5px] font-semibold text-white"
         >
           Generate another quiz
         </button>
@@ -460,7 +460,7 @@ function ScoreCard({ lab, run }: { lab: Lab; run: NonNullable<Lab["run"]> }) {
       </div>
       {missed.length ? (
         <div className="mt-6 w-full max-w-md space-y-1.5 text-left">
-          <p className="text-[11px] font-extrabold uppercase tracking-wide text-dim">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-dim">
             To review with the tutor
           </p>
           {missed.map((question) => (

@@ -56,7 +56,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
       >
         <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <div>
-            <h2 className="text-base font-extrabold">Progress</h2>
+            <h2 className="text-base font-semibold">Progress</h2>
             <p className="text-xs text-dim">
               Built from your quizzes and the review queue — nothing leaves this browser.
             </p>
@@ -83,7 +83,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
             <button
               type="button"
               onClick={onReview}
-              className="w-full rounded-full grad py-2.5 text-sm font-extrabold text-white"
+              className="w-full rounded-full grad py-2.5 text-sm font-semibold text-white"
             >
               Review {dueToday} due card{dueToday === 1 ? "" : "s"}
             </button>
@@ -92,7 +92,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
           {/* forecast ---------------------------------------------------- */}
           {cards.length ? (
             <section>
-              <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-dim">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
                 What's coming back
               </h3>
               <div className="flex h-24 items-end gap-1.5">
@@ -119,7 +119,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
           {/* per-material ------------------------------------------------ */}
           {materials.length ? (
             <section>
-              <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-dim">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
                 Mastery by material
               </h3>
               <ul className="space-y-1.5">
@@ -135,7 +135,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
                           {material?.name ?? "Material"}
                         </span>
                         <span
-                          className={`shrink-0 text-[10px] font-extrabold uppercase tracking-wide ${
+                          className={`shrink-0 text-[10px] font-semibold uppercase tracking-wide ${
                             entry.label === "Strong"
                               ? "text-good"
                               : entry.label === "Learning"
@@ -178,7 +178,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
           {/* trend -------------------------------------------------------- */}
           {attempts.length >= 2 ? (
             <section>
-              <h3 className="mb-2 text-[11px] font-extrabold uppercase tracking-wide text-dim">
+              <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
                 Last {Math.min(attempts.length, 10)} quizzes
               </h3>
               <Sparkline attempts={attempts.slice(0, 10).reverse()} />
@@ -197,7 +197,7 @@ function Stat({ label, value, accent }: { label: string; value: string; accent?:
         accent ? "border-cyan/40 bg-cyan/[.06]" : "border-line bg-panel-2"
       }`}
     >
-      <p className={`text-xl font-black ${accent ? "text-cyan" : ""}`}>{value}</p>
+      <p className={`text-xl font-bold ${accent ? "text-cyan" : ""}`}>{value}</p>
       <p className="text-[10.5px] font-semibold text-dim">{label}</p>
     </div>
   );

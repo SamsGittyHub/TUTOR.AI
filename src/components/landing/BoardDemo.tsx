@@ -135,7 +135,7 @@ export function BoardDemo() {
       </div>
 
       <div className="hidden flex-col border-l border-line lg:flex">
-        <div className="border-b border-line px-4 py-2.5 text-[11.5px] font-extrabold text-dim">
+        <div className="border-b border-line px-4 py-2.5 text-[11.5px] font-semibold text-dim">
           Ask anything
         </div>
         <div className="flex-1 space-y-3 overflow-hidden p-4">

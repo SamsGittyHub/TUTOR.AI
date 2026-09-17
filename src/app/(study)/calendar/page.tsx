@@ -92,10 +92,10 @@ export default function CalendarPage() {
     >
       <form
         onSubmit={add}
-        className="flex flex-wrap items-end gap-2 rounded-sm border border-line bg-panel px-4 py-3.5"
+        className="flex flex-wrap items-end gap-2 surface rounded-md px-4 py-3.5"
       >
         <label className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
             What
           </span>
           <input
@@ -106,7 +106,7 @@ export default function CalendarPage() {
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
             When
           </span>
           <input
@@ -117,7 +117,7 @@ export default function CalendarPage() {
           />
         </label>
         <label className="flex flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
             Kind
           </span>
           <select
@@ -134,7 +134,7 @@ export default function CalendarPage() {
         </label>
         {lib.courses.length > 0 && (
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
               Course
             </span>
             <select
@@ -152,7 +152,7 @@ export default function CalendarPage() {
           </label>
         )}
         <label className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
             Topics it covers
           </span>
           <input
@@ -165,7 +165,7 @@ export default function CalendarPage() {
         <button
           type="submit"
           disabled={busy || !title.trim() || !date}
-          className="rounded-full grad px-4 py-2 text-[13px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-40"
+          className="rounded-full grad px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
         >
           {busy ? "Adding…" : "Add"}
         </button>
@@ -210,18 +210,18 @@ export default function CalendarPage() {
               const done = blocks.filter((b) => b.status === "done").length;
               const course = lib.courses.find((c) => c.id === event.courseId);
               return (
-                <li key={event.id} className="rounded-sm border border-line bg-panel">
+                <li key={event.id} className="surface rounded-md">
                   <div className="flex flex-wrap items-start gap-3 px-4 py-3.5">
                     <span
-                      className={`rounded-full border px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-wider ${KIND_STYLE[event.kind]}`}
+                      className={`rounded-full border px-2.5 py-1 text-[10.5px] font-semibold uppercase tracking-wider ${KIND_STYLE[event.kind]}`}
                     >
                       {event.kind}
                     </span>
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-extrabold text-fg">
+                      <p className="truncate text-[14px] font-semibold text-fg">
                         {event.title}
                       </p>
-                      <p className="mt-0.5 text-[11.5px] font-bold uppercase tracking-wider text-dim">
+                      <p className="mt-0.5 text-[12px] text-dim">
                         {fmt(event.startsAt)} · {dayLabel(event.startsAt)}
                         {course ? ` · ${course.name}` : ""}
                         {blocks.length ? ` · ${done}/${blocks.length} sittings done` : ""}
@@ -283,7 +283,7 @@ export default function CalendarPage() {
                           >
                             {block.title}
                           </span>
-                          <span className="shrink-0 text-[11px] font-bold uppercase tracking-wider text-dim">
+                          <span className="shrink-0 text-[11.5px] text-dim">
                             {fmt(block.startsAt)} · {block.minutes}m
                           </span>
                         </li>

@@ -46,7 +46,7 @@ export default function ProgressPage() {
         dueToday > 0 ? (
           <Link
             href="/review"
-            className="rounded-full grad px-4 py-2.5 text-[13px] font-extrabold text-white transition hover:opacity-90"
+            className="rounded-full grad px-4 py-2.5 text-[13px] font-semibold text-white transition hover:opacity-90"
           >
             Review {dueToday} due
           </Link>
@@ -68,18 +68,21 @@ export default function ProgressPage() {
           </div>
 
           <section className="mt-8">
-            <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
               Next seven days
             </h2>
-            <div className="mt-3 flex items-end gap-2 rounded-sm border border-line bg-panel px-4 py-4">
+            <div className="surface mt-3 flex items-end gap-2 rounded-md px-4 py-4">
               {forecast.map((count, i) => {
                 const day = new Date(now + i * 864e5);
                 return (
                   <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
                     <span className="text-[11px] font-bold text-muted">{count || ""}</span>
                     <div
-                      className={`w-full rounded-xs ${count ? "grad" : "bg-panel-3"}`}
-                      style={{ height: `${Math.max(4, (count / peak) * 72)}px` }}
+                      className={`w-full rounded-[4px] ${count ? "grad" : "bg-[var(--tint)]"}`}
+                      style={{
+                        height: `${count ? Math.max(6, (count / peak) * 72) : 6}px`,
+                        transition: "height var(--dur-slow) var(--ease-out)",
+                      }}
                     />
                     <span className="text-[10.5px] font-bold uppercase text-dim">
                       {i === 0 ? "Today" : DAY_NAMES[day.getDay()]}
@@ -88,10 +91,16 @@ export default function ProgressPage() {
                 );
               })}
             </div>
+            {forecast.every((n) => n === 0) && (
+              <p className="mt-2.5 text-[12.5px] text-dim">
+                Nothing scheduled this week — answer some quiz questions and the
+                queue fills itself in.
+              </p>
+            )}
           </section>
 
           <section className="mt-8">
-            <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
               By material
             </h2>
             {!rollup.length ? (
@@ -106,13 +115,13 @@ export default function ProgressPage() {
                 {rollup.map((row) => (
                   <li
                     key={row.material.id}
-                    className="rounded-sm border border-line bg-panel px-4 py-3.5"
+                    className="surface rounded-md px-4 py-3.5"
                   >
                     <div className="flex items-center justify-between gap-4">
-                      <p className="min-w-0 flex-1 truncate text-[13.5px] font-extrabold text-fg">
+                      <p className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-fg">
                         {row.material.name}
                       </p>
-                      <span className="shrink-0 text-[11.5px] font-bold uppercase tracking-wider text-dim">
+                      <span className="shrink-0 text-[12px] text-dim">
                         {row.label}
                         {row.dueNow ? ` · ${row.dueNow} due` : ""}
                       </span>
@@ -136,11 +145,11 @@ export default function ProgressPage() {
 
 function Stat({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-sm border border-line bg-panel px-4 py-3.5">
-      <p className="text-[22px] font-black leading-none text-fg">{value}</p>
-      <p className="mt-1.5 text-[11.5px] font-bold uppercase tracking-wider text-dim">
-        {label}
+    <div className="surface rounded-md px-4 py-3.5">
+      <p className="text-[26px] font-semibold leading-none tracking-[-0.02em] text-fg">
+        {value}
       </p>
+      <p className="mt-1.5 text-[12px] text-dim">{label}</p>
     </div>
   );
 }

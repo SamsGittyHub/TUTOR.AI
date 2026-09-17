@@ -142,9 +142,9 @@ export function SketchPad({ onSend, onClose }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/85 p-3 backdrop-blur-sm sm:p-6">
-      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden rounded-md border border-line bg-panel">
+      <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col overflow-hidden surface rounded-md">
         <header className="flex flex-wrap items-center gap-2 border-b border-line px-4 py-2.5">
-          <h2 className="mr-auto text-[13px] font-extrabold text-fg">
+          <h2 className="mr-auto text-[13px] font-semibold text-fg">
             Show your work
           </h2>
 
@@ -218,7 +218,7 @@ export function SketchPad({ onSend, onClose }: Props) {
             type="button"
             onClick={send}
             disabled={empty}
-            className="rounded-full grad px-5 py-2.5 text-[13px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-40"
+            className="rounded-full grad px-5 py-2.5 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
           >
             Send to the tutor
           </button>

@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 
-import { AppNav } from "./AppNav";
-
 /**
  * Standard page frame: the shared nav, a centred column, and a title block.
  * Pages that need the full viewport (the board, live voice) skip this.
@@ -17,24 +15,25 @@ interface Props {
 
 export function PageShell({ title, lede, actions, children, wide }: Props) {
   return (
-    <div className="min-h-dvh bg-ink">
-      <AppNav />
+    <>
       <main
-        className={`mx-auto px-4 pb-24 pt-8 ${wide ? "max-w-6xl" : "max-w-4xl"}`}
+        className={`mx-auto px-5 pb-24 pt-10 ${wide ? "max-w-6xl" : "max-w-4xl"}`}
       >
-        <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="rise-in flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-[27px] font-black tracking-tight">{title}</h1>
+            <h1 className="text-[30px] font-bold leading-[1.1]">{title}</h1>
             {lede && (
-              <p className="mt-1.5 max-w-xl text-[13.5px] leading-relaxed text-muted">
+              <p className="mt-2 max-w-xl text-[14px] leading-[1.55] text-muted">
                 {lede}
               </p>
             )}
           </div>
           {actions}
         </div>
-        <div className="mt-7">{children}</div>
+        <div className="rise-in mt-8" style={{ animationDelay: "60ms" }}>
+          {children}
+        </div>
       </main>
-    </div>
+    </>
   );
 }

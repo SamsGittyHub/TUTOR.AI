@@ -71,7 +71,7 @@ export function Whiteboard({
         <div className="flex min-w-0 flex-1 items-center gap-3">
           {plan ? (
             <>
-              <span className="truncate text-sm font-extrabold">{plan.title}</span>
+              <span className="truncate text-sm font-semibold">{plan.title}</span>
               <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
                 {plan.steps.map((step, index) => (
                   <span

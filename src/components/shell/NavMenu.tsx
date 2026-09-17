@@ -40,23 +40,27 @@ export function NavMenu() {
         aria-expanded={open}
         aria-label="Go to"
         title="Go to"
-        className="flex h-8 items-center gap-1.5 rounded-full border border-line px-2.5 text-muted transition hover:text-fg"
+        className={`tx press flex h-8 items-center gap-1.5 rounded-full px-2.5 ${
+          open
+            ? "bg-[var(--tint-strong)] text-fg"
+            : "text-muted hover:bg-[var(--tint)] hover:text-fg"
+        }`}
       >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path
-            d="M4 6h16M4 12h16M4 18h16"
+            d="M4 7h16M4 12h16M4 17h16"
             stroke="currentColor"
-            strokeWidth="2"
+            strokeWidth="1.7"
             strokeLinecap="round"
           />
         </svg>
-        <span className="hidden text-[12px] font-bold sm:block">Go to</span>
+        <span className="hidden text-[12px] font-semibold sm:block">Go to</span>
       </button>
 
       {open && (
         <div
           role="menu"
-          className="absolute left-0 top-10 z-50 w-64 overflow-hidden rounded-sm border border-line bg-panel-2 py-1 shadow-xl"
+          className="surface-2 raised pop-in absolute left-0 top-10 z-50 w-64 overflow-hidden rounded-md p-1"
         >
           {NAV_LINKS.map((link) => {
             const active = isActive(pathname, link.href);
@@ -67,12 +71,12 @@ export function NavMenu() {
                 role="menuitem"
                 onClick={() => setOpen(false)}
                 aria-current={active ? "page" : undefined}
-                className={`block px-3.5 py-2 transition ${
-                  active ? "bg-panel-3" : "hover:bg-panel-3"
+                className={`tx block rounded-sm px-3 py-2 ${
+                  active ? "bg-[var(--tint-strong)]" : "hover:bg-[var(--tint)]"
                 }`}
               >
                 <span
-                  className={`block text-[13px] font-bold ${active ? "text-fg" : "text-muted"}`}
+                  className={`block text-[13px] font-semibold ${active ? "text-fg" : "text-muted"}`}
                 >
                   {link.label}
                 </span>

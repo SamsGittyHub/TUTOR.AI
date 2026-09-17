@@ -76,16 +76,16 @@ export default function SessionsPage() {
             return (
               <li
                 key={s.id}
-                className="flex items-start gap-4 rounded-sm border border-line bg-panel px-4 py-3.5"
+                className="flex items-start gap-4 surface rounded-md px-4 py-3.5"
               >
                 <div className="min-w-0 flex-1">
                   <Link
                     href={`/app?session=${encodeURIComponent(s.id)}`}
-                    className="truncate text-[14px] font-extrabold text-fg transition hover:text-cyan"
+                    className="truncate text-[14px] font-semibold text-fg transition hover:text-cyan"
                   >
                     {s.title}
                   </Link>
-                  <p className="mt-0.5 text-[11.5px] font-bold uppercase tracking-wider text-dim">
+                  <p className="mt-0.5 text-[12px] text-dim">
                     {when(s.updatedAt)}
                     {boardCards ? ` · ${boardCards} board cards` : ""}
                     {s.plan ? ` · step ${s.plan.currentIndex + 1}/${s.plan.steps.length}` : ""}

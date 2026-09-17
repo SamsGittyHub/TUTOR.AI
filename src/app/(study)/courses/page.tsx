@@ -53,10 +53,10 @@ export default function CoursesPage() {
     >
       <form
         onSubmit={add}
-        className="flex flex-wrap items-end gap-2 rounded-sm border border-line bg-panel px-4 py-3.5"
+        className="flex flex-wrap items-end gap-2 surface rounded-md px-4 py-3.5"
       >
         <label className="flex min-w-[180px] flex-1 flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
             Course
           </span>
           <input
@@ -67,7 +67,7 @@ export default function CoursesPage() {
           />
         </label>
         <label className="flex w-32 flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
             Term
           </span>
           <input
@@ -94,7 +94,7 @@ export default function CoursesPage() {
         <button
           type="submit"
           disabled={busy || !name.trim()}
-          className="rounded-full grad px-4 py-2 text-[13px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-40"
+          className="rounded-full grad px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
         >
           {busy ? "Adding…" : "Add course"}
         </button>
@@ -123,17 +123,17 @@ export default function CoursesPage() {
               return (
                 <li
                   key={course.id}
-                  className="rounded-sm border border-line bg-panel px-4 py-3.5"
+                  className="surface rounded-md px-4 py-3.5"
                 >
                   <div className="flex items-start gap-3">
                     <span
                       className={`mt-1 h-3 w-3 shrink-0 rounded-full ${SWATCH[course.color] ?? SWATCH.cyan}`}
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-[14px] font-extrabold text-fg">
+                      <p className="truncate text-[14px] font-semibold text-fg">
                         {course.name}
                       </p>
-                      <p className="mt-0.5 text-[11.5px] font-bold uppercase tracking-wider text-dim">
+                      <p className="mt-0.5 text-[12px] text-dim">
                         {course.term ?? "no term"} · {materials.length} files ·{" "}
                         {masteryLabel(avg, rollups.length > 0)}
                       </p>

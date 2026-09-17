@@ -85,10 +85,10 @@ export function SyllabusImport({ materials, courses, onImport }: Props) {
   }
 
   return (
-    <div className="rounded-sm border border-line bg-panel px-4 py-3.5">
+    <div className="surface rounded-md px-4 py-3.5">
       <div className="flex flex-wrap items-end gap-2">
         <label className="flex min-w-[200px] flex-1 flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
             Syllabus
           </span>
           <select
@@ -106,7 +106,7 @@ export function SyllabusImport({ materials, courses, onImport }: Props) {
         </label>
         {courses.length > 0 && (
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
               For course
             </span>
             <select
@@ -166,7 +166,7 @@ export function SyllabusImport({ materials, courses, onImport }: Props) {
                   aria-label={`Import ${event.title}`}
                   className="h-4 w-4 shrink-0 accent-[var(--color-cyan)]"
                 />
-                <span className="w-16 shrink-0 text-[10.5px] font-extrabold uppercase tracking-wider text-dim">
+                <span className="w-16 shrink-0 text-[11px] font-medium text-dim">
                   {event.kind}
                 </span>
                 <span className="flex-1 truncate text-[13px] text-fg">{event.title}</span>
@@ -180,7 +180,7 @@ export function SyllabusImport({ materials, courses, onImport }: Props) {
             type="button"
             onClick={confirm}
             disabled={busy || skip.size === found.length}
-            className="mt-3 rounded-full grad px-4 py-2 text-[13px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-40"
+            className="mt-3 rounded-full grad px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
           >
             {busy ? "Importing…" : `Import ${found.length - skip.size} to the calendar`}
           </button>

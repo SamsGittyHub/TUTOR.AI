@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 
-import { AppNav } from "@/components/shell/AppNav";
 import { Whiteboard } from "@/components/board/Whiteboard";
 import type { TutorAction } from "@/lib/actions";
 import { loadKeys, pullAccountKeys } from "@/lib/keys";
@@ -71,9 +70,7 @@ export default function VoicePage() {
   const live = rt.status === "live";
 
   return (
-    <div className="flex h-dvh flex-col bg-ink">
-      <AppNav />
-
+    <div className="flex h-[calc(100dvh-53px)] flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 lg:flex-row">
         <div className="min-h-0 flex-1">
           <Whiteboard
@@ -98,9 +95,9 @@ export default function VoicePage() {
           />
         </div>
 
-        <aside className="flex w-full shrink-0 flex-col rounded-md border border-line bg-panel lg:w-[340px]">
+        <aside className="flex w-full shrink-0 flex-col surface rounded-md lg:w-[340px]">
           <header className="flex items-center justify-between border-b border-line px-4 py-3">
-            <h2 className="text-[13px] font-extrabold text-fg">Live voice</h2>
+            <h2 className="text-[13px] font-semibold text-fg">Live voice</h2>
             <span
               className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${
                 live ? "text-good" : rt.status === "error" ? "text-pink" : "text-dim"
@@ -151,7 +148,7 @@ export default function VoicePage() {
               <ul className="flex flex-col gap-3">
                 {lines.map((line, i) => (
                   <li key={i}>
-                    <p className="text-[10.5px] font-extrabold uppercase tracking-wider text-dim">
+                    <p className="text-[11px] font-medium text-dim">
                       {line.role === "student" ? "you" : "tutor"}
                     </p>
                     <p className="mt-0.5 text-[13px] leading-relaxed text-fg">
@@ -168,7 +165,7 @@ export default function VoicePage() {
               <button
                 type="button"
                 onClick={rt.stop}
-                className="w-full rounded-full border border-line px-5 py-3 text-[13px] font-extrabold text-muted transition hover:border-pink/50 hover:text-pink"
+                className="w-full rounded-full border border-line px-5 py-3 text-[13px] font-semibold text-muted transition hover:border-pink/50 hover:text-pink"
               >
                 End session
               </button>
@@ -177,7 +174,7 @@ export default function VoicePage() {
                 type="button"
                 onClick={begin}
                 disabled={rt.status === "connecting"}
-                className="w-full rounded-full grad px-5 py-3 text-[13px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-50"
+                className="w-full rounded-full grad px-5 py-3 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
               >
                 {rt.status === "connecting" ? "Connecting…" : "Start talking"}
               </button>

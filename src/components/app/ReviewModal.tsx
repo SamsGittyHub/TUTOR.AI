@@ -57,7 +57,7 @@ export function ReviewModal({ queue, onAnswer, onTeach, onClose }: Props) {
       >
         <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
           <div>
-            <h2 className="text-base font-extrabold">Review</h2>
+            <h2 className="text-base font-semibold">Review</h2>
             <p className="text-xs text-dim">
               {finished
                 ? `${tally.right} right · ${tally.missed} missed`
@@ -75,7 +75,7 @@ export function ReviewModal({ queue, onAnswer, onTeach, onClose }: Props) {
 
         {finished ? (
           <div className="p-8 text-center">
-            <p className="text-2xl font-black grad-text">
+            <p className="text-2xl font-bold grad-text">
               {items.length === 0 ? "Nothing due." : `${tally.right}/${items.length}`}
             </p>
             <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted">
@@ -88,7 +88,7 @@ export function ReviewModal({ queue, onAnswer, onTeach, onClose }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="mt-5 rounded-full grad px-6 py-2 text-sm font-extrabold text-white"
+              className="mt-5 rounded-full grad px-6 py-2 text-sm font-semibold text-white"
             >
               Done
             </button>
@@ -164,7 +164,7 @@ export function ReviewModal({ queue, onAnswer, onTeach, onClose }: Props) {
                     <button
                       type="button"
                       onClick={() => onTeach(card, (picked ?? draft).trim())}
-                      className="rounded-full grad px-3 py-1 text-[11px] font-extrabold text-white"
+                      className="rounded-full grad px-3 py-1 text-[11px] font-semibold text-white"
                     >
                       Teach me this one
                     </button>

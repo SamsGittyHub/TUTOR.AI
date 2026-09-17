@@ -112,7 +112,7 @@ export function ChatRail({
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
       <header className="flex shrink-0 items-center justify-between border-b border-line px-4 py-2.5">
-        <span className="text-sm font-extrabold">Ask anything</span>
+        <span className="text-sm font-semibold">Ask anything</span>
         {busy ? (
           <button
             type="button"

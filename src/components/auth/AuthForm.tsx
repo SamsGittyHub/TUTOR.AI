@@ -75,7 +75,7 @@ export function AuthForm({ mode }: Props) {
         />
 
         <div className="relative w-full max-w-sm">
-          <h1 className="text-center text-[30px] font-black leading-tight tracking-tight">
+          <h1 className="text-center text-[30px] font-bold leading-tight tracking-tight">
             {signup ? (
               <>
                 Study from <span className="grad-text">any device</span>
@@ -132,7 +132,7 @@ export function AuthForm({ mode }: Props) {
             <button
               type="submit"
               disabled={busy}
-              className="mt-1 rounded-full grad px-6 py-3 text-sm font-extrabold text-white transition hover:opacity-90 disabled:opacity-50"
+              className="mt-1 rounded-full grad px-6 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
             >
               {busy
                 ? signup
@@ -181,7 +181,7 @@ interface FieldProps {
 function Field({ label, type, value, onChange, ...rest }: FieldProps) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
         {label}
       </span>
       <input

@@ -76,7 +76,7 @@ export function AccountMenu() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Account: ${label}`}
-        className="flex h-8 w-8 items-center justify-center rounded-full grad text-[12px] font-black text-white transition hover:opacity-90"
+        className="tx press grad flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold text-white shadow-[var(--elev-1)] hover:brightness-110"
       >
         {initial}
       </button>
@@ -84,20 +84,22 @@ export function AccountMenu() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-10 z-50 w-60 overflow-hidden rounded-sm border border-line bg-panel-2 shadow-xl"
+          className="surface-2 raised pop-in absolute right-0 top-10 z-50 w-60 overflow-hidden rounded-md p-1"
+          style={{ ["--origin" as string]: "top right" }}
         >
-          <div className="border-b border-line px-3.5 py-3">
+          <div className="px-3 pb-2.5 pt-2.5">
             {user.displayName && (
-              <p className="text-[13px] font-extrabold text-fg">{user.displayName}</p>
+              <p className="text-[13px] font-semibold text-fg">{user.displayName}</p>
             )}
             <p className="truncate text-[11.5px] text-dim">{user.email}</p>
           </div>
+          <div className="mx-1 mb-1 h-px bg-[var(--hairline)]" />
           <button
             type="button"
             role="menuitem"
             onClick={signOut}
             disabled={busy}
-            className="w-full px-3.5 py-2.5 text-left text-[13px] font-bold text-muted transition hover:bg-panel-3 hover:text-fg disabled:opacity-50"
+            className="tx w-full rounded-sm px-3 py-2 text-left text-[13px] font-semibold text-muted hover:bg-[var(--tint)] hover:text-fg disabled:opacity-50"
           >
             {busy ? "Signing out…" : "Sign out"}
           </button>

@@ -94,15 +94,15 @@ export default function ReviewPage() {
             : "Every quiz question you answer becomes a card here, scheduled so it comes back just as you're about to forget it."}
         </Empty>
       ) : finished ? (
-        <div className="rounded-md border border-line bg-panel px-6 py-12 text-center">
-          <p className="text-[19px] font-black text-fg">Queue cleared</p>
+        <div className="surface rounded-md px-6 py-12 text-center">
+          <p className="text-[19px] font-bold text-fg">Queue cleared</p>
           <p className="mt-2 text-[13.5px] text-muted">
             {tally.right} right · {tally.missed} to see again tomorrow.
           </p>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
             <Link
               href="/progress"
-              className="rounded-full grad px-5 py-2.5 text-[13px] font-extrabold text-white transition hover:opacity-90"
+              className="rounded-full grad px-5 py-2.5 text-[13px] font-semibold text-white transition hover:opacity-90"
             >
               See progress
             </Link>
@@ -115,10 +115,10 @@ export default function ReviewPage() {
           </div>
         </div>
       ) : card ? (
-        <div className="rounded-md border border-line bg-panel px-5 py-6 sm:px-7 sm:py-8">
-          <p className="text-[17px] font-extrabold leading-snug text-fg">{card.prompt}</p>
+        <div className="surface rounded-md px-5 py-6 sm:px-7 sm:py-8">
+          <p className="text-[17px] font-semibold leading-snug text-fg">{card.prompt}</p>
           {card.sourceLocator && (
-            <p className="mt-2 text-[11.5px] font-bold uppercase tracking-wider text-dim">
+            <p className="mt-2 text-[12px] text-dim">
               {card.sourceLocator}
             </p>
           )}
@@ -131,7 +131,7 @@ export default function ReviewPage() {
                   type="button"
                   disabled={verdict !== null}
                   onClick={() => answer(choice)}
-                  className="rounded-sm border border-line bg-panel-2 px-4 py-3 text-left text-[13.5px] font-bold text-fg transition hover:border-line-2 disabled:opacity-60"
+                  className="surface-2 rounded-md px-4 py-3 text-left text-[13.5px] font-bold text-fg transition hover:border-line-2 disabled:opacity-60"
                 >
                   {choice}
                 </button>
@@ -156,7 +156,7 @@ export default function ReviewPage() {
               <button
                 type="submit"
                 disabled={verdict !== null || !draft.trim()}
-                className="rounded-full grad px-5 py-2.5 text-[13px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-40"
+                className="rounded-full grad px-5 py-2.5 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
               >
                 Check
               </button>
@@ -166,7 +166,7 @@ export default function ReviewPage() {
           {verdict !== null && (
             <div className="mt-6 border-t border-line pt-5">
               <p
-                className={`text-[13.5px] font-extrabold ${verdict ? "text-good" : "text-pink"}`}
+                className={`text-[13.5px] font-semibold ${verdict ? "text-good" : "text-pink"}`}
               >
                 {verdict ? "Right." : `Not quite — it's ${card.answer}.`}
               </p>
@@ -179,7 +179,7 @@ export default function ReviewPage() {
                 <button
                   type="button"
                   onClick={next}
-                  className="rounded-full grad px-5 py-2.5 text-[13px] font-extrabold text-white transition hover:opacity-90"
+                  className="rounded-full grad px-5 py-2.5 text-[13px] font-semibold text-white transition hover:opacity-90"
                 >
                   Next card
                 </button>

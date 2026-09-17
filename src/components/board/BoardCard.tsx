@@ -246,7 +246,7 @@ function AskCard({
   return (
     <div className={`rounded-md border-2 border-dashed ${border} p-4`}>
       <p className={`hand mb-3 text-[21px] leading-snug ${bodyInk}`}>
-        <span className="mr-2 rounded-full px-2 py-[2px] text-[12px] font-black tracking-wide text-white grad align-middle">
+        <span className="mr-2 rounded-full px-2 py-[2px] text-[12px] font-bold tracking-wide text-white grad align-middle">
           YOUR TURN
         </span>
         {action.question}

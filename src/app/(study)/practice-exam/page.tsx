@@ -135,7 +135,7 @@ export default function PracticeExamPage() {
         wide
       >
         {exam.focus.length > 0 && !result && (
-          <details className="mb-4 rounded-sm border border-line bg-panel px-4 py-3">
+          <details className="mb-4 surface rounded-md px-4 py-3">
             <summary className="cursor-pointer text-[12.5px] font-bold text-fg">
               Why these questions?
             </summary>
@@ -151,7 +151,7 @@ export default function PracticeExamPage() {
         )}
 
         {result && result.weakestTopics.length > 0 && (
-          <div className="mb-4 rounded-sm border border-line bg-panel px-4 py-3">
+          <div className="mb-4 surface rounded-md px-4 py-3">
             <p className="text-[12.5px] font-bold text-fg">What to revise next</p>
             <p className="mt-1 text-[12.5px] text-muted">
               {result.weakestTopics.join(" · ")}
@@ -211,7 +211,7 @@ export default function PracticeExamPage() {
       ) : (
         <div className="grid gap-5 lg:grid-cols-[1fr_300px]">
           <div>
-            <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+            <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
               Lessons to examine
             </h2>
             <ul className="mt-3 flex flex-col gap-2">
@@ -231,10 +231,10 @@ export default function PracticeExamPage() {
                         className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--color-cyan)]"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate text-[13.5px] font-extrabold text-fg">
+                        <span className="block truncate text-[13.5px] font-semibold text-fg">
                           {session.title}
                         </span>
-                        <span className="mt-0.5 block text-[11.5px] font-bold uppercase tracking-wider text-dim">
+                        <span className="mt-0.5 block text-[12px] text-dim">
                           {session.transcript.filter((t) => t.role === "student").length}{" "}
                           questions asked ·{" "}
                           {session.plan
@@ -250,8 +250,8 @@ export default function PracticeExamPage() {
           </div>
 
           <aside className="flex flex-col gap-4">
-            <div className="rounded-sm border border-line bg-panel px-4 py-3.5">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+            <div className="surface rounded-md px-4 py-3.5">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-dim">
                 Paper
               </p>
               <div className="mt-2.5 flex flex-wrap gap-1.5">
@@ -286,8 +286,8 @@ export default function PracticeExamPage() {
             </div>
 
             {preview.length > 0 && (
-              <div className="rounded-sm border border-line bg-panel px-4 py-3.5">
-                <p className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+              <div className="surface rounded-md px-4 py-3.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-dim">
                   It will focus on
                 </p>
                 <ul className="mt-2.5 flex flex-col gap-2">
@@ -309,7 +309,7 @@ export default function PracticeExamPage() {
               type="button"
               onClick={generate}
               disabled={!chosen.length || busy}
-              className="rounded-full grad px-5 py-3 text-[13px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-40"
+              className="rounded-full grad px-5 py-3 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
             >
               {busy
                 ? "Writing your exam…"
@@ -347,24 +347,24 @@ function PastExams({ onOpen }: { onOpen: (id: string) => void }) {
 
   return (
     <section className="mt-10">
-      <h2 className="text-[11px] font-extrabold uppercase tracking-wider text-dim">
+      <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
         Past papers
       </h2>
       <ul className="mt-3 flex flex-col gap-2">
         {exams.map((row) => (
           <li
             key={row.exam.id}
-            className="flex items-center gap-4 rounded-sm border border-line bg-panel px-4 py-3"
+            className="flex items-center gap-4 surface rounded-md px-4 py-3"
           >
             <button
               type="button"
               onClick={() => onOpen(row.exam.id)}
               className="min-w-0 flex-1 text-left"
             >
-              <span className="block truncate text-[13.5px] font-extrabold text-fg">
+              <span className="block truncate text-[13.5px] font-semibold text-fg">
                 {row.exam.title}
               </span>
-              <span className="mt-0.5 block text-[11.5px] font-bold uppercase tracking-wider text-dim">
+              <span className="mt-0.5 block text-[12px] text-dim">
                 {new Date(row.exam.createdAt).toLocaleDateString()} ·{" "}
                 {row.submittedAt
                   ? `submitted · ${row.result?.percent ?? 0}%`

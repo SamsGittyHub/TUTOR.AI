@@ -279,7 +279,7 @@ export default function AppPage() {
             key={value}
             type="button"
             onClick={() => setMobileView(value)}
-            className={`flex-1 rounded-sm py-2 text-xs font-extrabold transition ${
+            className={`flex-1 rounded-sm py-2 text-xs font-semibold transition ${
               mobileView === value ? "bg-panel-3 text-fg" : "text-dim"
             }`}
           >
@@ -420,7 +420,7 @@ function EmptyBoard({
         <button
           type="button"
           onClick={onAddKey}
-          className="mt-5 rounded-full grad px-6 py-2.5 text-sm font-extrabold text-white"
+          className="mt-5 rounded-full grad px-6 py-2.5 text-sm font-semibold text-white"
         >
           Add your API key
         </button>

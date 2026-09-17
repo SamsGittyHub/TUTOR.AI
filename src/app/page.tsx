@@ -62,7 +62,7 @@ export default function LandingPage() {
             <ThemeToggle />
             <Link
               href="/app"
-              className="rounded-full grad px-4 py-2 text-[13px] font-extrabold text-white transition hover:opacity-90"
+              className="rounded-full grad px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90"
             >
               Open the board
             </Link>
@@ -77,12 +77,12 @@ export default function LandingPage() {
           className="pointer-events-none absolute left-1/2 top-0 h-[520px] w-[900px] -translate-x-1/2 rounded-full opacity-[.16] blur-[110px] grad"
         />
         <div className="relative mx-auto max-w-3xl text-center">
-          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-panel px-3.5 py-1.5 text-[11.5px] font-extrabold uppercase tracking-wider text-muted">
+          <span className="inline-flex items-center gap-2 rounded-full border border-line bg-panel px-3.5 py-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan" />
             Bring your own model
           </span>
 
-          <h1 className="mt-6 text-[42px] font-black leading-[1.05] tracking-tight sm:text-[68px]">
+          <h1 className="mt-6 text-[42px] font-bold leading-[1.05] tracking-tight sm:text-[68px]">
             The tutor that
             <br />
             <span className="grad-text">writes on the board</span>
@@ -98,7 +98,7 @@ export default function LandingPage() {
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
               href="/app"
-              className="w-full rounded-full grad px-7 py-3.5 text-sm font-extrabold text-white transition hover:opacity-90 sm:w-auto"
+              className="w-full rounded-full grad px-7 py-3.5 text-sm font-semibold text-white transition hover:opacity-90 sm:w-auto"
             >
               Start a lesson — free
             </Link>
@@ -142,7 +142,7 @@ export default function LandingPage() {
       {/* how it works ---------------------------------------------------- */}
       <section id="how" className="scroll-mt-20 px-5 py-20">
         <div className="mx-auto max-w-5xl">
-          <h2 className="text-center text-[32px] font-black tracking-tight sm:text-[44px]">
+          <h2 className="text-center text-[32px] font-bold tracking-tight sm:text-[44px]">
             Three steps, then it teaches
           </h2>
           <div className="mt-12 grid gap-4 md:grid-cols-3">
@@ -151,8 +151,8 @@ export default function LandingPage() {
                 key={step.n}
                 className="rounded-lg border border-line bg-panel p-6 transition hover:border-line-2"
               >
-                <span className="grad-text text-[44px] font-black leading-none">{step.n}</span>
-                <h3 className="mt-3 text-lg font-extrabold">{step.title}</h3>
+                <span className="grad-text text-[44px] font-bold leading-none">{step.n}</span>
+                <h3 className="mt-3 text-lg font-semibold">{step.title}</h3>
                 <p className="mt-2 text-[13.5px] leading-relaxed text-muted">{step.body}</p>
               </article>
             ))}
@@ -165,7 +165,7 @@ export default function LandingPage() {
         <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-line bg-panel">
           <div className="grid gap-8 p-8 sm:p-12 md:grid-cols-2">
             <div>
-              <h2 className="text-[30px] font-black leading-tight tracking-tight sm:text-[38px]">
+              <h2 className="text-[30px] font-bold leading-tight tracking-tight sm:text-[38px]">
                 Every other tutor app
                 <br />
                 <span className="grad-text">marks up your tokens</span>
@@ -182,7 +182,7 @@ export default function LandingPage() {
               </p>
               <Link
                 href="/app"
-                className="mt-6 inline-block rounded-full grad px-6 py-3 text-sm font-extrabold text-white"
+                className="mt-6 inline-block rounded-full grad px-6 py-3 text-sm font-semibold text-white"
               >
                 Paste a key, start teaching
               </Link>
@@ -201,7 +201,7 @@ export default function LandingPage() {
                 >
                   <span className="h-2 w-2 shrink-0 rounded-full grad" />
                   <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-extrabold">{name}</p>
+                    <p className="text-[13px] font-semibold">{name}</p>
                     <p className="truncate text-[11.5px] text-dim">{models}</p>
                   </div>
                   <span className="shrink-0 font-mono text-[11px] text-cyan">{price}</span>
@@ -220,7 +220,7 @@ export default function LandingPage() {
 
       {/* testimonials ---------------------------------------------------- */}
       <section className="overflow-hidden border-y border-line py-16">
-        <h2 className="px-5 text-center text-[32px] font-black tracking-tight sm:text-[44px]">
+        <h2 className="px-5 text-center text-[32px] font-bold tracking-tight sm:text-[44px]">
           What studying with it feels like
         </h2>
         <div className="mt-10 flex overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)]">
@@ -236,7 +236,7 @@ export default function LandingPage() {
                 <figcaption className="mt-4 flex items-center gap-2.5">
                   <span className="h-7 w-7 rounded-full grad opacity-80" />
                   <span>
-                    <span className="block text-[12.5px] font-extrabold">{item.name}</span>
+                    <span className="block text-[12.5px] font-semibold">{item.name}</span>
                     <span className="block text-[11px] text-dim">{item.role}</span>
                   </span>
                 </figcaption>
@@ -248,14 +248,14 @@ export default function LandingPage() {
 
       {/* closer ---------------------------------------------------------- */}
       <section className="px-5 py-24 text-center">
-        <h2 className="mx-auto max-w-2xl text-[34px] font-black leading-tight tracking-tight sm:text-[52px]">
+        <h2 className="mx-auto max-w-2xl text-[34px] font-bold leading-tight tracking-tight sm:text-[52px]">
           Your material. Your model.
           <br />
           <span className="grad-text">Your pace.</span>
         </h2>
         <Link
           href="/app"
-          className="mt-8 inline-block rounded-full grad px-8 py-4 text-sm font-extrabold text-white transition hover:opacity-90"
+          className="mt-8 inline-block rounded-full grad px-8 py-4 text-sm font-semibold text-white transition hover:opacity-90"
         >
           Open the whiteboard
         </Link>

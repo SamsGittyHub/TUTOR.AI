@@ -75,20 +75,20 @@ export function ExamPaper({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-3 rounded-sm border border-line bg-panel px-4 py-3">
+      <div className="flex flex-wrap items-center gap-3 surface rounded-md px-4 py-3">
         <div className="mr-auto">
-          <p className="text-[14px] font-extrabold text-fg">{exam.title}</p>
-          <p className="mt-0.5 text-[11.5px] font-bold uppercase tracking-wider text-dim">
+          <p className="text-[14px] font-semibold text-fg">{exam.title}</p>
+          <p className="mt-0.5 text-[12px] text-dim">
             {questionCount} questions · {marks} marks · {exam.minutes} min
             {submitted ? " · submitted" : ` · ${answered}/${questionCount} answered`}
           </p>
         </div>
         {submitted && result && (
           <div className="text-right">
-            <p className="text-[22px] font-black leading-none text-fg">
+            <p className="text-[22px] font-bold leading-none text-fg">
               {result.percent}%
             </p>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-dim">
+            <p className="text-[11.5px] text-dim">
               {result.awarded}/{result.total} marks
             </p>
           </div>
@@ -115,8 +115,8 @@ export function ExamPaper({
       </div>
 
       {section && (
-        <section className="mt-4 rounded-md border border-line bg-panel px-5 py-5">
-          <h2 className="text-[16px] font-black text-fg">{section.title}</h2>
+        <section className="mt-4 surface rounded-md px-5 py-5">
+          <h2 className="text-[16px] font-bold text-fg">{section.title}</h2>
           {section.instructions && (
             <p className="mt-1 text-[12.5px] text-muted">{section.instructions}</p>
           )}
@@ -128,14 +128,14 @@ export function ExamPaper({
               return (
                 <li key={question.id}>
                   <div className="flex items-start gap-3">
-                    <span className="mt-0.5 w-6 shrink-0 text-[13px] font-black text-dim">
+                    <span className="mt-0.5 w-6 shrink-0 text-[13px] font-bold text-dim">
                       {i + 1}.
                     </span>
                     <div className="min-w-0 flex-1">
                       <p className="text-[14px] leading-relaxed text-fg">
                         {question.prompt}
                       </p>
-                      <p className="mt-1 text-[11px] font-bold uppercase tracking-wider text-dim">
+                      <p className="mt-1 text-[11.5px] text-dim">
                         {question.marks} mark{question.marks === 1 ? "" : "s"}
                         {question.topic ? ` · ${question.topic}` : ""}
                         {question.sourceLocator ? ` · ${question.sourceLocator}` : ""}
@@ -188,7 +188,7 @@ export function ExamPaper({
                           }`}
                         >
                           <p
-                            className={`text-[12.5px] font-extrabold ${
+                            className={`text-[12.5px] font-semibold ${
                               unmarked
                                 ? "text-muted"
                                 : verdict?.correct
@@ -241,14 +241,14 @@ export function ExamPaper({
             >
               Previous
             </button>
-            <span className="text-[11.5px] font-bold uppercase tracking-wider text-dim">
+            <span className="text-[12px] text-dim">
               Page {page + 1} of {exam.sections.length}
             </span>
             {page < exam.sections.length - 1 ? (
               <button
                 type="button"
                 onClick={() => setPage((p) => p + 1)}
-                className="ml-auto rounded-full grad px-5 py-2 text-[12.5px] font-extrabold text-white transition hover:opacity-90"
+                className="ml-auto rounded-full grad px-5 py-2 text-[12.5px] font-semibold text-white transition hover:opacity-90"
               >
                 Next section
               </button>
@@ -257,7 +257,7 @@ export function ExamPaper({
                 type="button"
                 onClick={submit}
                 disabled={submitting}
-                className="ml-auto rounded-full grad px-5 py-2 text-[12.5px] font-extrabold text-white transition hover:opacity-90 disabled:opacity-50"
+                className="ml-auto rounded-full grad px-5 py-2 text-[12.5px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
               >
                 {submitting ? "Marking…" : "Submit paper"}
               </button>

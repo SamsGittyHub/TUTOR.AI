@@ -53,7 +53,7 @@ export function Sidebar(props: Props) {
             key={value}
             type="button"
             onClick={() => setTab(value)}
-            className={`flex-1 rounded-sm px-3 py-1.5 text-xs font-extrabold capitalize transition ${
+            className={`flex-1 rounded-sm px-3 py-1.5 text-xs font-semibold capitalize transition ${
               tab === value ? "bg-panel-3 text-fg" : "text-dim hover:text-muted"
             }`}
           >
@@ -110,7 +110,7 @@ export function Sidebar(props: Props) {
                   <button
                     type="button"
                     onClick={() => fileInput.current?.click()}
-                    className="grad rounded-full px-3.5 py-1.5 text-[11.5px] font-extrabold text-white"
+                    className="grad rounded-full px-3.5 py-1.5 text-[11.5px] font-semibold text-white"
                   >
                     Choose files
                   </button>
@@ -218,7 +218,7 @@ export function Sidebar(props: Props) {
           )}
 
           <div className="rounded-md border border-line bg-panel-2 p-2.5">
-            <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wide text-dim">
+            <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-dim">
               What should we cover?
             </label>
             <input
@@ -234,7 +234,7 @@ export function Sidebar(props: Props) {
               type="button"
               disabled={props.busy}
               onClick={() => props.onStartLesson(goal)}
-              className="mt-2 w-full rounded-full grad py-2 text-xs font-extrabold text-white disabled:opacity-40"
+              className="mt-2 w-full rounded-full grad py-2 text-xs font-semibold text-white disabled:opacity-40"
             >
               Start the lesson
             </button>

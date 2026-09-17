@@ -1,5 +1,6 @@
-import Link from "next/link";
 import type { ReactNode } from "react";
+
+import { ButtonLink } from "@/components/ui/Button";
 
 /** The same empty state everywhere: what this page is for, and the way to fill it. */
 export function Empty({
@@ -12,18 +13,18 @@ export function Empty({
   action?: { href: string; label: string };
 }) {
   return (
-    <div className="rounded-md border border-dashed border-line-2 px-6 py-14 text-center">
-      <p className="text-[15px] font-extrabold text-fg">{title}</p>
-      <p className="mx-auto mt-2 max-w-sm text-[13px] leading-relaxed text-muted">
+    <div className="rounded-md px-6 py-11 text-center shadow-[inset_0_0_0_1px_var(--hairline)]">
+      <p className="text-[15px] font-semibold text-fg">{title}</p>
+      <p className="mx-auto mt-1.5 max-w-sm text-[13px] leading-[1.6] text-muted">
         {children}
       </p>
       {action && (
-        <Link
-          href={action.href}
-          className="mt-5 inline-block rounded-full grad px-5 py-2.5 text-[13px] font-extrabold text-white transition hover:opacity-90"
-        >
+        // Secondary on purpose: the page header already carries the primary
+        // action, and two gradient buttons for the same thing is exactly the
+        // flattened hierarchy this pass is undoing.
+        <ButtonLink href={action.href} tone="secondary" className="mt-5">
           {action.label}
-        </Link>
+        </ButtonLink>
       )}
     </div>
   );
