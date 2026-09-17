@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { JsonObjectStream, extractFirstJson } from "../.test-build/core/stream-json.js";
-import { normalizeAction, unescapeBreaks } from "../.test-build/core/actions.js";
+import { isBoardAction, normalizeAction, unescapeBreaks } from "../.test-build/core/actions.js";
 import { compileExpression } from "../.test-build/core/expr.js";
 import {
   DAY_MS,
@@ -42,6 +42,10 @@ import {
   advanceListening, IDLE_LISTENING, levelOf, LISTEN_DEFAULTS,
   stripForSpeech, worthSpeaking,
 } from "../.test-build/core/speech.js";
+import {
+  briefLearning, describeLearning, emptyProfile, forgetNote, MAX_NOTES,
+  MIN_MODE_SHOWN, modeRanking, parseProfile, recordTurn, rememberNote,
+} from "../.test-build/core/learning.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
   normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
@@ -1508,7 +1512,8 @@ test("an unknown tool name comes back as prose, not a thrown error", () => {
 
 test("every declared tool is one the runner or the board actually handles", () => {
   const handled = new Set([
-    "write_on_board", "draw_image", "search_material", "get_progress", "list_lessons",
+    "write_on_board", "draw_image", "remember_this", "search_material",
+    "get_progress", "list_lessons",
   ]);
   for (const tool of VOICE_TOOLS) {
     assert.equal(tool.type, "function");
@@ -1853,7 +1858,8 @@ test("the session update carries the instructions and the tools", () => {
   assert.equal(message.session.tool_choice, "auto");
   assert.deepEqual(
     message.session.tools.map((t) => t.name),
-    ["write_on_board", "draw_image", "search_material", "get_progress", "list_lessons"],
+    ["write_on_board", "draw_image", "remember_this", "search_material",
+     "get_progress", "list_lessons"],
   );
 });
 
@@ -1970,6 +1976,207 @@ test("the thresholds can be tightened without touching the logic", () => {
   const strict = { ...LISTEN_DEFAULTS, silenceMs: 200, minSpeechMs: 50 };
   const actions = listen([[LOUD, 0], [LOUD, 100], [QUIET, 200], [QUIET, 350]], strict);
   assert.deepEqual(actions.map((a) => a[0]), ["start", "stop"]);
+});
+
+console.log("\n— what this student learns from —");
+
+const LEARN_NOW = Date.UTC(2026, 2, 1);
+
+/** Teaches `times` turns using `modes`, with `good` of them landing. */
+function teach(profile, modes, times, good) {
+  let out = profile;
+  for (let i = 0; i < times; i += 1) {
+    out = recordTurn(out, modes, i < good ? "landed" : "confused", LEARN_NOW + i);
+  }
+  return out;
+}
+
+test("a mode that keeps working rises above one that doesn't", () => {
+  let profile = emptyProfile(LEARN_NOW);
+  profile = teach(profile, ["show_image"], 10, 9);
+  profile = teach(profile, ["write_text"], 10, 2);
+  const ranked = modeRanking(profile);
+  assert.equal(ranked[0].mode, "show_image");
+  assert.equal(ranked[ranked.length - 1].mode, "write_text");
+  assert.equal(ranked[0].rate, 0.9);
+});
+
+test("one good turn is not a finding", () => {
+  // Otherwise the first lesson decides how someone is taught for a year.
+  const profile = teach(emptyProfile(LEARN_NOW), ["draw_plot"], 1, 1);
+  assert.equal(modeRanking(profile)[0].confident, false);
+  assert.equal(describeLearning(profile), "", "nothing confident, nothing said");
+});
+
+test("a thin record ranks last rather than looking like a failure", () => {
+  let profile = teach(emptyProfile(LEARN_NOW), ["write_steps"], MIN_MODE_SHOWN, 1);
+  profile = teach(profile, ["draw_plot"], 1, 1);
+  const ranked = modeRanking(profile);
+  assert.equal(ranked[0].mode, "write_steps", "the proven-bad one still outranks the unknown");
+  assert.equal(ranked[1].confident, false);
+});
+
+test("a turn that used three card types credits all three", () => {
+  const profile = recordTurn(emptyProfile(LEARN_NOW),
+                             ["write_text", "write_steps", "draw_diagram"], "landed", LEARN_NOW);
+  assert.equal(Object.keys(profile.modes).length, 3);
+  assert.equal(profile.modes.write_steps.landed, 1);
+});
+
+test("the same mode twice in one turn counts once", () => {
+  const profile = recordTurn(emptyProfile(LEARN_NOW),
+                             ["write_steps", "write_steps"], "landed", LEARN_NOW);
+  assert.equal(profile.modes.write_steps.shown, 1);
+});
+
+test("how someone learned in September stops outvoting how they learn now", () => {
+  // 60 turns of one behaviour, then a change of heart. Without decay the old
+  // record would swamp the new one for the rest of the year.
+  let profile = teach(emptyProfile(LEARN_NOW), ["draw_diagram"], 60, 60);
+  const afterDecay = profile.modes.draw_diagram.shown;
+  assert.ok(afterDecay < 60, `the tally is halved as it grows, got ${afterDecay}`);
+  profile = teach(profile, ["draw_diagram"], 15, 0);
+  assert.ok(modeRanking(profile)[0].rate < 0.85, "recent failures actually move it");
+});
+
+test("a turn with no cards in it records nothing", () => {
+  const profile = emptyProfile(LEARN_NOW);
+  assert.equal(recordTurn(profile, [], "confused", LEARN_NOW), profile);
+});
+
+console.log("\n— things the tutor noticed —");
+
+test("a note is kept, and the same note again is counted not duplicated", () => {
+  let profile = rememberNote(emptyProfile(LEARN_NOW),
+    "Needs the units written beside every number.", LEARN_NOW);
+  profile = rememberNote(profile,
+    "needs the units written beside every number", LEARN_NOW + 1000);
+  assert.equal(profile.notes.length, 1, "a memory full of rephrasings is unusable");
+  assert.equal(profile.notes[0].seen, 2);
+});
+
+test("a differently worded but genuinely different note is kept separately", () => {
+  let profile = rememberNote(emptyProfile(LEARN_NOW), "Needs the units written down.", LEARN_NOW);
+  profile = rememberNote(profile, "Gets there faster when asked before told.", LEARN_NOW);
+  assert.equal(profile.notes.length, 2);
+});
+
+test("something too vague to act on isn't remembered", () => {
+  const profile = emptyProfile(LEARN_NOW);
+  assert.equal(rememberNote(profile, "visual", LEARN_NOW), profile);
+  assert.equal(rememberNote(profile, "   ", LEARN_NOW), profile);
+});
+
+test("when the memory fills up, the least reinforced notes go first", () => {
+  let profile = emptyProfile(LEARN_NOW);
+  for (let i = 0; i < MAX_NOTES + 6; i += 1) {
+    profile = rememberNote(profile, `Observation number ${i} about this student.`, LEARN_NOW + i);
+  }
+  // Reinforce one of the earliest, then overflow again.
+  profile = rememberNote(profile, "Observation number 0 about this student.", LEARN_NOW + 999);
+  for (let i = 0; i < 6; i += 1) {
+    profile = rememberNote(profile, `Later thought ${i} about this student.`, LEARN_NOW + 2000 + i);
+  }
+  assert.equal(profile.notes.length, MAX_NOTES);
+  assert.ok(profile.notes.some((n) => n.text.includes("number 0")),
+            "the one seen twice survives the cull");
+});
+
+test("a student can make it forget one thing", () => {
+  const profile = rememberNote(emptyProfile(LEARN_NOW), "Struggles with fractions still.", LEARN_NOW);
+  const after = forgetNote(profile, profile.notes[0].id, LEARN_NOW + 1);
+  assert.equal(after.notes.length, 0);
+});
+
+console.log("\n— telling the next lesson about it —");
+
+test("the prompt block states the finding and the evidence for it", () => {
+  let profile = teach(emptyProfile(LEARN_NOW), ["show_image"], 10, 9);
+  profile = teach(profile, ["write_text"], 10, 2);
+  profile = rememberNote(profile, "Needs the units written beside every number.", LEARN_NOW);
+  const text = describeLearning(profile);
+  assert.match(text, /a generated picture works/);
+  assert.match(text, /90% of the 10 times/);
+  assert.match(text, /written explanation tends not to/);
+  assert.match(text, /units written beside every number/);
+  assert.match(text, /evidence, not as orders/, "a model told 'always' will illustrate algebra");
+});
+
+test("an empty memory adds nothing to the prompt", () => {
+  assert.equal(describeLearning(emptyProfile(LEARN_NOW)), "");
+});
+
+test("a memory with only a note still says it", () => {
+  const profile = rememberNote(emptyProfile(LEARN_NOW), "Prefers being asked first.", LEARN_NOW);
+  assert.match(describeLearning(profile), /Prefers being asked first/);
+});
+
+test("the spoken briefing is one line, not the whole block", () => {
+  let profile = teach(emptyProfile(LEARN_NOW), ["show_image"], 10, 9);
+  profile = rememberNote(profile, "Needs the units written beside every number.", LEARN_NOW);
+  const brief = briefLearning(profile);
+  assert.match(brief, /Learns well from a generated picture/);
+  assert.ok(brief.length < 400, "a live session has no room for the full block");
+  assert.doesNotMatch(brief, /\n\n/);
+});
+
+console.log("\n— reading the memory back safely —");
+
+test("a profile survives a round trip through storage", () => {
+  let profile = teach(emptyProfile(LEARN_NOW), ["draw_diagram"], 6, 5);
+  profile = rememberNote(profile, "Draws it out loud before writing anything.", LEARN_NOW);
+  const back = parseProfile(JSON.parse(JSON.stringify(profile)), LEARN_NOW);
+  assert.deepEqual(back.modes, profile.modes);
+  assert.equal(back.notes[0].text, profile.notes[0].text);
+});
+
+test("a row written by an older version can't put rubbish into a prompt", () => {
+  const back = parseProfile({
+    modes: {
+      draw_diagram: { shown: 8, landed: 6, confused: 2 },
+      invented_mode: { shown: 99, landed: 99 },
+      write_text: { shown: 0, landed: 5 },
+      draw_plot: { shown: 3, landed: 900 },
+    },
+    notes: [
+      { id: "a", text: "A real observation about them.", seen: 2, at: LEARN_NOW },
+      { id: "b", text: "tiny" },
+      "not an object",
+      null,
+    ],
+  }, LEARN_NOW);
+
+  assert.deepEqual(Object.keys(back.modes), ["draw_diagram", "draw_plot"]);
+  assert.equal(back.modes.draw_plot.landed, 3, "landed can never exceed shown");
+  assert.equal(back.notes.length, 1);
+  assert.equal(back.notes[0].text, "A real observation about them.");
+});
+
+test("nothing at all reads as an empty memory, not a crash", () => {
+  for (const raw of [null, undefined, "", 42, []]) {
+    const back = parseProfile(raw, LEARN_NOW);
+    assert.deepEqual(back.notes, []);
+    assert.deepEqual(back.modes, {});
+  }
+});
+
+test("a remember action is parsed, and a vague one is dropped", () => {
+  const action = normalizeAction({
+    type: "remember", id: "r1",
+    note: "Needs the units written beside every number.",
+  });
+  assert.equal(action.type, "remember");
+  assert.match(action.note, /units/);
+  assert.equal(normalizeAction({ type: "remember", id: "r2", note: "visual" }), null);
+});
+
+test("a remember never reaches the board or an export", () => {
+  // It is the tutor's note to itself about the student, not part of the lesson.
+  const action = normalizeAction({
+    type: "remember", id: "r3", note: "Gets lost when I say 'therefore'.",
+  });
+  assert.equal(isBoardAction(action), false);
+  assert.equal(actionToMarkdown(action), "");
 });
 
 console.log(`\n${passed} checks passed\n`);

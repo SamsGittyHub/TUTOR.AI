@@ -14,6 +14,7 @@ import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
 import { applyDrawnImage, type ImageRequest } from "@/lib/board-image";
 import { requestImage } from "@/lib/draw-image";
+import { useLearning } from "@/lib/useLearning";
 import { buildBriefing, runVoiceTool, type VoiceContext } from "@/lib/voice-tools";
 
 /**
@@ -109,7 +110,11 @@ it. get_progress tells you where they're strong and weak; list_lessons tells you
 what they've already been taught, so you build on it rather than repeat it.
 
 Look things up quietly. Say "let me check your notes", not "I am calling the
-search_material function".`;
+search_material function".
+
+When you work out something about how they learn — what makes it click, what
+loses them — call remember_this so your next self knows it. One short, specific
+sentence, only once you've seen it more than once, and never out loud.`;
 
 export default function VoicePage() {
   const [actions, setActions] = useState<TutorAction[]>([]);
@@ -120,6 +125,7 @@ export default function VoicePage() {
   // Everything the tutor is allowed to know about this student. Loaded up
   // front so a lookup mid-sentence is a local search, not a round trip.
   const lib = useLibrary();
+  const learning = useLearning();
   const [chunks, setChunks] = useState<MaterialChunk[]>([]);
 
   useEffect(() => {
@@ -169,8 +175,13 @@ export default function VoicePage() {
       attempts: lib.attempts,
       papers: lib.papers,
       drawImage,
+      learning: learning.profile,
+      remember: learning.remember,
     }),
-    [lib.materials, chunks, lib.sessions, lib.courses, lib.cards, lib.attempts, lib.papers, drawImage],
+    [
+      lib.materials, chunks, lib.sessions, lib.courses, lib.cards, lib.attempts,
+      lib.papers, drawImage, learning.profile, learning.remember,
+    ],
   );
 
   const contextRef = useRef(context);

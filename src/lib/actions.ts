@@ -173,6 +173,17 @@ export interface AskAction extends Common {
   explanation?: string;
 }
 
+/**
+ * Something the tutor worked out about how this student learns.
+ *
+ * Never rendered. It goes into the account's learning memory and comes back as
+ * part of the next lesson's prompt.
+ */
+export interface RememberAction extends Common {
+  type: "remember";
+  note: string;
+}
+
 /** End of turn. Carries the tutor's read on where the lesson is. */
 export interface DoneAction extends Common {
   type: "done";
@@ -193,11 +204,17 @@ export type TutorAction =
   | HighlightAction
   | EraseAction
   | AskAction
+  | RememberAction
   | DoneAction;
 
 export type BoardAction = Exclude<
   TutorAction,
-  SayAction | HighlightAction | EraseAction | DoneAction | LessonPlanAction
+  | SayAction
+  | HighlightAction
+  | EraseAction
+  | DoneAction
+  | LessonPlanAction
+  | RememberAction
 >;
 
 export const BOARD_TYPES = new Set([
@@ -619,6 +636,14 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       };
     }
 
+    case "remember":
+    case "note_about_student": {
+      const note = prose(r.note ?? r.text ?? r.observation);
+      // Short enough to be noise, and a memory of noise is worse than none.
+      if (note.trim().length < 8) return null;
+      return { ...base, type: "remember", note };
+    }
+
     case "done":
     case "end":
     case "finish": {
@@ -667,6 +692,8 @@ export function actionToText(action: TutorAction): string {
       return `[board:${action.id}] picture of ${action.prompt}${
         action.caption ? ` — "${action.caption}"` : ""
       }`;
+    case "remember":
+      return `[remembered: ${action.note}]`;
     case "highlight":
       return `[highlighted ${action.targetId}]`;
     case "erase":

@@ -134,9 +134,12 @@ export function actionToMarkdown(
       return `**Check yourself:** ${action.question}${choices}${answer}${why}`;
     }
 
-    // Board bookkeeping — meaningless once the board is a document.
+    // Board bookkeeping — meaningless once the board is a document. A
+    // "remember" never belongs in an export either: it is the tutor's note to
+    // itself about the student, not part of the lesson.
     case "highlight":
     case "erase":
+    case "remember":
     case "done":
       return "";
   }

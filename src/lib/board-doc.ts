@@ -206,6 +206,7 @@ export function boardToBlocks(
       // Board bookkeeping: meaningless once the board is a document.
       case "highlight":
       case "erase":
+      case "remember":
       case "done":
         break;
     }

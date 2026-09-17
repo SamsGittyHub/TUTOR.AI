@@ -68,6 +68,13 @@ Action types:
   A check for understanding. The student answers on the board; you see the reply
   next turn. Omit "choices" for an open question.
 
+{"type":"remember","id":"rm1","note":"Follows the algebra fine, but needs the units written beside every number or the answer comes out dimensionless."}
+  Something you worked out about how this student learns, kept between lessons.
+  Never shown to them and never on the board. One short, specific sentence
+  about what helps or what trips them up — not "is a visual learner", which
+  tells your next self nothing. Only when you have seen it more than once, and
+  at most one per turn. Most turns need none.
+
 {"type":"done","id":"end1","stepIndex":1,"suggestions":["Try another example","Why does the sign flip?"]}
   Always the last object of every turn. stepIndex is the 0-based index of the
   lesson-plan step you just finished. suggestions are 2-3 short things the
@@ -109,6 +116,8 @@ export interface PromptContext {
   materials: Material[];
   hasMaterialContext: boolean;
   studentLevel?: string;
+  /** What previous lessons established about how this person learns. */
+  learning?: string;
 }
 
 export function buildSystemPrompt(context: PromptContext): string {
@@ -119,6 +128,9 @@ order, with a marker in your hand.`,
     PROTOCOL,
     PEDAGOGY,
   ];
+
+  // Before the material, because it changes how everything else is taught.
+  if (context.learning) parts.push(context.learning);
 
   if (context.materials.length) {
     const list = context.materials

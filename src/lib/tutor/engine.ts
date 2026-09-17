@@ -25,6 +25,8 @@ export interface TurnRequest {
   queryVector?: number[] | null;
   /** The student's own handwriting, when they've worked something out on the board. */
   studentImages?: ImagePart[];
+  /** What previous lessons established about how this person learns. */
+  learning?: string;
   onAction: (action: TutorAction) => void;
   onStray?: (text: string) => void;
   signal?: AbortSignal;
@@ -121,6 +123,7 @@ export async function runTutorTurn(request: TurnRequest): Promise<TurnResult> {
   const baseSystem = buildSystemPrompt({
     materials: request.materials,
     hasMaterialContext: request.chunks.length > 0,
+    learning: request.learning,
   });
   // Appended rather than prepended: the action protocol has to lead, or a
   // weaker model starts treating the language note as the thing being asked.
@@ -223,7 +226,15 @@ export function boardSummary(actions: TutorAction[]): string {
   );
   return actions
     .filter((a) => !erased.has(a.id))
-    .filter((a) => a.type !== "say" && a.type !== "done" && a.type !== "erase")
+    // "remember" is a note to itself about the student, not a card the student
+    // is looking at; it reaches the next turn through the learning block.
+    .filter(
+      (a) =>
+        a.type !== "say" &&
+        a.type !== "done" &&
+        a.type !== "erase" &&
+        a.type !== "remember",
+    )
     .slice(-14)
     .map(actionToText)
     .join("\n");

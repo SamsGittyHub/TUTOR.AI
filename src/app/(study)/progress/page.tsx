@@ -9,6 +9,8 @@ import { bucketForecast, masteryForMaterial, rankSubjects } from "@/lib/progress
 import { useLanguage } from "@/lib/language";
 import { isDue } from "@/lib/srs";
 import { useLibrary } from "@/lib/useLibrary";
+import { useLearning } from "@/lib/useLearning";
+import { MIN_MODE_SHOWN, modeName, modeRanking } from "@/lib/learning";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -22,6 +24,7 @@ const SWATCH: Record<string, string> = {
 
 export default function ProgressPage() {
   const lib = useLibrary();
+  const learning = useLearning();
   const language = useLanguage();
   // Frozen per mount: a live Date.now() would recompute every memo on render.
   const [now] = useState(() => Date.now());
@@ -239,9 +242,119 @@ export default function ProgressPage() {
               </ul>
             )}
           </section>
+          <HowYouLearn learning={learning} />
         </>
       )}
     </PageShell>
+  );
+}
+
+/**
+ * What the tutor has worked out about this person, and the means to delete it.
+ *
+ * Shown because it is a record about them that changes how they get taught.
+ * Something kept about you that you can neither see nor erase is a different
+ * kind of thing from a tutor remembering how last term went.
+ */
+function HowYouLearn({ learning }: { learning: ReturnType<typeof useLearning> }) {
+  const ranked = modeRanking(learning.profile).filter((m) => m.confident);
+  const notes = [...learning.profile.notes].sort((a, b) => b.seen - a.seen || b.at - a.at);
+  const [confirming, setConfirming] = useState(false);
+
+  return (
+    <section className="mt-8">
+      <div className="flex items-center justify-between gap-4">
+        <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
+          How you learn
+        </h2>
+        {ranked.length || notes.length ? (
+          confirming ? (
+            <span className="flex items-center gap-2 text-[12px]">
+              <button
+                type="button"
+                onClick={() => {
+                  learning.forgetEverything();
+                  setConfirming(false);
+                }}
+                className="font-semibold text-pink hover:underline"
+              >
+                Erase it all
+              </button>
+              <button
+                type="button"
+                onClick={() => setConfirming(false)}
+                className="text-dim hover:text-fg"
+              >
+                Keep
+              </button>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConfirming(true)}
+              className="text-[12px] text-dim transition hover:text-pink"
+            >
+              Make it forget
+            </button>
+          )
+        ) : null}
+      </div>
+
+      {!ranked.length && !notes.length ? (
+        <p className="mt-3 surface rounded-md px-4 py-3.5 text-[13px] leading-relaxed text-muted">
+          Nothing yet. As the tutor teaches you, it works out what makes things
+          click — pictures, worked steps, being asked before being told — and
+          leans on that next time. It needs {MIN_MODE_SHOWN} or so lessons
+          before it will commit to anything.
+        </p>
+      ) : (
+        <div className="mt-3 flex flex-col gap-2">
+          {ranked.map((standing) => (
+            <div key={standing.mode} className="surface rounded-md px-4 py-3.5">
+              <div className="flex items-center justify-between gap-4">
+                <p className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-fg">
+                  {modeName(standing.mode)}
+                </p>
+                <span className="shrink-0 text-[12px] text-dim">
+                  landed {Math.round(standing.rate * 100)}% of {standing.shown}
+                </span>
+              </div>
+              <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-panel-3">
+                <div
+                  className="h-full grad transition-[width]"
+                  style={{ width: `${Math.round(standing.rate * 100)}%` }}
+                />
+              </div>
+            </div>
+          ))}
+
+          {notes.map((note) => (
+            <div
+              key={note.id}
+              className="surface flex items-start gap-3 rounded-md px-4 py-3.5"
+            >
+              <p className="min-w-0 flex-1 text-[13.5px] leading-relaxed text-fg">
+                {note.text}
+                {note.seen > 1 ? (
+                  <span className="ml-2 text-[12px] text-dim">
+                    noticed {note.seen} times
+                  </span>
+                ) : null}
+              </p>
+              <button
+                type="button"
+                onClick={() => learning.forget(note.id)}
+                title="Forget this"
+                aria-label="Forget this"
+                className="shrink-0 text-[12px] text-dim transition hover:text-pink"
+              >
+                forget
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 

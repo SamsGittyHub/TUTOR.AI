@@ -33,6 +33,7 @@ const TARGETS = [
       "src/lib/realtime-events.ts",
       "src/lib/board-image.ts",
       "src/lib/speech.ts",
+      "src/lib/learning.ts",
       "src/lib/voice-tools.ts",
       "src/lib/export.ts",
       "src/lib/materials/audio.ts",

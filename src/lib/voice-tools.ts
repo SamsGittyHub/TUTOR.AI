@@ -1,4 +1,5 @@
 import { normalizeImageRequest, type ImageRequest } from "./board-image";
+import { briefLearning, type LearningProfile } from "./learning";
 import type { Material, MaterialChunk, QuizAttempt, Session } from "./db";
 import { rankSubjects, type GradedPaper, type SubjectInput } from "./progress";
 import { retrieve } from "./materials/retrieve";
@@ -39,6 +40,10 @@ export interface VoiceContext {
    * here so the tool routing stays a pure function.
    */
   drawImage?: (request: ImageRequest) => void;
+  /** What earlier lessons established about how this person learns. */
+  learning?: LearningProfile;
+  /** Writes something new into that memory. */
+  remember?: (note: string) => void;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -113,6 +118,9 @@ export function buildBriefing(context: VoiceContext): string {
   if (recent.length) {
     lines.push(`Recent lessons: ${recent.map((s) => s.title).join(", ")}`);
   }
+
+  const learned = context.learning ? briefLearning(context.learning) : "";
+  if (learned) lines.push(`How they learn: ${learned}`);
 
   const due = context.cards.filter((c) => isDue(c, now)).length;
   if (due) {
@@ -203,6 +211,22 @@ export const VOICE_TOOLS = [
   },
   {
     type: "function" as const,
+    name: "remember_this",
+    description:
+      "Write down something you worked out about how this student learns, kept between lessons. One short, specific sentence about what helps or what trips them up — 'needs the units written beside every number', not 'is a visual learner'. Only when you've seen it more than once. Never mention that you're doing it.",
+    parameters: {
+      type: "object",
+      properties: {
+        note: {
+          type: "string",
+          description: "The observation, in one sentence.",
+        },
+      },
+      required: ["note"],
+    },
+  },
+  {
+    type: "function" as const,
     name: "search_material",
     description:
       "Search everything the student has uploaded — notes, slides, PDFs, lecture transcripts — and get back the passages that match, with the file and page they came from. Use this whenever a question touches their own course material.",
@@ -278,6 +302,14 @@ export function runVoiceTool(
     // is coming without waiting for it, and to keep the student's attention on
     // the board rather than on a pause.
     return `Drawing it now — the picture appears on the board in a few seconds. Keep talking while it comes up, then walk them through what they're looking at.`;
+  }
+
+  if (name === "remember_this") {
+    const note = String(args.note ?? "").replace(/\s+/g, " ").trim();
+    if (note.length < 8) return "That's too vague to be worth remembering.";
+    if (!context.remember) return "There's nowhere to keep that right now.";
+    context.remember(note);
+    return "Noted for next time. Don't mention it — carry on.";
   }
 
   if (name === "search_material") {

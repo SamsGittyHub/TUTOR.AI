@@ -9,6 +9,9 @@ import {
   type ImageRequest,
 } from "./board-image";
 import { requestImage } from "./draw-image";
+import { describeLearning, isTeachingMode, type TeachingMode } from "./learning";
+import { useLearning } from "./useLearning";
+import { isConfusion } from "./weakpoints";
 import {
   deleteMaterial as dbDeleteMaterial,
   deleteSession as dbDeleteSession,
@@ -222,6 +225,21 @@ export function useTutor() {
     [applyCards],
   );
 
+  /* --- what this student learns from -------------------------------------- */
+
+  const learning = useLearning();
+
+  /**
+   * The card types the last turn used, waiting on the student's reaction.
+   *
+   * A turn's worth of teaching is only judged by what the student says next,
+   * so the modes are held here until that arrives. Held in a ref rather than
+   * state: nothing renders from it, and it must not be a turn behind.
+   */
+  const pendingModes = useRef<TeachingMode[]>([]);
+  const learningRef = useRef(learning);
+  learningRef.current = learning;
+
   /* --- pictures ---------------------------------------------------------- */
 
   /**
@@ -263,6 +281,19 @@ export function useTutor() {
       abort.current = controller;
       setError(null);
       setStatus("thinking");
+
+      /*
+       * Judge the previous turn by what the student just said. Coming back
+       * confused after a diagram is the only honest evidence that diagrams
+       * aren't working for this person — far better than asking them.
+       */
+      if (pendingModes.current.length) {
+        learningRef.current.noteTurn(
+          pendingModes.current,
+          isConfusion(studentMessage) ? "confused" : "landed",
+        );
+        pendingModes.current = [];
+      }
 
       const at = Date.now();
       setSession((prev) => ({
@@ -330,6 +361,7 @@ export function useTutor() {
           materials: materials.filter((m) => inScope.includes(m.id)),
           chunks: scopedChunks,
           boardSummary: boardSummary(current.actions),
+          learning: describeLearning(learningRef.current.profile),
           queryVector,
           // A data URL from the sketch pad, split into the parts providers want.
           studentImages: options.sketch
@@ -347,6 +379,12 @@ export function useTutor() {
             // A picture card arrives with nothing in it: the tutor has asked
             // for one and the drawing takes seconds the lesson doesn't wait
             // for. It fills itself in while the rest of the turn streams.
+            if (action.type === "remember") {
+              learningRef.current.remember(action.note);
+            }
+            if (isTeachingMode(action.type)) {
+              pendingModes.current = [...pendingModes.current, action.type];
+            }
             if (action.type === "show_image" && !action.src && !action.error) {
               void drawIntoSession(action.id, {
                 prompt: action.prompt,
@@ -688,6 +726,8 @@ export function useTutor() {
 
   return {
     ready,
+    /** What the tutor has worked out about how this person learns. */
+    learning,
     settings,
     updateSettings,
     keys,
