@@ -108,6 +108,30 @@ export function buildImagePrompt(request: ImageRequest): string {
   return `${STYLE_PREAMBLE[request.style]}\n\nSubject: ${request.prompt}\n\n${RULES}`;
 }
 
+/** The model every picture on the board is drawn by. */
+export const IMAGE_MODEL = "gpt-image-2.5-flare-2026-09-08";
+
+/**
+ * The exact body posted to the image API.
+ *
+ * Built here rather than inline in the route so the thing that actually
+ * decides which model draws is covered by a test. A constant that is correct
+ * in the file and never reaches the request is the failure worth catching.
+ */
+export function imageRequestBody(request: ImageRequest): {
+  model: string;
+  prompt: string;
+  size: string;
+  n: number;
+} {
+  return {
+    model: IMAGE_MODEL,
+    prompt: buildImagePrompt(request),
+    size: sizeFor(request.shape),
+    n: 1,
+  };
+}
+
 /* -------------------------------------------------------------------------- */
 /* Landing a picture on the board                                              */
 /* -------------------------------------------------------------------------- */

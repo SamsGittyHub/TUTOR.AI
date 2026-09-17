@@ -1,12 +1,11 @@
 import { randomUUID } from "node:crypto";
 import type { NextRequest } from "next/server";
 
-import { BETA_IMAGE_MODEL } from "@/lib/beta";
 import {
-  buildImagePrompt,
   dimensionsFor,
+  IMAGE_MODEL,
+  imageRequestBody,
   normalizeImageRequest,
-  sizeFor,
 } from "@/lib/board-image";
 import { currentUser } from "@/lib/server/auth";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
@@ -65,12 +64,8 @@ export async function POST(request: NextRequest) {
       authorization: `Bearer ${apiKey}`,
       "content-type": "application/json",
     },
-    body: JSON.stringify({
-      model: BETA_IMAGE_MODEL,
-      prompt: buildImagePrompt(parsed),
-      size: sizeFor(parsed.shape),
-      n: 1,
-    }),
+    // Built in board-image.ts, where a test pins the model it names.
+    body: JSON.stringify(imageRequestBody(parsed)),
     signal: request.signal,
   });
 
@@ -79,12 +74,23 @@ export async function POST(request: NextRequest) {
     if (upstream.status === 401) {
       return Response.json({ error: "OpenAI rejected that key." }, { status: 401 });
     }
+
+    /*
+     * A 400 used to be reported as "the image model refused that description",
+     * which blames the student's request for what is just as likely the model
+     * id being unavailable on this account. Say which it is: nothing is more
+     * expensive to debug on a deployment than an error that names the wrong
+     * cause, and the provider's own wording is more useful than ours.
+     */
+    const aboutModel = /model/i.test(detail);
     return Response.json(
       {
         error:
-          upstream.status === 400
+          upstream.status === 400 && !aboutModel
             ? "The image model refused that description."
-            : `Couldn't draw that (${upstream.status}). ${detail.slice(0, 200)}`,
+            : aboutModel
+              ? `The drawing model ${IMAGE_MODEL} isn't available to this key. ${detail.slice(0, 200)}`
+              : `Couldn't draw that (${upstream.status}). ${detail.slice(0, 200)}`,
       },
       { status: upstream.status === 400 ? 400 : 502 },
     );

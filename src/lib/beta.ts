@@ -32,7 +32,7 @@ export const BETA_REALTIME_VOICE = "alloy";
  * free-body diagram, the thing the student can't picture — rather than only
  * the shapes the board can render from JSON. Same shared key, same daily cap.
  */
-export const BETA_IMAGE_MODEL = "gpt-image-2.5-flare-2026-09-08";
+export { IMAGE_MODEL as BETA_IMAGE_MODEL } from "./board-image";
 
 /**
  * The typed board's voice, both directions.

@@ -35,8 +35,8 @@ import {
 } from "../.test-build/core/realtime-events.js";
 import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
 import {
-  applyDrawnImage, buildImagePrompt, dimensionsFor, normalizeImageRequest,
-  settleUnfinishedImages, sizeFor,
+  applyDrawnImage, buildImagePrompt, dimensionsFor, IMAGE_MODEL,
+  imageRequestBody, normalizeImageRequest, settleUnfinishedImages, sizeFor,
 } from "../.test-build/core/board-image.js";
 import {
   advanceListening, IDLE_LISTENING, levelOf, LISTEN_DEFAULTS,
@@ -1570,6 +1570,23 @@ test("each shape has a size the image API accepts and matching dimensions", () =
   }
   assert.ok(dimensionsFor("wide").width > dimensionsFor("wide").height);
   assert.ok(dimensionsFor("tall").height > dimensionsFor("tall").width);
+});
+
+test("every picture is drawn by gpt-image-2.5-flare-2026-09-08", () => {
+  // Pinned deliberately. A constant that is right in the file but never
+  // reaches the request is the failure this is here to catch, so the assertion
+  // is on the posted body, not on the constant.
+  const body = imageRequestBody(normalizeImageRequest({ prompt: "a voltaic cell" }));
+  assert.equal(body.model, "gpt-image-2.5-flare-2026-09-08");
+  assert.equal(IMAGE_MODEL, "gpt-image-2.5-flare-2026-09-08");
+});
+
+test("the posted body is complete and the size matches the shape asked for", () => {
+  const tall = imageRequestBody(normalizeImageRequest({ prompt: "a lighthouse", shape: "tall" }));
+  assert.equal(tall.size, sizeFor("tall"));
+  assert.equal(tall.n, 1);
+  assert.match(tall.prompt, /Subject: a lighthouse/);
+  assert.deepEqual(Object.keys(tall).sort(), ["model", "n", "prompt", "size"]);
 });
 
 test("the built prompt carries the style, the subject and the legibility rules", () => {
