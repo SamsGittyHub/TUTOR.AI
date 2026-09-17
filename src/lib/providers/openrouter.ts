@@ -11,7 +11,7 @@ function referer(): Record<string, string> {
   if (typeof window === "undefined") return {};
   return {
     "HTTP-Referer": window.location.origin,
-    "X-Title": "Chalk AI Tutor",
+    "X-Title": "TUTOR AI",
   };
 }
 

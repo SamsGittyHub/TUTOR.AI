@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { readStored, THEME } from "./storage-keys";
+
 /**
  * Chrome theme (light / dark) — separate from the board's paper/chalk look,
  * which stays per-lesson. The default follows the OS until the student
@@ -11,10 +13,13 @@ import { useCallback, useEffect, useState } from "react";
 
 export type Theme = "light" | "dark";
 
-export const THEME_KEY = "chalk.theme.v1";
+export const THEME_KEY = THEME;
 
 /** Runs before paint (inline in the root layout) — not for React use. */
-export const THEME_BOOT_SCRIPT = `(function(){try{var s=localStorage.getItem("${THEME_KEY}");var t=s==="light"||s==="dark"?s:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");document.documentElement.dataset.theme=t;}catch(e){}})();`;
+// Runs before first paint, so it can't import the migrating reader — the old
+// key is checked inline instead, or a saved theme flashes wrong once after the
+// rename.
+export const THEME_BOOT_SCRIPT = `(function(){try{var s=localStorage.getItem("${THEME_KEY}")||localStorage.getItem("chalk.theme.v1");var t=s==="light"||s==="dark"?s:(window.matchMedia&&window.matchMedia("(prefers-color-scheme: light)").matches?"light":"dark");document.documentElement.dataset.theme=t;}catch(e){}})();`;
 
 function apply(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
@@ -27,6 +32,10 @@ export function useTheme() {
 
   useEffect(() => {
     setTheme(document.documentElement.dataset.theme === "light" ? "light" : "dark");
+    // The boot script reads the old key but can't rewrite it — it runs before
+    // any module loads. Carry it forward here so the inline fallback above can
+    // eventually be deleted.
+    readStored(localStorage, THEME_KEY);
   }, []);
 
   const toggle = useCallback(() => {

@@ -87,7 +87,7 @@ export default function CalendarPage() {
   return (
     <PageShell
       title="Calendar"
-      lede="Put your exams and deadlines in, and Chalk works backwards into a study plan — every topic twice, then a full review the day before."
+      lede="Put your exams and deadlines in, and TUTOR AI works backwards into a study plan — every topic twice, then a full review the day before."
       wide
     >
       <form
@@ -198,7 +198,7 @@ export default function CalendarPage() {
           <LoadError message={cal.error} />
         ) : !upcoming.length ? (
           <Empty title="Nothing on the calendar">
-            Add an exam above — with the topics it covers — and Chalk will build
+            Add an exam above — with the topics it covers — and TUTOR AI will build
             the study plan around it.
           </Empty>
         ) : (

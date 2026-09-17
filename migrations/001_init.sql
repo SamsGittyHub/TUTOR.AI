@@ -1,4 +1,4 @@
--- Chalk, server-authoritative.
+-- TUTOR AI, server-authoritative.
 --
 -- Postgres is the source of truth; the browser keeps a cache. Every table that
 -- holds student work hangs off users(id) with ON DELETE CASCADE, so "delete my

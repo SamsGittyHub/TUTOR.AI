@@ -26,7 +26,7 @@ const spaceMono = Space_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Chalk — the AI tutor that runs on your key",
+  title: "TUTOR AI — the tutor that runs on your key",
   description:
     "Upload your notes, slides, or lecture recordings and get a 1:1 lesson taught step by step on a live whiteboard. Bring your own API key and pick the model.",
 };

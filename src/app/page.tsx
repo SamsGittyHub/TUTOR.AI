@@ -176,7 +176,7 @@ export default function LandingPage() {
                 you pay whether you study or not.
               </p>
               <p className="mt-3 text-[14px] leading-relaxed text-muted">
-                Chalk asks for your key instead. Use a frontier model for a proof and a
+                TUTOR AI asks for your key instead. Use a frontier model for a proof and a
                 cheap one for flashcards. Watch the running cost in the corner. When
                 you stop studying, you stop paying.
               </p>

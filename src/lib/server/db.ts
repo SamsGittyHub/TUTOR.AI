@@ -12,7 +12,7 @@ import { Pool, type PoolClient, type QueryResultRow } from "pg";
 
 declare global {
   // eslint-disable-next-line no-var
-  var __chalkPool: Pool | undefined;
+  var __tutorAiPool: Pool | undefined;
 }
 
 function connectionString(): string {
@@ -26,17 +26,17 @@ function connectionString(): string {
 }
 
 export function pool(): Pool {
-  if (!global.__chalkPool) {
+  if (!global.__tutorAiPool) {
     const url = connectionString();
     const local = /localhost|127\.0\.0\.1/.test(url);
-    global.__chalkPool = new Pool({
+    global.__tutorAiPool = new Pool({
       connectionString: url,
       ssl: local ? undefined : { rejectUnauthorized: false },
       max: Number(process.env.PGPOOL_MAX ?? 10),
       idleTimeoutMillis: 30_000,
     });
   }
-  return global.__chalkPool;
+  return global.__tutorAiPool;
 }
 
 export async function query<T extends QueryResultRow = QueryResultRow>(

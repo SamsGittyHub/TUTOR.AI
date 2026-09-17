@@ -33,7 +33,7 @@ export function Logo({ size = 26, withWordmark = true }: Props) {
         />
       </svg>
       {withWordmark ? (
-        <span className="text-[17px] font-black tracking-tight">Chalk</span>
+        <span className="text-[17px] font-black tracking-tight">TUTOR AI</span>
       ) : null}
     </span>
   );

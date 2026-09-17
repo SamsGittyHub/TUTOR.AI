@@ -14,7 +14,11 @@ import { dirname, join, resolve, sep } from "node:path";
  * able to climb out with "../".
  */
 
-const ROOT = resolve(process.env.CHALK_STORAGE_DIR ?? ".storage");
+const ROOT = resolve(
+  // CHALK_STORAGE_DIR is the pre-rename name; honouring it means an already
+  // deployed volume doesn't come back empty after this rename.
+  process.env.TUTOR_AI_STORAGE_DIR ?? process.env.CHALK_STORAGE_DIR ?? ".storage",
+);
 
 /** 25 MB is the transcription cap; PDFs and slide decks rarely exceed it. */
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;

@@ -177,7 +177,7 @@ export default function VoicePage() {
               </button>
             )}
             <p className="mt-2 text-center text-[11px] leading-relaxed text-dim">
-              Your mic streams straight to OpenAI. Chalk only mints the session
+              Your mic streams straight to OpenAI. TUTOR AI only mints the session
               token — it never stores your key.
             </p>
           </div>

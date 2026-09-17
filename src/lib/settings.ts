@@ -1,4 +1,5 @@
 import type { ProviderId } from "./providers/types";
+import { readStored, SETTINGS } from "./storage-keys";
 
 /**
  * Provider/model choice, shared by the board and the flashcards page. Both
@@ -6,7 +7,7 @@ import type { ProviderId } from "./providers/types";
  * model the other uses.
  */
 
-export const SETTINGS_KEY = "chalk.settings.v1";
+export const SETTINGS_KEY = SETTINGS;
 
 export interface Settings {
   providerId: ProviderId;
@@ -21,7 +22,7 @@ export const DEFAULT_SETTINGS: Settings = {
 export function loadSettings(): Settings {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
+    const raw = readStored(localStorage, SETTINGS_KEY);
     if (!raw) return DEFAULT_SETTINGS;
     return { ...DEFAULT_SETTINGS, ...(JSON.parse(raw) as Partial<Settings>) };
   } catch {

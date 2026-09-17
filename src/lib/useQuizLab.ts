@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+import { QUIZ_SELECTION, readStored, TEACH_HANDOFF } from "./storage-keys";
 import {
   getChunksFor,
   listAttempts,
@@ -21,9 +23,9 @@ import { checkAnswer, generateQuiz } from "./tutor/engine";
 import { resolveCardMaterials } from "./useTutor";
 
 /** Handoff to the board: "teach me this one" is answered there, live. */
-export const TEACH_REQUEST_KEY = "chalk.teach.v1";
+export const TEACH_REQUEST_KEY = TEACH_HANDOFF;
 
-const SELECTION_KEY = "chalk.quiz.materials.v1";
+const SELECTION_KEY = QUIZ_SELECTION;
 const MAX_QUESTIONS = 30;
 
 export interface QuizRun {
@@ -63,7 +65,7 @@ export function useQuizLab() {
         setMaterials(allMaterials);
         setAttempts(allAttempts);
         cardsRef.current = allCards;
-        const stored = localStorage.getItem(SELECTION_KEY);
+        const stored = readStored(localStorage, SELECTION_KEY);
         if (stored) {
           setSelectedIds((JSON.parse(stored) as string[]).filter((id) =>
             allMaterials.some((m) => m.id === id),

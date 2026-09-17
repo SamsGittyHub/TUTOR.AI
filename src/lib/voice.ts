@@ -9,7 +9,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
  * browsers degrade to silent text mode.
  */
 
-const VOICE_PREF_KEY = "chalk.voice.v1";
+import { readStored, VOICE_PREF } from "./storage-keys";
+
+const VOICE_PREF_KEY = VOICE_PREF;
 
 export function ttsSupported(): boolean {
   return typeof window !== "undefined" && "speechSynthesis" in window;
@@ -225,7 +227,7 @@ export function useVoice({ onTranscript }: UseVoiceOptions) {
   // Restore the voice preference once, client-side.
   useEffect(() => {
     setMounted(true);
-    if (ttsSupported() && localStorage.getItem(VOICE_PREF_KEY) === "on") {
+    if (ttsSupported() && readStored(localStorage, VOICE_PREF_KEY) === "on") {
       ttsOnRef.current = true;
       setTtsOn(true);
     }

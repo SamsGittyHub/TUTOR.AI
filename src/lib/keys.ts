@@ -1,6 +1,13 @@
 "use client";
 
 import type { ProviderId } from "./providers/types";
+import {
+  clearStored,
+  KEYS_MODE,
+  KEYS_SALT,
+  KEYS_STORAGE,
+  readStored,
+} from "./storage-keys";
 
 /**
  * Key storage.
@@ -13,8 +20,8 @@ import type { ProviderId } from "./providers/types";
  * encrypt, and offer session-only storage for shared machines.
  */
 
-const STORAGE_KEY = "chalk.keys.v1";
-const MODE_KEY = "chalk.keys.mode";
+const STORAGE_KEY = KEYS_STORAGE;
+const MODE_KEY = KEYS_MODE;
 
 export type KeyStorageMode = "local" | "session";
 
@@ -43,34 +50,36 @@ function unscramble(value: string, salt: string): string {
 
 /** Stable per-browser salt so the blob isn't plainly greppable. */
 function salt(): string {
-  const existing = localStorage.getItem("chalk.salt");
+  // The salt must survive the rename with the blob it scrambled, or every
+  // stored key decodes to noise.
+  const existing = readStored(localStorage, KEYS_SALT);
   if (existing) return existing;
   const fresh = crypto.randomUUID();
-  localStorage.setItem("chalk.salt", fresh);
+  localStorage.setItem(KEYS_SALT, fresh);
   return fresh;
 }
 
 function store(): Storage {
-  const mode = (localStorage.getItem(MODE_KEY) as KeyStorageMode | null) ?? "local";
+  const mode = (readStored(localStorage, MODE_KEY) as KeyStorageMode | null) ?? "local";
   return mode === "session" ? sessionStorage : localStorage;
 }
 
 export function getStorageMode(): KeyStorageMode {
   if (typeof window === "undefined") return "local";
-  return (localStorage.getItem(MODE_KEY) as KeyStorageMode | null) ?? "local";
+  return (readStored(localStorage, MODE_KEY) as KeyStorageMode | null) ?? "local";
 }
 
 export function setStorageMode(mode: KeyStorageMode): void {
   const current = loadKeys();
   localStorage.setItem(MODE_KEY, mode);
-  localStorage.removeItem(STORAGE_KEY);
-  sessionStorage.removeItem(STORAGE_KEY);
+  clearStored(localStorage, STORAGE_KEY);
+  clearStored(sessionStorage, STORAGE_KEY);
   saveKeys(current);
 }
 
 export function loadKeys(): KeyMap {
   if (typeof window === "undefined") return {};
-  const raw = store().getItem(STORAGE_KEY);
+  const raw = readStored(store(), STORAGE_KEY);
   if (!raw) return {};
   try {
     const decoded = JSON.parse(unscramble(raw, salt())) as KeyMap;
@@ -98,8 +107,8 @@ export function setKey(id: ProviderId, value: string): KeyMap {
 }
 
 export function clearAllKeys(): void {
-  localStorage.removeItem(STORAGE_KEY);
-  sessionStorage.removeItem(STORAGE_KEY);
+  clearStored(localStorage, STORAGE_KEY);
+  clearStored(sessionStorage, STORAGE_KEY);
 }
 
 /** "sk-ant-…4f2a" — enough to recognize, useless to steal. */

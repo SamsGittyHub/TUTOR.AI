@@ -99,7 +99,7 @@ export interface PromptContext {
 
 export function buildSystemPrompt(context: PromptContext): string {
   const parts: string[] = [
-    `You are Chalk, a tutor who teaches on a live whiteboard. You explain things
+    `You are TUTOR AI, a tutor who teaches on a live whiteboard. You explain things
 the way the best teacher a student ever had explained things: patiently, in
 order, with a marker in your hand.`,
     PROTOCOL,

@@ -29,7 +29,9 @@ const scrypt = promisify(scryptCb) as (
 ) => Promise<Buffer>;
 
 const SCRYPT_KEYLEN = 64;
-export const SESSION_COOKIE = "chalk_session";
+export const SESSION_COOKIE = "tutorai_session";
+/** The pre-rename cookie. Read, never written, so live sessions survive. */
+export const LEGACY_SESSION_COOKIE = "chalk_session";
 const SESSION_DAYS = 30;
 
 export async function hashPassword(password: string): Promise<string> {
@@ -90,12 +92,14 @@ export async function setSessionCookie(token: string, expiresAt: Date) {
 export async function clearSessionCookie() {
   const store = await cookies();
   store.delete(SESSION_COOKIE);
+  store.delete(LEGACY_SESSION_COOKIE);
 }
 
 /** The signed-in user for this request, or null. Expired rows are swept here. */
 export async function currentUser(): Promise<SessionUser | null> {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+  const token =
+    store.get(SESSION_COOKIE)?.value ?? store.get(LEGACY_SESSION_COOKIE)?.value;
   if (!token) return null;
 
   const row = await queryOne<{
@@ -122,7 +126,8 @@ export async function currentUser(): Promise<SessionUser | null> {
 
 export async function destroyCurrentSession(): Promise<void> {
   const store = await cookies();
-  const token = store.get(SESSION_COOKIE)?.value;
+  const token =
+    store.get(SESSION_COOKIE)?.value ?? store.get(LEGACY_SESSION_COOKIE)?.value;
   if (token) {
     await query("delete from auth_sessions where token_hash = $1", [sha256(token)]);
   }

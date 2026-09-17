@@ -5,7 +5,7 @@ import { AuthForm } from "@/components/auth/AuthForm";
 import { currentUser } from "@/lib/server/auth";
 
 export const metadata: Metadata = {
-  title: "Create your account — Chalk",
+  title: "Create your account — TUTOR AI",
 };
 
 export default async function SignupPage() {

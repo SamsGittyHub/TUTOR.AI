@@ -1,4 +1,4 @@
-# Chalk — an AI tutor that teaches on a whiteboard
+# TUTOR AI — a tutor that teaches on a whiteboard
 
 Upload your own study material, get a 1:1 lesson worked out step by step on a
 live whiteboard, interrupt whenever you're lost, and quiz yourself on what you
@@ -9,9 +9,9 @@ Built from [`PRD-ai-tutor.md`](./PRD-ai-tutor.md).
 
 ```bash
 npm install
-docker run -d --name chalk-pg -e POSTGRES_PASSWORD=chalk -e POSTGRES_USER=chalk \
-  -e POSTGRES_DB=chalk -p 55432:5432 postgres:16-alpine
-cp .env.example .env          # DATABASE_URL, CHALK_STORAGE_DIR
+docker run -d --name tutorai-pg -e POSTGRES_PASSWORD=tutorai \
+  -e POSTGRES_USER=tutorai -e POSTGRES_DB=tutorai -p 55432:5432 postgres:16-alpine
+cp .env.example .env          # DATABASE_URL, TUTOR_AI_STORAGE_DIR
 npm run migrate               # applies migrations/*.sql once each
 npm run dev                   # http://localhost:3000
 npm test                      # 72 checks
@@ -19,7 +19,7 @@ npm run build
 ```
 
 Needs Node 20+ and a Postgres. On Railway, set `DATABASE_URL` from the Postgres
-service and point `CHALK_STORAGE_DIR` at a mounted volume.
+service and point `TUTOR_AI_STORAGE_DIR` at a mounted volume.
 
 ---
 

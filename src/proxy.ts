@@ -12,7 +12,8 @@ import { NextResponse, type NextRequest } from "next/server";
  * Next 16 renamed this convention from `middleware` to `proxy`.
  */
 
-const SESSION_COOKIE = "chalk_session";
+const SESSION_COOKIE = "tutorai_session";
+const LEGACY_SESSION_COOKIE = "chalk_session";
 const PROTECTED = ["/app", "/quiz", "/materials", "/courses", "/progress",
                    "/review", "/sessions", "/calendar", "/voice", "/settings"];
 
@@ -21,7 +22,12 @@ export function proxy(request: NextRequest) {
   if (!PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return NextResponse.next();
   }
-  if (request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
+  if (
+    request.cookies.has(SESSION_COOKIE) ||
+    request.cookies.has(LEGACY_SESSION_COOKIE)
+  ) {
+    return NextResponse.next();
+  }
 
   const login = new URL("/login", request.url);
   // Come back to whatever they were reaching for once they're in.
