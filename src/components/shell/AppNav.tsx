@@ -26,6 +26,9 @@ export function AppNav() {
   const listRef = useRef<HTMLElement>(null);
   const itemRefs = useRef(new Map<string, HTMLAnchorElement>());
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
+  // Which edges still have content past them, so the fade only appears where
+  // there is genuinely more to scroll to.
+  const [edges, setEdges] = useState({ start: true, end: true });
   const settled = useRef(false);
 
   // Layout effect: measure before paint, or the pill visibly jumps into place.
@@ -48,7 +51,12 @@ export function AppNav() {
       const active = NAV_LINKS.find((l) => isActive(pathname, l.href));
       const node = active ? itemRefs.current.get(active.href) : undefined;
       if (node) setPill({ x: node.offsetLeft - list.scrollLeft, w: node.offsetWidth });
+      setEdges({
+        start: list.scrollLeft <= 1,
+        end: list.scrollLeft + list.clientWidth >= list.scrollWidth - 1,
+      });
     };
+    reposition();
     const observer = new ResizeObserver(reposition);
     observer.observe(list);
     list.addEventListener("scroll", reposition, { passive: true });
@@ -71,7 +79,9 @@ export function AppNav() {
 
         <nav
           ref={listRef}
-          className="relative -mx-1 flex flex-1 items-center gap-0.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          data-at-start={edges.start}
+          data-at-end={edges.end}
+          className="edge-fade relative -mx-1 flex flex-1 items-center gap-0.5 overflow-x-auto px-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {pill && (
             <span

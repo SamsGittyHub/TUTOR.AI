@@ -16,7 +16,7 @@ const SESSION_COOKIE = "tutorai_session";
 const LEGACY_SESSION_COOKIE = "chalk_session";
 const PROTECTED = ["/app", "/quiz", "/materials", "/courses", "/progress",
                    "/review", "/sessions", "/calendar", "/voice", "/settings",
-                   "/practice-exam"];
+                   "/practice-exam", "/exam-review"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;

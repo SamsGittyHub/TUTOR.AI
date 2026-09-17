@@ -21,6 +21,7 @@ export const NAV_LINKS: NavLink[] = [
   { href: "/calendar", label: "Calendar", blurb: "Exams and your study plan" },
   { href: "/quiz", label: "Flashcards", blurb: "Quick quizzes from your notes" },
   { href: "/practice-exam", label: "Practice exam", blurb: "A full paper on your weak spots" },
+  { href: "/exam-review", label: "Exam review", blurb: "Go through a marked paper" },
   { href: "/review", label: "Review", blurb: "Cards due today" },
   { href: "/progress", label: "Progress", blurb: "Mastery and what's coming due" },
   { href: "/sessions", label: "Lessons", blurb: "Past lessons, resumable" },

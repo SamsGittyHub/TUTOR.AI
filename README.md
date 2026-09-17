@@ -151,6 +151,12 @@ below.
 - **Sessions** — saved to your account, resumable on any device, board and all,
   and exportable as Markdown notes (display math, real tables, mermaid diagrams,
   source citations) so a lesson survives the tab closing.
+- **Exam review** — photograph a marked paper and the tutor goes through it
+  question by question: what you wrote, what went wrong *in your working*, and
+  what to do differently. A question it can't read off the photo is marked
+  unclear and excluded from the score rather than guessed at — telling a student
+  they got something wrong when the page was blurry sends them to re-learn
+  something they already knew. Anything you lost marks on goes to the board.
 - **Practice exam** — pick one or more past lessons and get a full multi-section
   paper, weighted toward what you personally found hard: the questions you
   interrupted with mid-lesson, the cards you keep forgetting, the quizzes you
@@ -198,6 +204,7 @@ src/lib/
   planner.ts          exam date → study plan (pure, unit-tested)
   weakpoints.ts       lessons → what you're actually weak at (pure, unit-tested)
   exam.ts             practice exam shape + marking (pure, unit-tested)
+  exam-review.ts      reading a marked paper back (pure, unit-tested)
   export.ts           lesson → Markdown notes (pure, unit-tested)
   server/             db pool, auth, repository, volume storage
   materials/embed.ts  embeddings via the student's own provider

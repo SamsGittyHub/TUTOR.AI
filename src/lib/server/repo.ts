@@ -9,6 +9,7 @@ import type {
 } from "@/lib/db";
 import type { CalendarEvent, EventKind, StudyBlock } from "@/lib/calendar";
 import { gradeExam, type ExamResponses, type ExamResult, type PracticeExam } from "@/lib/exam";
+import type { ExamReview } from "@/lib/exam-review";
 import { sanitizeDeep, sanitizeText } from "@/lib/sanitize";
 import type { ReviewCard } from "@/lib/srs";
 
@@ -932,4 +933,81 @@ export async function submitExam(
 
 export async function deleteExam(userId: string, id: string): Promise<void> {
   await query("delete from practice_exams where id = $1 and user_id = $2", [id, userId]);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Exam reviews                                                                */
+/* -------------------------------------------------------------------------- */
+
+interface ExamReviewRow {
+  id: string;
+  course_id: string | null;
+  title: string;
+  pages: unknown;
+  review: unknown;
+  created_at: Date;
+}
+
+const toExamReview = (r: ExamReviewRow): ExamReview => ({
+  id: r.id,
+  courseId: r.course_id ?? undefined,
+  title: r.title,
+  pages: (r.pages ?? []) as ExamReview["pages"],
+  review: (r.review ?? null) as ExamReview["review"],
+  createdAt: ms(r.created_at),
+});
+
+const REVIEW_COLUMNS = `id, course_id, title, pages, review, created_at`;
+
+export async function listExamReviews(userId: string): Promise<ExamReview[]> {
+  const rows = await query<ExamReviewRow>(
+    `select ${REVIEW_COLUMNS} from exam_reviews where user_id = $1 order by created_at desc`,
+    [userId],
+  );
+  return rows.map(toExamReview);
+}
+
+export async function getExamReview(
+  userId: string,
+  id: string,
+): Promise<ExamReview | null> {
+  const rows = await query<ExamReviewRow>(
+    `select ${REVIEW_COLUMNS} from exam_reviews where id = $1 and user_id = $2`,
+    [id, userId],
+  );
+  return rows[0] ? toExamReview(rows[0]) : null;
+}
+
+export async function putExamReview(
+  userId: string,
+  review: ExamReview,
+): Promise<void> {
+  const wrote = await query(
+    `insert into exam_reviews (id, user_id, course_id, title, pages, review, created_at)
+     values ($1,$2,$3,$4,$5,$6, to_timestamp($7 / 1000.0))
+     on conflict (id) do update set
+       course_id = excluded.course_id,
+       title = excluded.title,
+       pages = excluded.pages,
+       review = excluded.review,
+       updated_at = now()
+     where exam_reviews.user_id = $2
+     returning id`,
+    [
+      review.id,
+      userId,
+      review.courseId ?? null,
+      sanitizeText(review.title),
+      JSON.stringify(sanitizeDeep(review.pages ?? [])),
+      review.review ? JSON.stringify(sanitizeDeep(review.review)) : null,
+      review.createdAt || Date.now(),
+    ],
+  );
+  assertWrote(wrote, "exam review");
+}
+
+export async function deleteExamReview(userId: string, id: string): Promise<void> {
+  await query("delete from exam_reviews where id = $1 and user_id = $2", [id, userId]);
+  // Page images live under the review's own directory on the volume.
+  await deleteMaterialFiles(userId, id).catch(() => {});
 }

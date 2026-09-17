@@ -28,6 +28,9 @@ import {
 } from "../.test-build/core/docx.js";
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
+import {
+  normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
+} from "../.test-build/core/exam-review.js";
 import { actionToMarkdown, exportFilename, lessonToMarkdown } from "../.test-build/core/export.js";
 import { encodeWav, secondsPerChunk, TRANSCRIBE_LIMIT_BYTES } from "../.test-build/core/materials/audio.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
@@ -918,6 +921,104 @@ test("sanitizeDeep cleans nested strings, keys, and arrays", () => {
 test("sanitizeDeep leaves a clean board action identical", () => {
   const action = { id: "eq1", type: "write_equation", latex: "\\int u\\,dv", color: "cyan" };
   assert.deepEqual(sanitizeDeep(action), action);
+});
+
+
+console.log("\n— exam review —");
+
+const rq = (o) => ({ number: "Q1", verdict: "wrong", prompt: "p", ...o });
+
+test("a row with nothing but a number is dropped", () => {
+  assert.equal(normalizeQuestion({ number: "Q1" }, 0), null);
+  assert.ok(normalizeQuestion({ number: "Q1", wentWrong: "sign error" }, 0));
+});
+
+test("an unknown verdict becomes 'unclear', never a guess", () => {
+  assert.equal(normalizeQuestion(rq({ verdict: "maybe" }), 0).verdict, "unclear");
+  assert.equal(normalizeQuestion(rq({ verdict: "PARTIAL" }), 0).verdict, "partial");
+});
+
+test("snake_case and camelCase both parse", () => {
+  const q = normalizeQuestion({ number: "Q2", your_answer: "3x", went_wrong: "dropped a term",
+                                marks_awarded: 1, marks_available: 3 }, 1);
+  assert.equal(q.given, "3x");
+  assert.equal(q.wentWrong, "dropped a term");
+  assert.equal(q.marksAwarded, 1);
+  assert.equal(q.marksAvailable, 3);
+});
+
+test("awarded marks can never exceed the marks available", () => {
+  const q = normalizeQuestion(rq({ marksAwarded: 5, marksAvailable: 3 }), 0);
+  assert.equal(q.marksAwarded, 3);
+});
+
+test("nulls from a scanned page are stripped out of the text", () => {
+  const NUL = String.fromCharCode(0);
+  const q = normalizeQuestion(rq({ wentWrong: `sign${NUL} error` }), 0);
+  assert.equal(q.wentWrong, "sign error");
+});
+
+test("a review with no usable questions is rejected", () => {
+  assert.equal(normalizeReview({ summary: "ok", questions: [] }), null);
+  assert.equal(normalizeReview(null), null);
+  assert.ok(normalizeReview({ summary: "s", questions: [rq({ wentWrong: "x" })] }));
+});
+
+test("the score sums marks rather than counting questions", () => {
+  const review = { summary: "", questions: [
+    rq({ verdict: "correct", marksAwarded: 6, marksAvailable: 6 }),
+    rq({ verdict: "wrong",   marksAwarded: 0, marksAvailable: 4 }),
+  ]};
+  const s = scoreOf(review);
+  assert.equal(s.awarded, 6);
+  assert.equal(s.total, 10);
+  assert.equal(s.percent, 60);
+});
+
+test("a correct answer with no awarded marks still earns them", () => {
+  const s = scoreOf({ summary: "", questions: [rq({ verdict: "correct", marksAvailable: 5 })] });
+  assert.equal(s.awarded, 5);
+});
+
+test("unreadable questions lower confidence, not the grade", () => {
+  const s = scoreOf({ summary: "", questions: [
+    rq({ verdict: "correct", marksAwarded: 4, marksAvailable: 4 }),
+    rq({ verdict: "unclear", marksAvailable: 6 }),
+  ]});
+  assert.equal(s.total, 4, "an unreadable question was counted against the student");
+  assert.equal(s.percent, 100);
+  assert.equal(s.unclear, 1);
+});
+
+test("weak topics rank by marks lost, not by number of slips", () => {
+  const review = { summary: "", questions: [
+    rq({ topic: "Integration", verdict: "wrong", marksAwarded: 0, marksAvailable: 8,
+         wentWrong: "wrong substitution" }),
+    rq({ topic: "Algebra", verdict: "wrong", marksAwarded: 1, marksAvailable: 2, wentWrong: "sign" }),
+    rq({ topic: "Algebra", verdict: "partial", marksAwarded: 1, marksAvailable: 2, wentWrong: "sign" }),
+  ]};
+  const topics = weakTopics(review);
+  assert.equal(topics[0].topic, "Integration");
+  assert.equal(topics[0].lost, 8);
+  assert.equal(topics[1].count, 2, "the two Algebra slips did not merge");
+  assert.deepEqual(topics[1].reasons, ["sign"], "an identical reason was repeated");
+});
+
+test("correct and unclear questions never become revision topics", () => {
+  const topics = weakTopics({ summary: "", questions: [
+    rq({ topic: "Fine", verdict: "correct", marksAvailable: 3 }),
+    rq({ topic: "Blurry", verdict: "unclear", marksAvailable: 3 }),
+  ]});
+  assert.equal(topics.length, 0);
+});
+
+test("the teach prompt carries the student's own answer and the error", () => {
+  const prompt = teachPrompt(rq({ number: "Q3(b)", given: "x^2", expected: "2x",
+                                  wentWrong: "differentiated instead of integrating" }));
+  assert.ok(prompt.includes("Q3(b)"));
+  assert.ok(prompt.includes("x^2"));
+  assert.ok(prompt.includes("differentiated instead of integrating"));
+  assert.ok(/not just the correction/.test(prompt), "it asks only for the fix");
 });
 
 console.log(`\n${passed} checks passed\n`);
