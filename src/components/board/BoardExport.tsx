@@ -96,17 +96,37 @@ export function BoardExport({
 
   return (
     <div ref={boxRef} className="relative">
+      {/*
+        Bordered and captioned on purpose. This used to be bare grey text at
+        40% opacity between two icon buttons, which on a board with nothing on
+        it yet read as no button at all — and a fresh board is exactly where a
+        student first looks for it. It stays legible while there is nothing to
+        export; the tooltip says why it won't do anything.
+      */}
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={empty}
-        title={empty ? "Nothing on the board yet" : "Export this board"}
+        title={empty ? "Nothing on the board to export yet" : "Save this board as a PDF, Word file, image or notes"}
         aria-haspopup="menu"
         aria-expanded={open}
-        className={`tx press inline-flex items-center gap-1.5 rounded-full font-medium disabled:pointer-events-none disabled:opacity-40 ${
-          size === "sm" ? "h-7 px-3 text-[11.5px]" : "h-9 px-4 text-[13px]"
-        } ${open ? "bg-[var(--tint-strong)] text-fg" : "text-muted hover:bg-[var(--tint)] hover:text-fg"}`}
+        className={`tx press inline-flex shrink-0 items-center gap-1.5 rounded-full border font-semibold disabled:pointer-events-none disabled:opacity-60 ${
+          size === "sm" ? "h-8 px-3 text-[12px]" : "h-9 px-4 text-[13px]"
+        } ${
+          open
+            ? "border-transparent bg-[var(--tint-strong)] text-fg"
+            : "border-line text-muted hover:border-line-2 hover:bg-[var(--tint)] hover:text-fg"
+        }`}
       >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path
+            d="M12 3v11m0 0 4-4m-4 4-4-4M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"
+            stroke="currentColor"
+            strokeWidth="1.9"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
         {label}
       </button>
 
