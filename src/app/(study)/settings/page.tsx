@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { PageShell } from "@/components/shell/PageShell";
 import { SettingsModal } from "@/components/app/SettingsModal";
+import { BETA } from "@/lib/beta";
 import { loadSettings, saveSettings, type Settings } from "@/lib/settings";
 
 /**
@@ -40,7 +41,11 @@ export default function SettingsPage() {
   return (
     <PageShell
       title="Settings"
-      lede="Your key never leaves this browser — it goes straight to the provider you pick. Your material lives on your account so it follows you between devices."
+      lede={
+        BETA
+          ? "Nothing to configure during the beta — the tutor is already running. Your material lives on your account and follows you between devices."
+          : "Your key never leaves this browser — it goes straight to the provider you pick. Your material lives on your account so it follows you between devices."
+      }
     >
       <SettingsModal
         key={nonce}

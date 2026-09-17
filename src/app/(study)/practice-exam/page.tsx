@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { keyFor } from "@/lib/beta";
 import { useEffect, useMemo, useState } from "react";
 
 import { ExamPaper } from "@/components/exam/ExamPaper";
@@ -64,7 +65,7 @@ export default function PracticeExamPage() {
     setError(null);
     try {
       const settings = loadSettings();
-      const apiKey = loadKeys()[settings.providerId];
+      const apiKey = keyFor(loadKeys()[settings.providerId]);
       if (!apiKey) throw new Error("Add an API key in Settings first.");
 
       const materialIds = [...new Set(chosen.flatMap((s) => s.materialIds))];

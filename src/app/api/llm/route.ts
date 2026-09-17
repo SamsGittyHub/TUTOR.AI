@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { currentUser } from "@/lib/server/auth";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
+import { limitMessage, recordUsage, usageToday } from "@/lib/server/usage";
 
 /**
  * The beta's single API gateway.
@@ -50,6 +51,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Checked before the upstream call, so a capped account never costs anything.
+  const usage = await usageToday(user.id);
+  if (usage.exceeded) {
+    return Response.json({ error: limitMessage(usage) }, { status: 429 });
+  }
+
   const body =
     payload.body && typeof payload.body === "object"
       ? ({ ...(payload.body as Record<string, unknown>) } as Record<string, unknown>)
@@ -75,8 +82,59 @@ export async function POST(request: NextRequest) {
     });
   }
 
-  return new Response(upstream.body, {
+  // Streaming bodies are passed through untouched — the client's SSE parser
+  // must not be able to tell this apart from a direct call — so usage is read
+  // off a tee of the stream rather than by buffering it.
+  const contentType =
+    upstream.headers.get("content-type") ?? "text/event-stream";
+
+  if (!upstream.body) {
+    return new Response(null, { status: upstream.status, headers: { "content-type": contentType } });
+  }
+
+  const [toClient, toMeter] = upstream.body.tee();
+  void meterStream(user.id, toMeter);
+
+  return new Response(toClient, {
     status: upstream.status,
-    headers: { "content-type": upstream.headers.get("content-type") ?? "text/event-stream" },
+    headers: { "content-type": contentType },
   });
+}
+
+/**
+ * Reads the usage block out of a copy of the response.
+ *
+ * OpenAI reports token counts in the final SSE frame (with stream_options) or
+ * in the plain JSON body of a non-streaming call. Either way this runs after
+ * the student already has their answer, so a metering failure can never break
+ * a lesson — it only risks under-counting, which the next request re-checks.
+ */
+async function meterStream(userId: string, body: ReadableStream<Uint8Array>) {
+  try {
+    const text = await new Response(body).text();
+    let input = 0;
+    let output = 0;
+
+    // Take the last usage object seen: streamed responses repeat it as null
+    // until the final frame.
+    for (const match of text.matchAll(/"usage"\s*:\s*(\{[^}]*\})/g)) {
+      try {
+        const parsed = JSON.parse(match[1]) as {
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          total_tokens?: number;
+        };
+        if (parsed.prompt_tokens || parsed.completion_tokens) {
+          input = parsed.prompt_tokens ?? 0;
+          output = parsed.completion_tokens ?? 0;
+        }
+      } catch {
+        // A usage block split across chunks; the next one will do.
+      }
+    }
+
+    if (input || output) await recordUsage(userId, input, output);
+  } catch {
+    // Metering is best-effort by design; never surface it to the student.
+  }
 }

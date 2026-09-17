@@ -1,5 +1,6 @@
 "use client";
 
+import { BETA } from "../beta";
 import type { ProviderId } from "../providers/types";
 
 /**
@@ -39,6 +40,8 @@ export const EMBED_MODELS: Partial<Record<ProviderId, EmbedModel>> = {
 export function embedderFor(
   keys: Partial<Record<ProviderId, string>>,
 ): { model: EmbedModel; apiKey: string } | null {
+  // The beta gateway embeds with the shared key, so there is always an embedder.
+  if (BETA) return { model: EMBED_MODELS.openai!, apiKey: "beta" };
   for (const id of ["openai", "google"] as const) {
     const model = EMBED_MODELS[id];
     const apiKey = keys[id];
@@ -56,15 +59,27 @@ async function embedOpenAI(
   apiKey: string,
   signal?: AbortSignal,
 ): Promise<number[][]> {
-  const response = await fetch(model.endpoint, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ model: model.model, input: texts }),
-    signal,
-  });
+  const payload = { model: model.model, input: texts };
+  const response = BETA
+    ? await fetch("/api/llm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          providerId: "openai",
+          path: "/embeddings",
+          body: payload,
+        }),
+        signal,
+      })
+    : await fetch(model.endpoint, {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${apiKey}`,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        signal,
+      });
   if (!response.ok) {
     throw new Error(`Embedding failed (${response.status}).`);
   }

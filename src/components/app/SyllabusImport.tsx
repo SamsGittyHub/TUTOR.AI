@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { keyFor } from "@/lib/beta";
 
 import type { EventKind } from "@/lib/calendar";
 import { getChunksFor, type Material } from "@/lib/db";
@@ -40,7 +41,7 @@ export function SyllabusImport({ materials, courses, onImport }: Props) {
     setFound(null);
     try {
       const settings = loadSettings();
-      const apiKey = loadKeys()[settings.providerId];
+      const apiKey = keyFor(loadKeys()[settings.providerId]);
       if (!apiKey) {
         throw new Error("Add an API key in Settings first — reading a syllabus is a model call.");
       }

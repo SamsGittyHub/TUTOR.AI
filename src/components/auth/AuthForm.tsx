@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+import { BETA } from "@/lib/beta";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -86,7 +87,9 @@ export function AuthForm({ mode }: Props) {
           </h1>
           <p className="mx-auto mt-3 max-w-xs text-center text-[13.5px] leading-relaxed text-muted">
             {signup
-              ? "Free account. Your material, lessons, and review queue follow you everywhere — and your API key can too, encrypted, if you want it to."
+              ? BETA
+                ? "Free while we're in beta — no API key, no card, nothing to set up. Your material, lessons and review queue follow you to any device."
+                : "Free account. Your material, lessons, and review queue follow you everywhere — and your API key can too, encrypted, if you want it to."
               : "Sign in to pick up where you left off."}
           </p>
 
@@ -158,9 +161,9 @@ export function AuthForm({ mode }: Props) {
           </p>
 
           <p className="mt-8 text-center text-[11.5px] leading-relaxed text-dim">
-            Your material syncs so it&rsquo;s on every device. Your API key stays
-            in this browser unless you ask us to remember it, and calls always go
-            straight from here to your provider.
+            {BETA
+              ? "The tutor runs on our key during the beta, with a daily limit so it keeps working for everyone. Tell us what breaks."
+              : "Your material syncs so it's on every device. Your API key stays in this browser unless you ask us to remember it, and calls always go straight from here to your provider."}
           </p>
         </div>
       </div>

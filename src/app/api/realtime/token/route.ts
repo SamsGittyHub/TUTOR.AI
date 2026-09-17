@@ -1,10 +1,8 @@
 import type { NextRequest } from "next/server";
 
+import { BETA, BETA_REALTIME_MODEL } from "@/lib/beta";
 import { currentUser } from "@/lib/server/auth";
-<<<<<<< HEAD
-=======
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
->>>>>>> 3413b32 (Setup env config and secure API key handling)
 
 /**
  * Mints an ephemeral Realtime session token.
@@ -15,8 +13,9 @@ import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
  * minute. This is the one place a provider key touches the server, and it is
  * deliberately write-only: nothing logs it, nothing persists it.
  *
- * The student's key still comes from their own browser, so the BYOK stance
- * holds: we are a relay for one call, not a key holder.
+ * In the free beta the key is the server's, so nothing is asked of the student
+ * at all. Outside it, the student's key still comes from their own browser and
+ * the BYOK stance holds: we are a relay for one call, not a key holder.
  */
 
 const REALTIME_SESSIONS = "https://api.openai.com/v1/realtime/sessions";
@@ -26,25 +25,28 @@ export async function POST(request: NextRequest) {
   if (!user) return Response.json({ error: "Not signed in." }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));
-  const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+
+  // The shared key wins when it exists: in beta the browser sends none at all.
+  const clientKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+  const apiKey = hasBetaOpenAiKey() ? BETA_OPENAI_KEY : clientKey;
+
   if (!apiKey) {
     return Response.json(
-      { error: "Live voice needs an OpenAI key. Add one in Settings." },
-      { status: 400 },
-    );
-  }
-
-  if (!apiKey && !hasBetaOpenAiKey()) {
-    return Response.json(
-      { error: "The OpenAI API key is not configured on this server." },
-      { status: 503 },
+      {
+        error: BETA
+          ? "Live voice isn't configured on this server yet."
+          : "Live voice needs an OpenAI key. Add one in Settings.",
+      },
+      { status: BETA ? 503 : 400 },
     );
   }
 
   const model =
     typeof body.model === "string" && body.model
       ? body.model
-      : "gpt-4o-realtime-preview";
+      : BETA
+        ? BETA_REALTIME_MODEL
+        : "gpt-4o-realtime-preview";
 
   const response = await fetch(REALTIME_SESSIONS, {
     method: "POST",

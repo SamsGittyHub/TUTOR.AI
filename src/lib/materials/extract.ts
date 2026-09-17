@@ -2,6 +2,7 @@
 
 import type { Material, MaterialChunk, MaterialImage, MaterialKind } from "../db";
 import { toTranscribableChunks } from "./audio";
+import { BETA } from "../beta";
 import { sanitizeText } from "../sanitize";
 import { chunkUnits, type SourceUnit } from "./chunk";
 
@@ -188,7 +189,9 @@ interface TranscriptSegment {
 }
 
 async function transcribe(input: ExtractInput): Promise<SourceUnit[]> {
-  if (!input.openaiKey) {
+  // In beta the server re-signs the upload with the shared key, so the browser
+  // needs none of its own.
+  if (!BETA && !input.openaiKey) {
     throw new ExtractionError(
       "Lecture recordings need an OpenAI key for transcription — add one in Settings, then re-upload.",
     );
@@ -218,12 +221,18 @@ async function transcribe(input: ExtractInput): Promise<SourceUnit[]> {
     form.append("response_format", "verbose_json");
     form.append("timestamp_granularities[]", "segment");
 
-    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { authorization: `Bearer ${input.openaiKey}` },
-      body: form,
-      signal: input.signal,
-    });
+    const response = BETA
+      ? await fetch("/api/transcribe", {
+          method: "POST",
+          body: form,
+          signal: input.signal,
+        })
+      : await fetch("https://api.openai.com/v1/audio/transcriptions", {
+          method: "POST",
+          headers: { authorization: `Bearer ${input.openaiKey}` },
+          body: form,
+          signal: input.signal,
+        });
 
     if (!response.ok) {
       const detail = await response.text();

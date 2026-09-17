@@ -56,4 +56,15 @@ if (secret && secret.length >= 16) {
   );
 }
 
+const betaKey = process.env.OPENAI_API_KEY ?? process.env.BETA_OPENAI_KEY;
+if (betaKey) {
+  const limit = Number(process.env.TUTOR_AI_DAILY_TOKEN_LIMIT) || 300000;
+  console.log(`  ok  free beta     on — shared key, ${limit.toLocaleString()} tokens/user/day`);
+} else {
+  console.log(
+    "  !   free beta     off — no OPENAI_API_KEY, so students are asked for\n" +
+      "                   their own key. Set it to run the free beta.",
+  );
+}
+
 console.log("\nReady.\n");

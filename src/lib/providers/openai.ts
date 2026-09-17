@@ -7,6 +7,8 @@ import {
   throwForResponse,
 } from "./types";
 
+import { BETA } from "../beta";
+
 const BASE = "https://api.openai.com/v1";
 
 /** Shared by OpenAI and OpenRouter — same chat-completions wire format. */
@@ -35,24 +37,43 @@ export async function streamOpenAICompatible(
   label: string,
   options: StreamOptions,
   extraBody: Record<string, unknown> = {},
+  /**
+   * In the free beta the key lives on the server, so the request goes to our
+   * own gateway instead. The gateway passes the upstream SSE body through
+   * untouched, which is why the decoder below needs no idea this happened.
+   */
+  gatewayPath?: string,
 ): Promise<void> {
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${options.apiKey}`,
-      ...extraHeaders,
-    },
-    body: JSON.stringify({
-      model: options.model,
-      messages: toOpenAIMessages(options.system, options.messages),
-      max_completion_tokens: options.maxTokens ?? 8000,
-      stream: true,
-      stream_options: { include_usage: true },
-      ...extraBody,
-    }),
-    signal: options.signal,
-  });
+  const payload = {
+    model: options.model,
+    messages: toOpenAIMessages(options.system, options.messages),
+    max_completion_tokens: options.maxTokens ?? 8000,
+    stream: true,
+    stream_options: { include_usage: true },
+    ...extraBody,
+  };
+
+  const response = gatewayPath
+    ? await fetch("/api/llm", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          providerId: "openai",
+          path: gatewayPath,
+          body: payload,
+        }),
+        signal: options.signal,
+      })
+    : await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${options.apiKey}`,
+          ...extraHeaders,
+        },
+        body: JSON.stringify(payload),
+        signal: options.signal,
+      });
   if (!response.ok) await throwForResponse(response, label);
 
   let inputTokens = 0;
@@ -138,6 +159,7 @@ export const openai: Provider = {
       isReasoning
         ? { reasoning_effort: options.effort ?? "low" }
         : { temperature: options.temperature ?? 0.4 },
+      BETA ? "/chat/completions" : undefined,
     );
   },
 };

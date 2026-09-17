@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { hasUsableKey } from "@/lib/beta";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { SettingsModal } from "@/components/app/SettingsModal";
@@ -126,7 +127,7 @@ function Setup({
   count: number;
   setCount: (n: number) => void;
 }) {
-  const hasKey = Boolean(loadKeys()[lab.settings.providerId]);
+  const hasKey = hasUsableKey(loadKeys()[lab.settings.providerId]);
 
   return (
     <div className="space-y-5 py-6">

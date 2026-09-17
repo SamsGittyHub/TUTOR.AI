@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { keyFor } from "./beta";
 import { useRouter } from "next/navigation";
 
 import { QUIZ_SELECTION, readStored, TEACH_HANDOFF } from "./storage-keys";
@@ -100,7 +101,7 @@ export function useQuizLab() {
 
   const generate = useCallback(
     async (topic: string, count: number) => {
-      const apiKey = loadKeys()[settings.providerId];
+      const apiKey = keyFor(loadKeys()[settings.providerId]);
       if (!apiKey) {
         setError({
           message: "No API key for this provider yet.",

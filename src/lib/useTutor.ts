@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { hasUsableKey, keyFor } from "./beta";
 import type { TutorAction } from "./actions";
 import {
   deleteMaterial as dbDeleteMaterial,
@@ -166,7 +167,8 @@ export function useTutor() {
   }, [session, ready]);
 
   const apiKey = keys[settings.providerId];
-  const hasKey = Boolean(apiKey);
+  // In beta the key is the server's, so the board is never key-gated.
+  const hasKey = hasUsableKey(apiKey);
 
   const materialName = useCallback(
     (id: string) => materials.find((m) => m.id === id)?.name ?? "your notes",
@@ -222,7 +224,7 @@ export function useTutor() {
       options: { titleFrom?: string; sketch?: string } = {},
     ) => {
       const current = sessionRef.current;
-      const key = loadKeys()[current.providerId] ?? loadKeys()[settings.providerId];
+      const key = keyFor(loadKeys()[current.providerId] ?? loadKeys()[settings.providerId]);
       if (!key) {
         setError({
           message: "No API key for this provider yet.",
@@ -270,8 +272,10 @@ export function useTutor() {
 
       try {
         const result = await runTutorTurn({
-          providerId: current.providerId,
-          model: current.model,
+          // A lesson resumed from before the beta carries its own provider;
+          // in beta the shared key only works for one, so loadSettings wins.
+          providerId: settings.providerId,
+          model: settings.model,
           apiKey: key,
           studentMessage,
           transcript: current.transcript,

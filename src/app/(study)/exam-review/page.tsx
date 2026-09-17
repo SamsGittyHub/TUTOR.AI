@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { keyFor } from "@/lib/beta";
 import { useEffect, useRef, useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
@@ -118,7 +119,7 @@ export default function ExamReviewPage() {
     setError(null);
     try {
       const settings = loadSettings();
-      const apiKey = loadKeys()[settings.providerId];
+      const apiKey = keyFor(loadKeys()[settings.providerId]);
       if (!apiKey) throw new Error("Add an API key in Settings first.");
 
       const images: ImagePart[] = pages.map((p) => ({

@@ -1,3 +1,4 @@
+import { BETA, BETA_MODEL, BETA_PROVIDER } from "./beta";
 import type { ProviderId } from "./providers/types";
 import { readStored, SETTINGS } from "./storage-keys";
 
@@ -19,7 +20,18 @@ export const DEFAULT_SETTINGS: Settings = {
   model: "claude-sonnet-5",
 };
 
+/** The beta runs on one provider, because the shared key only works for one. */
+const BETA_SETTINGS: Settings = {
+  providerId: BETA_PROVIDER,
+  model: BETA_MODEL,
+};
+
 export function loadSettings(): Settings {
+  // Forced, not defaulted: a saved choice from before the beta — or a
+  // provider picked on another device — would otherwise send the turn
+  // straight to that vendor with a placeholder key, bypassing the gateway
+  // entirely and failing with a confusing 401.
+  if (BETA) return BETA_SETTINGS;
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
     const raw = readStored(localStorage, SETTINGS_KEY);
@@ -31,6 +43,6 @@ export function loadSettings(): Settings {
 }
 
 export function saveSettings(settings: Settings): void {
-  if (typeof window === "undefined") return;
+  if (BETA || typeof window === "undefined") return;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
 }

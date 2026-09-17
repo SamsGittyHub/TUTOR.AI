@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { Whiteboard } from "@/components/board/Whiteboard";
 import type { TutorAction } from "@/lib/actions";
+import { BETA } from "@/lib/beta";
 import { loadKeys, pullAccountKeys } from "@/lib/keys";
 import { loadSettings } from "@/lib/settings";
 import { useRealtime } from "@/lib/useRealtime";
@@ -57,9 +58,10 @@ export default function VoicePage() {
   }, []);
 
   function begin() {
-    const keys = loadKeys();
-    const openaiKey = keys.openai;
-    if (!openaiKey) {
+    // In beta the realtime token is minted with the server's key, so the
+    // browser has nothing to send and nothing to be missing.
+    const openaiKey = BETA ? "" : (loadKeys().openai ?? "");
+    if (!BETA && !openaiKey) {
       setKeyMissing(true);
       return;
     }
