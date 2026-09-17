@@ -90,6 +90,14 @@ export const openai: Provider = {
   keyUrl: "https://platform.openai.com/api-keys",
   allowsCustomModel: true,
   models: [
+    {
+      id: "gpt-5.6-terra",
+      label: "GPT-5.6 Terra",
+      inputPrice: 0,
+      outputPrice: 0,
+      vision: true,
+      note: "Your requested default tutor model.",
+    },
     { id: "gpt-4.1", label: "GPT-4.1", inputPrice: 2, outputPrice: 8, vision: true },
     {
       id: "gpt-4.1-mini",

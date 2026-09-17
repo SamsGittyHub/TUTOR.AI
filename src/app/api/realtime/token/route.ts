@@ -1,6 +1,10 @@
 import type { NextRequest } from "next/server";
 
 import { currentUser } from "@/lib/server/auth";
+<<<<<<< HEAD
+=======
+import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
+>>>>>>> 3413b32 (Setup env config and secure API key handling)
 
 /**
  * Mints an ephemeral Realtime session token.
@@ -27,6 +31,13 @@ export async function POST(request: NextRequest) {
     return Response.json(
       { error: "Live voice needs an OpenAI key. Add one in Settings." },
       { status: 400 },
+    );
+  }
+
+  if (!apiKey && !hasBetaOpenAiKey()) {
+    return Response.json(
+      { error: "The OpenAI API key is not configured on this server." },
+      { status: 503 },
     );
   }
 
