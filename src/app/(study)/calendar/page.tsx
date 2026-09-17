@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
 import { PageShell } from "@/components/shell/PageShell";
+import { MonthGrid } from "@/components/app/MonthGrid";
 import { SyllabusImport } from "@/components/app/SyllabusImport";
 import { EVENT_KINDS, type EventKind } from "@/lib/calendar";
 import { useCalendar } from "@/lib/useCalendar";
@@ -44,11 +45,26 @@ export default function CalendarPage() {
   const [busy, setBusy] = useState(false);
   const [planFor, setPlanFor] = useState<string | null>(null);
   const [minutesPerDay, setMinutesPerDay] = useState(90);
+  const [selectedDay, setSelectedDay] = useState<number | null>(null);
 
   const upcoming = useMemo(
     () => cal.events.filter((e) => e.startsAt >= Date.now() - 864e5),
     [cal.events],
   );
+
+  /** Clicking a day narrows the list to it; otherwise it's what's coming up. */
+  const shown = useMemo(() => {
+    if (selectedDay === null) return upcoming;
+    const day = new Date(selectedDay);
+    return cal.events.filter((e) => {
+      const d = new Date(e.startsAt);
+      return (
+        d.getFullYear() === day.getFullYear() &&
+        d.getMonth() === day.getMonth() &&
+        d.getDate() === day.getDate()
+      );
+    });
+  }, [selectedDay, upcoming, cal.events]);
 
   async function add(event: React.FormEvent) {
     event.preventDefault();
@@ -135,7 +151,7 @@ export default function CalendarPage() {
         {lib.courses.length > 0 && (
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-              Course
+              Subject
             </span>
             <select
               value={courseId}
@@ -192,18 +208,53 @@ export default function CalendarPage() {
       </div>
 
       <div className="mt-6">
+        <MonthGrid
+          events={cal.events}
+          blocks={cal.blocks}
+          selectedDay={selectedDay}
+          onSelectDay={setSelectedDay}
+        />
+      </div>
+
+      {selectedDay !== null && (
+        <div className="mt-4 flex items-center gap-3">
+          <p className="text-[13px] font-semibold text-fg">
+            {new Date(selectedDay).toLocaleDateString(undefined, {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+            })}
+          </p>
+          <button
+            type="button"
+            onClick={() => setSelectedDay(null)}
+            className="tx press rounded-full px-3 py-1 text-[12px] font-medium text-muted hover:bg-[var(--tint)] hover:text-fg"
+          >
+            Show everything
+          </button>
+        </div>
+      )}
+
+      <div className="mt-6">
         {cal.loading ? (
           <Loading what="your calendar" />
         ) : cal.error ? (
           <LoadError message={cal.error} />
-        ) : !upcoming.length ? (
-          <Empty title="Nothing on the calendar">
-            Add an exam above — with the topics it covers — and TUTOR AI will build
-            the study plan around it.
+        ) : !shown.length ? (
+          <Empty
+            title={
+              selectedDay === null
+                ? "Nothing on the calendar"
+                : `Nothing on ${new Date(selectedDay).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}`
+            }
+          >
+            {selectedDay === null
+              ? "Add an exam above — with the topics it covers — and TUTOR AI will build the study plan around it."
+              : "Pick that day again to go back to everything coming up."}
           </Empty>
         ) : (
           <ul className="flex flex-col gap-3">
-            {upcoming.map((event) => {
+            {shown.map((event) => {
               const blocks = cal.blocks
                 .filter((b) => b.eventId === event.id)
                 .sort((a, b) => a.startsAt - b.startsAt);

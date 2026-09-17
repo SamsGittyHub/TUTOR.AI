@@ -1,6 +1,7 @@
 "use client";
 
 import type { EventKind } from "../calendar";
+import { languageInstruction } from "../language";
 import type { Material, MaterialChunk } from "../db";
 import { formatContext } from "../materials/retrieve";
 import { getProvider, type ProviderId, type Usage } from "../providers";
@@ -108,7 +109,7 @@ export async function parseSyllabus(
     apiKey: request.apiKey,
     model: request.model,
     system:
-      "You extract dated items from a course syllabus. You reply with JSON and nothing else.",
+      "You extract dated items from a course syllabus. You reply with JSON and nothing else." + languageInstruction(),
     messages: [
       {
         role: "user",

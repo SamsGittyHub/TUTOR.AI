@@ -4,6 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
+import { translate } from "@/lib/i18n";
+import { useLanguage } from "@/lib/language";
+
 import { isActive, NAV_LINKS } from "./nav-links";
 
 /**
@@ -32,6 +35,7 @@ interface Props {
 
 export function NavLinks({ spread = true }: Props) {
   const pathname = usePathname();
+  const language = useLanguage();
   const listRef = useRef<HTMLElement>(null);
   const itemRefs = useRef(new Map<string, HTMLAnchorElement>());
   const [pill, setPill] = useState<{ x: number; w: number } | null>(null);
@@ -122,7 +126,7 @@ export function NavLinks({ spread = true }: Props) {
               active ? "text-fg" : "text-muted hover:text-fg"
             }`}
           >
-            {link.label}
+            {translate(language.code, link.key)}
           </Link>
         );
       })}

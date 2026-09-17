@@ -83,14 +83,14 @@ export default function MaterialsPage() {
                     {lib.courses.length > 0 && (
                       <select
                         value={m.courseId ?? ""}
-                        aria-label={`Course for ${m.name}`}
+                        aria-label={`Subject for ${m.name}`}
                         onChange={async (e) => {
                           await setMaterialCourse(m.id, e.target.value || null);
                           lib.reload();
                         }}
                         className="tx h-7 rounded-full bg-[var(--tint)] px-2.5 text-[11.5px] font-medium text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] outline-none hover:text-fg"
                       >
-                        <option value="">No course</option>
+                        <option value="">No subject</option>
                         {lib.courses.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}

@@ -1,6 +1,7 @@
 "use client";
 
 import { normalizeReview, type ExamReviewResult } from "../exam-review";
+import { languageInstruction } from "../language";
 import { getProvider, type ImagePart, type ProviderId, type Usage } from "../providers";
 import { extractFirstJson } from "../stream-json";
 
@@ -84,7 +85,7 @@ export async function reviewExam(
     apiKey: request.apiKey,
     model: request.model,
     system:
-      "You are a tutor going through a student's marked exam with them. You diagnose why marks were lost, in their own working. You reply with JSON and nothing else.",
+      "You are a tutor going through a student's marked exam with them. You diagnose why marks were lost, in their own working. You reply with JSON and nothing else." + languageInstruction(),
     messages: [
       {
         role: "user",

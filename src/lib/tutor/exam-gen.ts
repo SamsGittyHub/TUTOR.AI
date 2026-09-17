@@ -1,6 +1,7 @@
 "use client";
 
 import type { Material, MaterialChunk, Session } from "../db";
+import { languageInstruction } from "../language";
 import type {
   ExamQuestion,
   ExamQuestionKind,
@@ -174,7 +175,7 @@ export async function generateExam(
     apiKey: request.apiKey,
     model: request.model,
     system:
-      "You write practice exams for one student, drawn strictly from their own study material and aimed at what they personally find hard. You reply with JSON and nothing else.",
+      "You write practice exams for one student, drawn strictly from their own study material and aimed at what they personally find hard. You reply with JSON and nothing else." + languageInstruction(),
     messages: [
       {
         role: "user",

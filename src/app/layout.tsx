@@ -1,3 +1,5 @@
+import { LanguageProvider } from "@/lib/language";
+
 import type { Metadata, Viewport } from "next";
 import { Nunito, Kalam, Space_Mono } from "next/font/google";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
@@ -55,7 +57,7 @@ export default function RootLayout({
         {/* Applies the stored / OS theme before first paint — no flash. It
             also flips the browser UI (color-scheme) along with it. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
-        {children}
+        <LanguageProvider>{children}</LanguageProvider>
       </body>
     </html>
   );

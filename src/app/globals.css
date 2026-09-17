@@ -242,24 +242,22 @@ h2 {
 .grad {
   background: linear-gradient(
     286deg,
-    var(--color-cyan) 6%,
-    color-mix(in oklab, var(--color-cyan), var(--color-pink)) 48%,
-    var(--color-pink) 96%
+    var(--color-cyan) 0%,
+    var(--color-accent) 100%
   );
 }
 .grad-soft {
   background: linear-gradient(
-    301.9deg,
-    rgba(6, 178, 252, 0.14) 16.68%,
-    rgba(246, 83, 162, 0.14) 89.46%
+    286deg,
+    color-mix(in srgb, var(--color-cyan) 14%, transparent) 0%,
+    color-mix(in srgb, var(--color-accent) 14%, transparent) 100%
   );
 }
 .grad-text {
   background: linear-gradient(
     286deg,
-    var(--color-cyan) 6%,
-    color-mix(in oklab, var(--color-cyan), var(--color-pink)) 48%,
-    var(--color-pink) 96%
+    var(--color-cyan) 0%,
+    var(--color-accent) 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -275,7 +273,11 @@ h2 {
   inset: 0;
   border-radius: inherit;
   padding: 1px;
-  background: linear-gradient(301.9deg, #06b2fc 16.68%, #f653a2 89.46%);
+  background: linear-gradient(
+    286deg,
+    var(--color-cyan) 0%,
+    var(--color-accent) 100%
+  );
   -webkit-mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -371,8 +373,8 @@ h2 {
 .marker > mark {
   background: linear-gradient(
     transparent 58%,
-    rgba(246, 83, 162, 0.42) 58%,
-    rgba(6, 178, 252, 0.32) 100%
+    color-mix(in srgb, var(--color-cyan) 40%, transparent) 58%,
+    color-mix(in srgb, var(--color-accent) 30%, transparent) 100%
   );
   color: inherit;
   padding: 0 2px;
@@ -394,7 +396,7 @@ h2 {
   content: "▍";
   margin-left: 1px;
   animation: cursor-blink 900ms steps(1) infinite;
-  color: var(--color-pink);
+  color: var(--color-accent);
 }
 
 @keyframes float-slow {

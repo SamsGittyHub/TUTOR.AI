@@ -3,6 +3,8 @@
 import Link from "next/link";
 
 import { NAV_LINKS } from "@/components/shell/nav-links";
+import { translate } from "@/lib/i18n";
+import { useLanguage } from "@/lib/language";
 
 import { useRef, useState } from "react";
 import type { Material, Session } from "@/lib/db";
@@ -45,6 +47,7 @@ const KIND_ICON: Record<Material["kind"], string> = {
 const BOARD_LINKS = NAV_LINKS.filter((l) => l.href !== "/app");
 
 export function Sidebar(props: Props) {
+  const language = useLanguage();
   const [tab, setTab] = useState<"material" | "history">("material");
   const [goal, setGoal] = useState("");
   const [pasting, setPasting] = useState(false);
@@ -269,7 +272,7 @@ export function Sidebar(props: Props) {
                     href={link.href}
                     className="tx press rounded-full bg-[var(--tint)] px-3 py-2 text-center text-[13px] font-medium text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] hover:text-fg"
                   >
-                    {link.label}
+                    {translate(language.code, link.key)}
                   </Link>
                 ))}
               </div>

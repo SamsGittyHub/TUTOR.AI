@@ -4,6 +4,7 @@ import { normalizeAction, actionToText, type TutorAction } from "../actions";
 import type { Material, MaterialChunk, QuizQuestion, TranscriptEntry } from "../db";
 import { formatContext, retrieve, retrieveHybrid } from "../materials/retrieve";
 import { getProvider, type ChatMessage, type ImagePart, type ProviderId, type Usage } from "../providers";
+import { languageInstruction } from "../language";
 import { extractFirstJson, JsonObjectStream } from "../stream-json";
 import {
   buildQuizPrompt,
@@ -117,10 +118,13 @@ function buildMessages(request: TurnRequest): ChatMessage[] {
  */
 export async function runTutorTurn(request: TurnRequest): Promise<TurnResult> {
   const provider = getProvider(request.providerId);
-  const system = buildSystemPrompt({
+  const baseSystem = buildSystemPrompt({
     materials: request.materials,
     hasMaterialContext: request.chunks.length > 0,
   });
+  // Appended rather than prepended: the action protocol has to lead, or a
+  // weaker model starts treating the language note as the thing being asked.
+  const system = baseSystem + languageInstruction();
   const messages = buildMessages(request);
 
   const actions: TutorAction[] = [];
@@ -268,7 +272,7 @@ export async function generateQuiz(
     apiKey: request.apiKey,
     model: request.model,
     system:
-      "You write practice questions for a student, drawn strictly from their own study material. You reply with JSON and nothing else.",
+      "You write practice questions for a student, drawn strictly from their own study material. You reply with JSON and nothing else." + languageInstruction(),
     messages: [
       {
         role: "user",

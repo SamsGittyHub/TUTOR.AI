@@ -369,7 +369,7 @@ export default function ExamReviewPage() {
           {lib.courses.length > 0 && (
             <label className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-                Course
+                Subject
               </span>
               <select
                 value={courseId}
