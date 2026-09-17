@@ -26,8 +26,8 @@ import { buildBriefing, runVoiceTool, type VoiceContext } from "@/lib/voice-tool
 
 const BOARD_SCHEMA = `## The board
 
-Call write_on_board with an "actions" array of JSON objects. Every object needs
-a short unique "id". These are the card types:
+Call write_on_board with "actions": one JSON object per line, nothing else on
+the line. Every object needs a short unique "id". These are the card types:
 
 {"type":"write_text","id":"h1","text":"Integration by parts","style":"title","color":"ink"}
   style: "title" | "body" | "note". color: ink | cyan | pink | amber | green | violet.

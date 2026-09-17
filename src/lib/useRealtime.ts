@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { TutorAction } from "./actions";
 import { BETA_REALTIME_MODEL } from "./beta";
-import { handleRealtimeEvent, toolResultMessages } from "./realtime-events";
+import { VOICE_TOOLS } from "./voice-tools";
+import {
+  handleRealtimeEvent,
+  sessionUpdateMessage,
+  toolResultMessages,
+} from "./realtime-events";
 
 /**
  * A live speech-to-speech tutor session over WebRTC.
@@ -115,6 +120,19 @@ export function useRealtime({
 
         const channel = pc.createDataChannel("oai-events");
         channelRef.current = channel;
+
+        // Configure the session over the channel as soon as it opens. The
+        // minted secret already carries the same instructions and tools, but
+        // relying on that alone produced a tutor that talked well and never
+        // once wrote on the board.
+        channel.onopen = () => {
+          channel.send(sessionUpdateMessage(instructions, VOICE_TOOLS));
+        };
+
+        // One session, one set of answered call ids — the same call arrives on
+        // several events and must only be drawn once.
+        const seenCalls = new Set<string>();
+
         channel.onmessage = (event) => {
           let message: Record<string, unknown>;
           try {
@@ -126,6 +144,7 @@ export function useRealtime({
             onAction: (action) => actionRef.current(action),
             onTranscript: (role, text) => transcriptRef.current(role, text),
             onSpeaking: setSpeaking,
+            seenCalls,
             // Acknowledging a tool call matters: without an output item the
             // model waits on it and the conversation stalls mid-sentence.
             runTool: (name, args) =>

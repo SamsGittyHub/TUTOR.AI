@@ -8,9 +8,12 @@ import { normalizeAction, type TutorAction } from "./actions";
  * GA renamed most of these events and the failure mode of getting a name wrong
  * is a session that connects, sounds fine, and silently never draws anything.
  *
- * Both the GA names and the beta ones are matched. The cost is a few string
- * comparisons; the benefit is that a session opened against an older
- * deployment doesn't fall mute.
+ * That failure actually happened, which is why the matching below is as wide
+ * as it is: a tool call is recognised from three different events, its
+ * arguments are accepted in four shapes, and a JSON line that turns up in the
+ * spoken transcript is drawn rather than dropped. Each of those is a model
+ * doing something slightly different from the documented happy path, and each
+ * of them used to mean a blank whiteboard.
  */
 
 export interface RealtimeHandlers {
@@ -27,6 +30,11 @@ export interface RealtimeHandlers {
    * hear back. Board cards are handled here too, via onAction.
    */
   runTool?: (name: string, args: Record<string, unknown>) => string;
+  /**
+   * Call ids already answered. The same call arrives on more than one event,
+   * and running a tool twice would draw the card twice.
+   */
+  seenCalls?: Set<string>;
   onError?: (message: string) => void;
 }
 
@@ -48,41 +56,69 @@ const TUTOR_TRANSCRIPT = new Set([
 
 const TEXT_DONE = new Set(["response.output_text.done", "response.text.done"]);
 
-/**
- * Pulls board actions out of one `write_on_board` tool call.
- *
- * One call may carry several cards — a title, the working, and the result go
- * up together rather than as three round trips through a spoken turn — so
- * `action` and `actions` are both read, and either may arrive as a JSON string
- * or as the object itself. Models send all four shapes; dropping a card
- * because of which one turned up is a board that mysteriously stays empty.
- */
-function actionsFromToolCall(message: Record<string, unknown>): TutorAction[] {
-  const parse = (value: unknown): unknown => {
-    if (typeof value !== "string") return value;
-    try {
-      return JSON.parse(value);
-    } catch {
-      return null;
-    }
-  };
+/* -------------------------------------------------------------------------- */
+/* Board actions                                                               */
+/* -------------------------------------------------------------------------- */
 
-  let args: { action?: unknown; actions?: unknown };
+/** JSON if it parses, the value itself if it's already an object, else null. */
+function loose(value: unknown): unknown {
+  if (typeof value !== "string") return value ?? null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
   try {
-    args = JSON.parse(String(message.arguments ?? "{}"));
+    return JSON.parse(trimmed);
   } catch {
-    return [];
+    return null;
   }
+}
 
-  const raw = parse(args.actions ?? args.action);
-  const list = Array.isArray(raw) ? raw : [raw];
+/**
+ * Every board action in one tool call's arguments.
+ *
+ * The argument may be a single object, an array of them, a JSON string of
+ * either, or several objects one per line — and may arrive under `actions`,
+ * `action` or `cards`. Models send all of these. Insisting on one shape is how
+ * a board ends up empty while the tutor talks happily over it.
+ */
+function actionsFromToolCall(rawArguments: unknown): TutorAction[] {
+  const args = loose(rawArguments);
+  if (!args || typeof args !== "object") return [];
 
-  return list
-    .map((item) => normalizeAction(parse(item)))
+  const record = args as Record<string, unknown>;
+  const raw = record.actions ?? record.action ?? record.cards ?? record.card;
+
+  const candidates: unknown[] = [];
+  const consider = (value: unknown) => {
+    if (value === null || value === undefined) return;
+    if (Array.isArray(value)) {
+      for (const item of value) consider(item);
+      return;
+    }
+    if (typeof value === "string") {
+      // One object, or several separated by newlines — the same shape the
+      // typed tutor streams, which is what these models reach for.
+      const lines = value.split("\n").map((l) => l.trim()).filter(Boolean);
+      if (lines.length <= 1) {
+        const parsed = loose(value);
+        if (parsed) consider(parsed);
+        return;
+      }
+      for (const line of lines) {
+        const parsed = loose(line);
+        if (parsed) consider(parsed);
+      }
+      return;
+    }
+    candidates.push(value);
+  };
+  consider(raw);
+
+  return candidates
+    .map((c) => normalizeAction(c))
     .filter((a): a is TutorAction => a !== null);
 }
 
-/** Pulls board actions out of a text turn — the pre-tool-call arrangement. */
+/** Board actions from a block of text — the pre-tool-call arrangement. */
 function actionsFromText(text: string): TutorAction[] {
   const out: TutorAction[] = [];
   for (const line of text.split("\n")) {
@@ -95,6 +131,76 @@ function actionsFromText(text: string): TutorAction[] {
       // A half-formed object isn't worth surfacing mid-conversation.
     }
   }
+  return out;
+}
+
+/** Speech with any JSON the model read out loud stripped back out of it. */
+export function spokenOnly(text: string): string {
+  return text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("{"))
+    .join("\n")
+    .trim();
+}
+
+/* -------------------------------------------------------------------------- */
+/* Tool calls                                                                  */
+/* -------------------------------------------------------------------------- */
+
+interface ToolCall {
+  name: string;
+  callId: string;
+  args: unknown;
+}
+
+/**
+ * Tool calls carried by one event.
+ *
+ * Three events can carry them: the arguments-done event, the output-item-done
+ * event, and the final response.done with the whole output array. Which of
+ * those a given model sends is not something to bet a blank whiteboard on, so
+ * all three are read and the duplicates filtered out by call id.
+ */
+function toolCallsIn(message: Record<string, unknown>): ToolCall[] {
+  const type = String(message.type ?? "");
+  const out: ToolCall[] = [];
+
+  const fromItem = (raw: unknown) => {
+    if (!raw || typeof raw !== "object") return;
+    const item = raw as Record<string, unknown>;
+    const kind = String(item.type ?? "");
+    if (kind !== "function_call" && kind !== "tool_call") return;
+    const name = String(item.name ?? "");
+    if (!name) return;
+    out.push({
+      name,
+      callId: String(item.call_id ?? item.id ?? ""),
+      args: item.arguments ?? item.args ?? "{}",
+    });
+  };
+
+  if (type === "response.function_call_arguments.done") {
+    const name = String(message.name ?? "");
+    if (name) {
+      out.push({
+        name,
+        callId: String(message.call_id ?? message.item_id ?? ""),
+        args: message.arguments ?? "{}",
+      });
+    }
+  }
+
+  if (type === "response.output_item.done" || type === "conversation.item.created") {
+    fromItem(message.item);
+  }
+
+  if (type === "response.done") {
+    const response = message.response as { output?: unknown } | undefined;
+    if (Array.isArray(response?.output)) {
+      for (const item of response.output) fromItem(item);
+    }
+  }
+
   return out;
 }
 
@@ -113,39 +219,41 @@ export function handleRealtimeEvent(
     if (text) handlers.onTranscript("student", text);
   }
 
-  // What the tutor said out loud.
+  // What the tutor said out loud. If it read a card aloud despite being told
+  // not to, put the card on the board and keep it out of the transcript —
+  // better a drawn card and clean speech than neither.
   if (TUTOR_TRANSCRIPT.has(type)) {
-    const text = String(message.transcript ?? "").trim();
-    if (text) handlers.onTranscript("tutor", text);
+    const raw = String(message.transcript ?? "");
+    for (const action of actionsFromText(raw)) handlers.onAction(action);
+    const spoken = spokenOnly(raw);
+    if (spoken) handlers.onTranscript("tutor", spoken);
   }
 
-  // Tool calls: board cards, and lookups into the student's own work.
-  if (type === "response.function_call_arguments.done") {
-    const name = String(message.name ?? "");
-    const callId = String(message.call_id ?? "");
-    let output = "ok";
+  for (const call of toolCallsIn(message)) {
+    // The same call arrives on more than one event; drawing it twice is worse
+    // than the redundancy that buys.
+    const key = call.callId || `${call.name}:${String(call.args)}`;
+    if (handlers.seenCalls?.has(key)) continue;
+    handlers.seenCalls?.add(key);
 
-    if (name === "write_on_board") {
-      const actions = actionsFromToolCall(message);
+    let output = "ok";
+    if (call.name === "write_on_board") {
+      const actions = actionsFromToolCall(call.args);
       for (const action of actions) handlers.onAction(action);
       output = actions.length
         ? `Written on the board (${actions.length} card${actions.length === 1 ? "" : "s"}).`
-        : "That card wasn't usable.";
+        : "None of those cards were usable — check the shape and send them again.";
     } else if (handlers.runTool) {
-      try {
-        const args = JSON.parse(String(message.arguments ?? "{}")) as Record<
-          string,
-          unknown
-        >;
-        output = handlers.runTool(name, args);
-      } catch {
-        output = "That lookup failed — the arguments weren't readable.";
-      }
+      const parsed = loose(call.args);
+      output =
+        parsed && typeof parsed === "object"
+          ? handlers.runTool(call.name, parsed as Record<string, unknown>)
+          : "That lookup failed — the arguments weren't readable.";
     }
 
     // Answered even for a tool we don't know: an unanswered call stalls the
     // conversation, and silence is a worse outcome than a useless answer.
-    if (callId) handlers.onToolResult(callId, output);
+    if (call.callId) handlers.onToolResult(call.callId, output);
   }
 
   if (TEXT_DONE.has(type)) {
@@ -181,4 +289,28 @@ export function toolResultMessages(callId: string, output: string): string[] {
     }),
     JSON.stringify({ type: "response.create" }),
   ];
+}
+
+/**
+ * Installs the tutor's instructions and tools on a live session.
+ *
+ * Sent over the data channel the moment it opens rather than relied on from
+ * the minted client secret: whatever that endpoint does or doesn't carry
+ * through, a session.update is configuration the model definitely has. A
+ * session missing this talks perfectly well and never touches the board, which
+ * is exactly how it presented.
+ */
+export function sessionUpdateMessage(
+  instructions: string,
+  tools: unknown[],
+): string {
+  return JSON.stringify({
+    type: "session.update",
+    session: {
+      type: "realtime",
+      instructions,
+      tools,
+      tool_choice: "auto",
+    },
+  });
 }

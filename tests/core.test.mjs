@@ -30,7 +30,9 @@ import {
   blocksToXml, contentTypesXml, documentRelsXml, documentXml, esc, pxToEmu,
 } from "../.test-build/core/docx.js";
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
-import { handleRealtimeEvent, toolResultMessages } from "../.test-build/core/realtime-events.js";
+import {
+  handleRealtimeEvent, sessionUpdateMessage, spokenOnly, toolResultMessages,
+} from "../.test-build/core/realtime-events.js";
 import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
 import {
   buildImagePrompt, dimensionsFor, normalizeImageRequest, sizeFor,
@@ -1182,9 +1184,10 @@ test("a subject with no material at all still appears", () => {
 
 console.log("\n— live voice events —");
 
-function collect(message, runTool) {
+function collect(message, runTool, seenCalls = new Set()) {
   const seen = { actions: [], lines: [], speaking: [], acks: [], outputs: [], errors: [] };
   handleRealtimeEvent(message, {
+    seenCalls,
     onAction: (a) => seen.actions.push(a),
     onTranscript: (role, text) => seen.lines.push([role, text]),
     onSpeaking: (v) => seen.speaking.push(v),
@@ -1668,6 +1671,127 @@ test("one bad card in a batch doesn't take the good ones down with it", () => {
   });
   assert.equal(seen.actions.length, 1);
   assert.match(seen.outputs[0], /1 card\)/);
+});
+
+console.log("\n— getting the board wired up —");
+
+const boardCall = (args, type = "response.function_call_arguments.done") =>
+  type === "response.function_call_arguments.done"
+    ? { type, name: "write_on_board", call_id: "c1", arguments: JSON.stringify(args) }
+    : { type, item: { type: "function_call", name: "write_on_board", call_id: "c1",
+                      arguments: JSON.stringify(args) } };
+
+const TITLE = { type: "write_text", id: "t1", text: "Ohm's law", style: "title", color: "ink" };
+const EQ = { type: "write_equation", id: "e1", latex: "V = IR", color: "cyan" };
+
+test("cards arrive whichever of the four shapes the model sends them in", () => {
+  // Each of these is a real thing a model does with the same tool schema.
+  const shapes = {
+    "newline-delimited string": { actions: `${JSON.stringify(TITLE)}\n${JSON.stringify(EQ)}` },
+    "array of JSON strings": { actions: [JSON.stringify(TITLE), JSON.stringify(EQ)] },
+    "array of objects": { actions: [TITLE, EQ] },
+    "a JSON string of an array": { actions: JSON.stringify([TITLE, EQ]) },
+  };
+  for (const [label, args] of Object.entries(shapes)) {
+    const seen = collect(boardCall(args));
+    assert.equal(seen.actions.length, 2, `${label} should produce two cards`);
+    assert.deepEqual(seen.actions.map((a) => a.id), ["t1", "e1"], label);
+  }
+});
+
+test("the singular 'action' key still works, and so does 'cards'", () => {
+  assert.equal(collect(boardCall({ action: JSON.stringify(TITLE) })).actions.length, 1);
+  assert.equal(collect(boardCall({ cards: [TITLE, EQ] })).actions.length, 2);
+});
+
+test("a tool call carried on response.output_item.done is not missed", () => {
+  // Some models only surface the call here, and missing it is a blank board.
+  const seen = collect(boardCall({ actions: [TITLE] }, "response.output_item.done"));
+  assert.equal(seen.actions.length, 1);
+  assert.deepEqual(seen.acks, ["c1"]);
+});
+
+test("a tool call carried on response.done is not missed either", () => {
+  const seen = collect({
+    type: "response.done",
+    response: {
+      output: [
+        { type: "message", content: [] },
+        { type: "function_call", name: "write_on_board", call_id: "c9",
+          arguments: JSON.stringify({ actions: [TITLE] }) },
+      ],
+    },
+  });
+  assert.equal(seen.actions.length, 1);
+  assert.deepEqual(seen.acks, ["c9"]);
+});
+
+test("the same call arriving on two events is drawn once, not twice", () => {
+  const shared = new Set();
+  const args = { actions: [TITLE] };
+  const first = collect(boardCall(args), undefined, shared);
+  const second = collect(boardCall(args, "response.output_item.done"), undefined, shared);
+  assert.equal(first.actions.length, 1);
+  assert.equal(second.actions.length, 0, "the second event is the same call");
+  assert.deepEqual(second.acks, []);
+});
+
+test("a lookup tool is deduped the same way", () => {
+  const shared = new Set();
+  let runs = 0;
+  const call = {
+    type: "response.function_call_arguments.done",
+    name: "get_progress", call_id: "c5", arguments: "{}",
+  };
+  collect(call, () => (runs += 1, "fine"), shared);
+  collect({ ...call, type: "response.output_item.done",
+            item: { type: "function_call", name: "get_progress", call_id: "c5", arguments: "{}" } },
+          () => (runs += 1, "fine"), shared);
+  assert.equal(runs, 1, "a search must not run twice because two events described it");
+});
+
+test("cards the tutor read aloud still reach the board", () => {
+  // It is told never to speak the JSON. When it does anyway, drawing the card
+  // and keeping the transcript clean beats losing both.
+  const seen = collect({
+    type: "response.output_audio_transcript.done",
+    transcript: `Here's the formula.\n${JSON.stringify(EQ)}\nNotice the units.`,
+  });
+  assert.equal(seen.actions.length, 1);
+  assert.equal(seen.actions[0].latex, "V = IR");
+  assert.deepEqual(seen.lines, [["tutor", "Here's the formula.\nNotice the units."]]);
+});
+
+test("ordinary speech is left exactly as it was said", () => {
+  const seen = collect({
+    type: "response.output_audio_transcript.done",
+    transcript: "So the resistance is two ohms.",
+  });
+  assert.deepEqual(seen.lines, [["tutor", "So the resistance is two ohms."]]);
+  assert.equal(seen.actions.length, 0);
+});
+
+test("spokenOnly leaves nothing when the turn was only JSON", () => {
+  assert.equal(spokenOnly(`${JSON.stringify(EQ)}\n${JSON.stringify(TITLE)}`), "");
+});
+
+test("an unusable batch tells the model what to do about it", () => {
+  const seen = collect(boardCall({ actions: "not json at all" }));
+  assert.equal(seen.actions.length, 0);
+  assert.match(seen.outputs[0], /send them again/, "silence teaches the model nothing");
+});
+
+test("the session update carries the instructions and the tools", () => {
+  // Without this the tutor talks perfectly and never touches the board.
+  const message = JSON.parse(sessionUpdateMessage("be a tutor", VOICE_TOOLS));
+  assert.equal(message.type, "session.update");
+  assert.equal(message.session.type, "realtime");
+  assert.equal(message.session.instructions, "be a tutor");
+  assert.equal(message.session.tool_choice, "auto");
+  assert.deepEqual(
+    message.session.tools.map((t) => t.name),
+    ["write_on_board", "draw_image", "search_material", "get_progress", "list_lessons"],
+  );
 });
 
 console.log(`\n${passed} checks passed\n`);

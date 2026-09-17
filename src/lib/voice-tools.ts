@@ -161,10 +161,9 @@ export const VOICE_TOOLS = [
       type: "object",
       properties: {
         actions: {
-          type: "array",
+          type: "string",
           description:
-            "The cards to write, in the order they should appear. See the board schema in your instructions for every card type.",
-          items: { type: "string", description: "One board action as a JSON object." },
+            'The cards to write: one board action as a JSON object per line, in the order they should appear. For example:\n{"type":"write_text","id":"t1","text":"Ohm\'s law","style":"title","color":"ink"}\n{"type":"write_equation","id":"e1","latex":"V = IR","color":"cyan"}\nSee the board schema in your instructions for every card type.',
         },
       },
       required: ["actions"],
