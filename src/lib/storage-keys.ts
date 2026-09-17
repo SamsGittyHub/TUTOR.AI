@@ -23,6 +23,7 @@ export const THEME = `${PREFIX}.theme.v1`;
 export const VOICE_PREF = `${PREFIX}.voice.v1`;
 export const QUIZ_SELECTION = `${PREFIX}.quiz.materials.v1`;
 export const TEACH_HANDOFF = `${PREFIX}.teach.v1`;
+export const CHAT_WIDTH = `${PREFIX}.chatwidth.v1`;
 
 function legacyNameFor(key: string): string {
   return `${LEGACY_PREFIX}${key.slice(PREFIX.length)}`;

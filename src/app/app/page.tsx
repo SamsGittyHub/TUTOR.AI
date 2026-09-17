@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { ChatRail } from "@/components/app/ChatRail";
+import { Resizer, useStoredWidth } from "@/components/app/Resizer";
+import { CHAT_WIDTH } from "@/lib/storage-keys";
 import { ProgressPanel } from "@/components/app/ProgressPanel";
 import { ReviewModal } from "@/components/app/ReviewModal";
 import { SettingsModal } from "@/components/app/SettingsModal";
@@ -22,6 +24,11 @@ import { useVoice } from "@/lib/voice";
 
 type MobileView = "material" | "board" | "chat";
 
+/** The rail stops being usable below this, and stops being a rail above it. */
+const MIN_CHAT_WIDTH = 260;
+const MAX_CHAT_WIDTH = 720;
+const DEFAULT_CHAT_WIDTH = 330;
+
 export default function AppPage() {
   const tutor = useTutor();
   const router = useRouter();
@@ -29,6 +36,14 @@ export default function AppPage() {
   const [showReview, setShowReview] = useState(false);
   const [showProgress, setShowProgress] = useState(false);
   const [showSketch, setShowSketch] = useState(false);
+  // How the board and the rail split the width is the student's call: a long
+  // derivation wants the board, a conversation about it wants the rail.
+  const [chatWidth, setChatWidth] = useStoredWidth(
+    CHAT_WIDTH,
+    DEFAULT_CHAT_WIDTH,
+    MIN_CHAT_WIDTH,
+    MAX_CHAT_WIDTH,
+  );
   const [mobileView, setMobileView] = useState<MobileView>("board");
 
   const voice = useVoice({ onTranscript: handleTranscript });
@@ -190,7 +205,10 @@ export default function AppPage() {
         <Banner tone="info" title={tutor.notice} onDismiss={tutor.dismissNotice} />
       ) : null}
 
-      <div className="grid min-h-0 flex-1 gap-2 p-2 lg:grid-cols-[268px_minmax(0,1fr)_330px]">
+      <div
+        className="grid min-h-0 flex-1 gap-2 p-2 lg:grid-cols-[268px_minmax(0,1fr)_10px_var(--chat-w)]"
+        style={{ ["--chat-w" as string]: `${chatWidth}px` }}
+      >
         <div className={`min-h-0 ${mobileView === "material" ? "block" : "hidden"} lg:block`}>
           <Sidebar
             materials={tutor.materials}
@@ -245,6 +263,15 @@ export default function AppPage() {
             }
           />
         </div>
+
+        <Resizer
+          width={chatWidth}
+          onChange={setChatWidth}
+          min={MIN_CHAT_WIDTH}
+          max={MAX_CHAT_WIDTH}
+          defaultWidth={DEFAULT_CHAT_WIDTH}
+          label="Resize the chat panel"
+        />
 
         <div className={`min-h-0 ${mobileView === "chat" ? "block" : "hidden"} lg:block`}>
           <ChatRail
