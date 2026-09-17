@@ -55,8 +55,9 @@ export default function ProgressPage() {
         lib.attempts,
         lib.cards,
         now,
+        lib.papers,
       ),
-    [lib.courses, lib.materials, lib.attempts, lib.cards, now],
+    [lib.courses, lib.materials, lib.attempts, lib.cards, lib.papers, now],
   );
   const ranked = subjects.filter((s) => s.confident);
 
@@ -169,6 +170,10 @@ export default function ProgressPage() {
                           {subject.confident
                             ? `${subject.label} · ${subject.mastery}%`
                             : language.t("progress.notEnough")}
+                          {subject.answered
+                            ? ` · ${subject.correct}/${subject.answered} answered`
+                            : ""}
+                          {subject.lapses ? ` · ${subject.lapses} forgotten` : ""}
                           {subject.dueNow ? ` · ${subject.dueNow} due` : ""}
                         </span>
                       </div>

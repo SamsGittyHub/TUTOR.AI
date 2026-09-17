@@ -17,7 +17,8 @@ import {
   computeMastery,
   masteryForMaterial,
   rankSubjects,
-  RANK_MIN_ATTEMPTS,
+  RANK_MIN_ANSWERED,
+  subjectMastery,
   recentAttemptAccuracy,
 } from "../.test-build/core/progress.js";
 import { buildPlan, describePlan, studyDays } from "../.test-build/core/planner.js";
@@ -1082,7 +1083,8 @@ test("plot expressions are left alone", () => {
 console.log("\n— subject ranking —");
 
 const subj = (id, name, materialIds) => ({ id, name, color: "cyan", materialIds });
-const att = (materialIds, score, total) => ({ materialIds, score, total, createdAt: 1 });
+const att = (materialIds, score, total, createdAt = 1) =>
+  ({ materialIds, score, total, createdAt });
 
 test("strongest subject ranks above the weakest", () => {
   const ranked = rankSubjects(
@@ -1096,36 +1098,74 @@ test("strongest subject ranks above the weakest", () => {
   assert.ok(ranked[0].mastery > ranked.at(-1).mastery);
 });
 
-test("a subject with too little history is not ranked as weak", () => {
-  const ranked = rankSubjects(
-    [subj("s1", "Maths", ["m1"]), subj("s2", "New", ["m2"])],
-    [att(["m1"], 8, 10), att(["m1"], 9, 10), att(["m2"], 0, 10)],
-    [],
-  );
-  const fresh = ranked.find((r) => r.name === "New");
-  assert.equal(fresh.confident, false, "one attempt was treated as a pattern");
-  assert.equal(ranked[0].name, "Maths", "an unranked subject outranked a ranked one");
+test("a twenty-question paper outweighs a four-question one", () => {
+  // Same two results either way; only the sizes differ. Weighting by attempt
+  // alone would score these identically.
+  const bigGood = subjectMastery({ attempts: [att(["m"], 20, 20, 2), att(["m"], 0, 4, 1)], cards: [] });
+  const bigBad  = subjectMastery({ attempts: [att(["m"], 0, 20, 2), att(["m"], 4, 4, 1)], cards: [] });
+  assert.ok(bigGood.mastery > bigBad.mastery,
+    "the larger paper did not dominate");
+  assert.equal(bigGood.answered, 24);
+  assert.equal(bigGood.correct, 20);
 });
 
-test("confidence needs the stated number of attempts", () => {
-  const few = Array.from({ length: RANK_MIN_ATTEMPTS - 1 }, () => att(["m1"], 5, 10));
-  const enough = Array.from({ length: RANK_MIN_ATTEMPTS }, () => att(["m1"], 5, 10));
-  assert.equal(rankSubjects([subj("s", "S", ["m1"])], few, [])[0].confident, false);
-  assert.equal(rankSubjects([subj("s", "S", ["m1"])], enough, [])[0].confident, true);
+test("recent work counts for more than old work", () => {
+  const improving = subjectMastery({ attempts: [att(["m"], 10, 10, 100), att(["m"], 0, 10, 1)], cards: [] });
+  const declining = subjectMastery({ attempts: [att(["m"], 0, 10, 100), att(["m"], 10, 10, 1)], cards: [] });
+  assert.ok(improving.mastery > declining.mastery,
+    "recency was ignored — the same two scores scored the same");
+});
+
+test("one bad afternoon doesn't erase a long good record", () => {
+  const history = Array.from({ length: 8 }, (_, i) => att(["m"], 10, 10, i + 1));
+  const withSlip = subjectMastery({ attempts: [...history, att(["m"], 0, 10, 99)], cards: [] });
+  assert.ok(withSlip.mastery > 50,
+    `a single bad quiz dropped a strong record to ${withSlip.mastery}`);
+});
+
+test("practice exam results count alongside quizzes", () => {
+  const quizOnly = subjectMastery({ attempts: [att(["m"], 5, 10, 1)], cards: [] });
+  const withExam = subjectMastery({
+    attempts: [att(["m"], 5, 10, 1)], cards: [],
+    papers: [{ materialIds: ["m"], awarded: 40, total: 40, createdAt: 2 }],
+  });
+  assert.ok(withExam.mastery > quizOnly.mastery, "a full paper was ignored");
+  assert.equal(withExam.answered, 50);
+});
+
+test("answered questions gate the ranking, not the number of quizzes", () => {
+  // Three tiny quizzes: plenty of attempts, barely any questions.
+  const tiny = [att(["m1"], 1, 2), att(["m1"], 1, 2), att(["m1"], 1, 2)];
+  const one = [att(["m1"], 6, 12)];
+  assert.equal(rankSubjects([subj("s", "S", ["m1"])], tiny, [])[0].confident, false);
+  assert.equal(rankSubjects([subj("s", "S", ["m1"])], one, [])[0].confident, true);
+  assert.ok(RANK_MIN_ANSWERED > 2);
+});
+
+test("an unranked subject never outranks a ranked one", () => {
+  const ranked = rankSubjects(
+    [subj("s1", "Maths", ["m1"]), subj("s2", "New", ["m2"])],
+    [att(["m1"], 3, 20), att(["m2"], 1, 1)],
+    [],
+  );
+  assert.equal(ranked[0].name, "Maths");
+  assert.equal(ranked.at(-1).confident, false);
 });
 
 test("attempts on other subjects' material don't count", () => {
   const ranked = rankSubjects([subj("s1", "Maths", ["m1"])],
-    [att(["OTHER"], 0, 10), att(["OTHER"], 0, 10)], []);
-  assert.equal(ranked[0].attempts, 0, "an unrelated quiz leaked into the subject");
+    [att(["OTHER"], 0, 20), att(["OTHER"], 0, 20)], []);
+  assert.equal(ranked[0].answered, 0, "an unrelated quiz leaked into the subject");
 });
 
-test("cards due are counted per subject", () => {
-  const card = { id: "c", promptKey: "k", materialIds: ["m1"], prompt: "p", answer: "a",
-                 createdAt: 0, dueAt: 0, intervalDays: 1, ease: 2.5, reps: 1, lapses: 0 };
-  const ranked = rankSubjects([subj("s1", "Maths", ["m1"])], [], [card], 10_000);
-  assert.equal(ranked[0].cards, 1);
-  assert.equal(ranked[0].dueNow, 1);
+test("forgotten cards are surfaced per subject", () => {
+  const card = (lapses) => ({ id: "c" + lapses, promptKey: "k" + lapses,
+    materialIds: ["m1"], prompt: "p", answer: "a", createdAt: 0, dueAt: 0,
+    intervalDays: 1, ease: 2.5, reps: 1, lapses });
+  const ranked = rankSubjects([subj("s1", "Maths", ["m1"])], [], [card(2), card(1)], 10_000);
+  assert.equal(ranked[0].cards, 2);
+  assert.equal(ranked[0].dueNow, 2);
+  assert.equal(ranked[0].lapses, 3);
 });
 
 test("a subject with no material at all still appears", () => {

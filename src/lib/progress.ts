@@ -144,23 +144,37 @@ export interface SubjectRank {
   courseId: string;
   name: string;
   color: string;
+  /** 0-100, dominated by how questions were actually answered. */
   mastery: number;
   label: MasteryLabel;
-  /** How much evidence is behind the number. */
+  /** Questions answered across quizzes and practice exams. */
+  answered: number;
+  /** Of those, how many were right. */
+  correct: number;
   attempts: number;
   cards: number;
   dueNow: number;
+  /** Cards forgotten after being learned — the clearest weakness signal. */
+  lapses: number;
   materials: number;
   /**
-   * False when there's too little history to rank honestly. One quiz is not a
-   * pattern, and telling a student their weakest subject on that basis sends
-   * them to revise the wrong thing.
+   * False when there's too little answered to rank honestly. A handful of
+   * questions is not a pattern, and naming a weakest subject on that basis
+   * sends a student to revise the wrong thing.
    */
   confident: boolean;
 }
 
-/** Below this, a subject is shown but not ranked. */
-export const RANK_MIN_ATTEMPTS = 2;
+/** Questions answered before a subject is ranked rather than just listed. */
+export const RANK_MIN_ANSWERED = 10;
+
+/** A graded paper: practice exams and marked exam reviews both fit this. */
+export interface GradedPaper {
+  materialIds: string[];
+  awarded: number;
+  total: number;
+  createdAt: number;
+}
 
 export interface SubjectInput {
   id: string;
@@ -169,38 +183,117 @@ export interface SubjectInput {
   materialIds: string[];
 }
 
+export interface SubjectSignals {
+  attempts: AttemptLike[];
+  cards: ReviewCard[];
+  papers?: GradedPaper[];
+}
+
+/**
+ * How a subject is actually going.
+ *
+ * Weighted hard toward answered questions, because that's the only signal that
+ * reflects whether the student can do the thing. Two adjustments matter:
+ *
+ *   - Questions, not quizzes. A twenty-question paper says more than a
+ *     four-question one, so accuracy is weighted by how much was answered
+ *     rather than treating every attempt as one vote.
+ *   - Recency, with a long tail. Last week's score matters more than last
+ *     month's, but not so much that one bad afternoon erases a term — each
+ *     step back halves the weight, and nothing is dropped outright the way a
+ *     fixed five-attempt window does.
+ *
+ * Review retention is folded in at a fifth: it says whether something stuck
+ * after it was learned, which answered questions alone can't tell you.
+ */
+export function subjectMastery(signals: SubjectSignals): {
+  mastery: number;
+  answered: number;
+  correct: number;
+} {
+  const graded: GradedPaper[] = [
+    ...signals.attempts.map((a) => ({
+      materialIds: a.materialIds,
+      awarded: a.score,
+      total: a.total,
+      createdAt: a.createdAt,
+    })),
+    ...(signals.papers ?? []),
+  ].filter((p) => p.total > 0);
+
+  const answered = graded.reduce((sum, p) => sum + p.total, 0);
+  const correct = graded.reduce((sum, p) => sum + p.awarded, 0);
+
+  // Newest first, so the halving below is by how far back a paper is.
+  const ordered = [...graded].sort((a, b) => b.createdAt - a.createdAt);
+
+  let weighted = 0;
+  let weights = 0;
+  ordered.forEach((paper, index) => {
+    // Size × recency: a big recent paper dominates, an old short one barely
+    // registers, and nothing falls off a cliff.
+    const weight = paper.total * Math.pow(0.5, index / 4);
+    weighted += weight * (paper.awarded / paper.total);
+    weights += weight;
+  });
+  const accuracy = weights > 0 ? weighted / weights : null;
+
+  const health = cardHealth(signals.cards);
+
+  if (accuracy === null && health === null) {
+    return { mastery: 0, answered, correct };
+  }
+
+  const parts: Array<[number, number]> = [];
+  if (accuracy !== null) parts.push([accuracy, 0.8]);
+  if (health !== null) parts.push([health, 0.2]);
+  const weightSum = parts.reduce((sum, [, w]) => sum + w, 0);
+  const blended = parts.reduce((sum, [v, w]) => sum + v * w, 0) / weightSum;
+
+  return { mastery: Math.round(blended * 100), answered, correct };
+}
+
 /**
  * Ranks subjects strongest to weakest.
  *
- * Mastery per subject is the same blend as per material — recent quiz accuracy
- * and card health — pooled across everything filed under it, rather than an
- * average of per-file averages, which would let one four-question file outvote
- * a whole term of notes.
+ * Pooled across everything filed under a subject rather than averaging
+ * per-file averages, which would let one four-question file outvote a whole
+ * term of notes.
  */
 export function rankSubjects(
   subjects: SubjectInput[],
   attempts: AttemptLike[],
   cards: ReviewCard[],
   now: number = Date.now(),
+  papers: GradedPaper[] = [],
 ): SubjectRank[] {
   return subjects
     .map((subject) => {
       const ids = new Set(subject.materialIds);
       const own = attempts.filter((a) => a.materialIds.some((id) => ids.has(id)));
+      const ownPapers = papers.filter((p) => p.materialIds.some((id) => ids.has(id)));
       const ownCards = cards.filter((c) => c.materialIds.some((id) => ids.has(id)));
-      const mastery = computeMastery(own, ownCards);
+
+      const { mastery, answered, correct } = subjectMastery({
+        attempts: own,
+        cards: ownCards,
+        papers: ownPapers,
+      });
 
       return {
         courseId: subject.id,
         name: subject.name,
         color: subject.color,
         mastery,
-        label: masteryLabel(mastery, own.length > 0 || ownCards.length > 0),
-        attempts: own.length,
+        label: masteryLabel(mastery, answered > 0 || ownCards.length > 0),
+        answered,
+        correct,
+        attempts: own.length + ownPapers.length,
         cards: ownCards.length,
         dueNow: ownCards.filter((c) => isDue(c, now)).length,
+        lapses: ownCards.reduce((sum, c) => sum + c.lapses, 0),
         materials: subject.materialIds.length,
-        confident: own.length >= RANK_MIN_ATTEMPTS,
+        confident: answered >= RANK_MIN_ANSWERED,
       };
     })
     .sort((a, b) => {
