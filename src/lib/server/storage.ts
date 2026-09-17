@@ -14,11 +14,39 @@ import { dirname, join, resolve, sep } from "node:path";
  * able to climb out with "../".
  */
 
+/**
+ * Where originals live, in order of preference:
+ *
+ *   1. TUTOR_AI_STORAGE_DIR, if it's set explicitly.
+ *   2. RAILWAY_VOLUME_MOUNT_PATH — Railway sets this on any service with a
+ *      volume attached, so mounting one is the whole configuration step.
+ *   3. CHALK_STORAGE_DIR, the pre-rename name, so an existing deploy's volume
+ *      doesn't come back empty.
+ *   4. ./.storage, for local development.
+ *
+ * Getting this wrong is quiet rather than loud — uploads succeed into the
+ * container's ephemeral filesystem and vanish on the next deploy — which is
+ * why the volume path is detected rather than left to be remembered.
+ */
 const ROOT = resolve(
-  // CHALK_STORAGE_DIR is the pre-rename name; honouring it means an already
-  // deployed volume doesn't come back empty after this rename.
-  process.env.TUTOR_AI_STORAGE_DIR ?? process.env.CHALK_STORAGE_DIR ?? ".storage",
+  process.env.TUTOR_AI_STORAGE_DIR ??
+    process.env.RAILWAY_VOLUME_MOUNT_PATH ??
+    process.env.CHALK_STORAGE_DIR ??
+    ".storage",
 );
+
+/** True when originals are going somewhere that survives a redeploy. */
+export function storageIsPersistent(): boolean {
+  return Boolean(
+    process.env.TUTOR_AI_STORAGE_DIR ??
+      process.env.RAILWAY_VOLUME_MOUNT_PATH ??
+      process.env.CHALK_STORAGE_DIR,
+  );
+}
+
+export function storageRoot(): string {
+  return ROOT;
+}
 
 /** 25 MB is the transcription cap; PDFs and slide decks rarely exceed it. */
 export const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;

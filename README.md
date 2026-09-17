@@ -26,6 +26,44 @@ disappears from Settings — it will never fall back to storing them in plaintex
 
 ---
 
+## Deploying to Railway
+
+`railway.json` carries the whole build and deploy config, so the only manual
+steps are the ones Railway can't infer.
+
+1. **New project → Deploy from GitHub repo**, pointed at this repository.
+2. **Add a Postgres service** (`+ New → Database → PostgreSQL`).
+3. In the app service's **Variables**, add:
+
+   | Variable | Value |
+   |---|---|
+   | `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` |
+   | `TUTOR_AI_KEY_SECRET` | output of `openssl rand -base64 48` |
+
+4. **Attach a volume** to the app service (`+ New → Volume`). Any mount path
+   works — it's read from `RAILWAY_VOLUME_MOUNT_PATH` automatically.
+
+Everything else configures itself:
+
+- **Migrations** run in `preDeployCommand`, against the live database, before
+  the new version takes traffic. A failed migration stops the deploy and the
+  old version keeps serving.
+- **Node 20+** is pinned via `engines` and `.nvmrc`; the build fails loudly
+  rather than tripping over Next 16's runtime requirement.
+- **Uploads** go to the mounted volume, detected at boot.
+- **`/api/health`** is the healthcheck target. It returns 503 while anything
+  required is missing — an unreachable database, or a database nobody has
+  migrated — so a broken deploy never takes traffic. Degraded-but-working
+  states report in the body without failing the check.
+
+The two optional pieces degrade rather than break. No volume means uploaded
+originals are lost on each redeploy (lessons and chunks still live in
+Postgres). No `TUTOR_AI_KEY_SECRET` means the key vault is disabled and
+students re-enter their API key per device; the server will never fall back to
+storing keys in plaintext.
+
+Check a running deployment with `curl https://your-app.up.railway.app/api/health`.
+
 ## The split: your account holds the work, your browser holds the key
 
 The PRD left key storage open. This build splits it, and the split is the whole
