@@ -150,4 +150,77 @@ await run([
       );
     },
   },
+  {
+    name: "search finds a word from inside an uploaded file",
+    async fn({ page, base }) {
+      await page.locator("input[type=file]").setInputFiles({
+        name: "Chem notes.txt",
+        mimeType: "text/plain",
+        buffer: Buffer.from(
+          "Before the titration begins, rinse the burette with the acid. " +
+          "The end point is where the indicator changes colour permanently.\n".repeat(3),
+        ),
+      });
+      await page.waitForTimeout(6000);
+
+      await page.goto(`${base}/search`, { waitUntil: "networkidle" });
+      await page.getByLabel("Search your material and lessons").fill("burette");
+      await page.waitForTimeout(1500);
+      expect(
+        await page.getByText(/Chem notes\.txt/).count() > 0,
+        "the file it matched isn't named",
+      );
+      expect(await page.locator("mark").count() > 0, "the matched word isn't marked");
+    },
+  },
+  {
+    name: "a shared lesson opens for someone with no account",
+    async fn({ page, context, base }) {
+      const id = `s_${crypto.randomUUID()}`;
+      await page.evaluate(
+        ([id, base]) =>
+          fetch(`${base}/api/lessons`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              session: {
+                id, title: "e2e shared lesson",
+                createdAt: Date.now(), updatedAt: Date.now(),
+                materialIds: [], providerId: "openai", model: "m", mode: "typed",
+                actions: [{ type: "write_text", id: "t1", text: "Shared board card", style: "title", color: "ink" }],
+                transcript: [], usage: {}, boardTheme: "paper",
+              },
+            }),
+          }).then((r) => r.json()),
+        [id, base],
+      );
+
+      await page.goto(`${base}/sessions`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(800);
+      const row = page.locator("li").filter({ hasText: "e2e shared lesson" });
+      await row.getByRole("button", { name: "Share" }).click();
+      await page.waitForTimeout(1200);
+      expect(await row.getByText(/Link copied|Copy link/).count() === 1, "no link came back");
+
+      // A brand-new context: no cookies, no account, like a classmate.
+      const link = await page.evaluate(() => {
+        const el = document.querySelector('[title^="http"]');
+        return el?.getAttribute("title") ?? "";
+      });
+      expect(link.includes("/s/"), `unexpected share link: ${link}`);
+
+      const stranger = await context.browser().newContext();
+      const strangerPage = await stranger.newPage();
+      await strangerPage.goto(link, { waitUntil: "networkidle" });
+      expect(
+        await strangerPage.getByText("Shared board card").count() > 0,
+        "a signed-out visitor can't see the shared board",
+      );
+      expect(
+        !strangerPage.url().includes("/login"),
+        "the share link bounced to the login page",
+      );
+      await stranger.close();
+    },
+  },
 ]);

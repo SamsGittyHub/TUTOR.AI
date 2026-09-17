@@ -9,6 +9,7 @@ import { PageShell } from "@/components/shell/PageShell";
 import { deleteSession, setSessionCourse } from "@/lib/db";
 import { exportFilename, lessonToMarkdown } from "@/lib/export";
 import { BoardExport } from "@/components/board/BoardExport";
+import { ShareLesson } from "@/components/board/ShareLesson";
 import { useLibrary } from "@/lib/useLibrary";
 
 function when(ms: number): string {
@@ -171,6 +172,7 @@ export default function SessionsPage() {
                       ))}
                     </select>
                   )}
+                  <ShareLesson lessonId={s.id} />
                   <BoardExport
                     actions={s.actions}
                     title={s.title}

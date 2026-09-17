@@ -36,6 +36,8 @@ const TARGETS = [
       "src/lib/learning.ts",
       "src/lib/nav.ts",
       "src/lib/tour.ts",
+      "src/lib/search.ts",
+      "src/lib/reminders.ts",
       "src/lib/voice-tools.ts",
       "src/lib/export.ts",
       "src/lib/materials/audio.ts",

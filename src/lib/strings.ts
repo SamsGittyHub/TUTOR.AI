@@ -19,6 +19,7 @@ export const STRINGS = {
   /* nav ------------------------------------------------------------------ */
   "nav.board": "Board",
   "nav.material": "Material",
+  "nav.search": "Search",
   "nav.subjects": "Subjects",
   "nav.calendar": "Calendar",
   "nav.flashcards": "Flashcards",

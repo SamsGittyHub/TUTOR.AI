@@ -48,6 +48,8 @@ import {
 } from "../.test-build/core/learning.js";
 import { isActive, NAV_LINKS } from "../.test-build/core/nav.js";
 import { TOUR_STEPS } from "../.test-build/core/tour.js";
+import { excerpt, searchTerms, splitOnTerms } from "../.test-build/core/search.js";
+import { reminderText, shouldRemind } from "../.test-build/core/reminders.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
   normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
@@ -2248,6 +2250,82 @@ test("a nav item is active on its own page and on pages below it", () => {
   assert.equal(isActive("/courses/abc", "/courses"), true);
   assert.equal(isActive("/coursework", "/courses"), false, "a prefix is not a parent");
   assert.equal(isActive("/app", "/materials"), false);
+});
+
+console.log("\n— finding your own notes —");
+
+const NOTE =
+  "Before the titration begins, rinse the burette with the acid you are about " +
+  "to use. The end point is where the indicator changes colour permanently, " +
+  "and the rough titre is discarded before any accurate readings are taken.";
+
+test("the excerpt is a window around the match, not the opening", () => {
+  const out = excerpt(NOTE, "end point indicator", 90);
+  assert.match(out, /end point/);
+  assert.ok(out.length <= 96, `too long: ${out.length}`);
+  assert.ok(out.startsWith("…"), "a mid-note window says it was cut");
+});
+
+test("an excerpt never starts or ends mid-word", () => {
+  for (const q of ["burette", "indicator", "readings"]) {
+    const out = excerpt(NOTE, q, 80).replace(/^…|…$/g, "");
+    assert.ok(NOTE.includes(out), `"${out}" isn't a clean slice of the note`);
+  }
+});
+
+test("a note shorter than the window comes back whole and unmarked", () => {
+  assert.equal(excerpt("Short note about acids.", "acids", 200), "Short note about acids.");
+});
+
+test("a match only in the title still gets a readable opening", () => {
+  const out = excerpt(NOTE, "photosynthesis", 60);
+  assert.ok(out.endsWith("…"));
+  assert.ok(!out.startsWith("…"), "there was no earlier context to cut");
+});
+
+test("search terms drop punctuation and single letters", () => {
+  assert.deepEqual(searchTerms("What is a titration?!"), ["what", "is", "titration"]);
+  assert.deepEqual(searchTerms("   "), []);
+});
+
+test("terms are split out for highlighting, in order, losing nothing", () => {
+  const runs = splitOnTerms("The end point of the titration", "titration point");
+  assert.equal(runs.map((r) => r.text).join(""), "The end point of the titration");
+  assert.deepEqual(runs.filter((r) => r.hit).map((r) => r.text), ["point", "titration"]);
+});
+
+test("highlighting is case-insensitive and handles overlapping hits", () => {
+  const runs = splitOnTerms("Titration and titrations", "titration");
+  assert.equal(runs.filter((r) => r.hit).length, 2);
+  assert.equal(runs.map((r) => r.text).join(""), "Titration and titrations");
+});
+
+test("an empty query highlights nothing rather than everything", () => {
+  assert.deepEqual(splitOnTerms("anything at all", "  "), [{ text: "anything at all", hit: false }]);
+});
+
+console.log("\n— telling you cards are due —");
+
+const MORNING = Date.UTC(2026, 4, 6, 9);
+
+test("a reminder fires once, for a queue that has something in it", () => {
+  assert.equal(shouldRemind(null, 4, MORNING), true);
+  assert.equal(shouldRemind(null, 0, MORNING), false, "nothing due, nothing to say");
+});
+
+test("it doesn't fire twice in a day", () => {
+  // Permission gets revoked over exactly this.
+  assert.equal(shouldRemind(MORNING, 4, MORNING + 60 * 60 * 1000), false);
+});
+
+test("it fires again the next day", () => {
+  assert.equal(shouldRemind(MORNING, 4, MORNING + 26 * 60 * 60 * 1000), true);
+});
+
+test("the reminder says how many, because 'you have reviews' is ignorable", () => {
+  assert.match(reminderText(1).title, /^1 card/);
+  assert.match(reminderText(7).title, /^7 cards/);
+  assert.notEqual(reminderText(1).body, reminderText(7).body);
 });
 
 console.log(`\n${passed} checks passed\n`);

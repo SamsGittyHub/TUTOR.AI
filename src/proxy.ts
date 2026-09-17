@@ -16,10 +16,15 @@ const SESSION_COOKIE = "tutorai_session";
 const LEGACY_SESSION_COOKIE = "chalk_session";
 const PROTECTED = ["/app", "/quiz", "/materials", "/courses", "/progress",
                    "/review", "/sessions", "/calendar", "/voice", "/settings",
-                   "/practice-exam", "/exam-review"];
+                   "/practice-exam", "/exam-review", "/search"];
+
+// Shared boards are the one study surface with no account behind it — that is
+// the entire point of a link you can send to a classmate.
+const PUBLIC_PREFIXES = ["/s/"];
 
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) return NextResponse.next();
   if (!PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
     return NextResponse.next();
   }

@@ -46,6 +46,17 @@ export const TOUR_STEPS: TourStep[] = [
     ],
   },
   {
+    title: "Search",
+    href: "/search",
+    what:
+      "Everything you've uploaded and every lesson you've been taught, searchable by the words your notes actually use — including what was said out loud in a recorded lecture.",
+    how: [
+      "Search a topic, not a filename: it reads the text inside your files.",
+      "\"Teach me this\" on any result opens a lesson on that exact passage.",
+      "Lessons match on their board too, so you can find the one where you did it.",
+    ],
+  },
+  {
     title: "Subjects",
     href: "/courses",
     what:
@@ -76,6 +87,7 @@ export const TOUR_STEPS: TourStep[] = [
       "Generate a quiz from a file or a subject and answer it.",
       "Get one wrong and it comes back tomorrow; get it right and the gap stretches out.",
       "Review shows what's ripe today. \"Teach me this one\" opens a lesson on anything you keep missing.",
+      "Turn on reminders there and it tells you when cards come due.",
     ],
   },
   {
@@ -120,6 +132,7 @@ export const TOUR_STEPS: TourStep[] = [
       "Lessons lists everything, typed and spoken. Open one to carry on.",
       "Export any board as a PDF, a Word document, an image, or Markdown notes.",
       "The Export button sits in the board's own header too, mid-lesson.",
+      "Share turns a lesson into a read-only link for a classmate — and you can turn it off again.",
     ],
   },
 ];

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { Empty, LoadError, Loading } from "@/components/shell/Empty";
+import { DueReminder } from "@/components/shell/DueReminder";
 import { PageShell } from "@/components/shell/PageShell";
 import { putCard } from "@/lib/db";
 import { checkAnswer } from "@/lib/tutor/engine";
@@ -94,6 +95,10 @@ export default function ReviewPage() {
           {lib.cards.length
             ? `You have ${lib.cards.length} cards on the schedule — none of them are ripe yet. Come back tomorrow, or make more.`
             : "Every quiz question you answer becomes a card here, scheduled so it comes back just as you're about to forget it."}
+          {/* The scheduler has always known what's ripe and never told anyone,
+              which made spaced repetition work only for people who were going
+              to open the app anyway. */}
+          <DueReminder dueCount={due.length} />
         </Empty>
       ) : finished ? (
         <div className="surface rounded-md px-6 py-12 text-center">
