@@ -1,24 +1,27 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { normalizeAction, type TutorAction } from "./actions";
+import type { TutorAction } from "./actions";
+import { handleRealtimeEvent, toolResultMessage } from "./realtime-events";
 
 /**
  * A live speech-to-speech tutor session over WebRTC.
  *
- * The model talks and listens continuously; barge-in is handled by OpenAI's
- * own VAD rather than our mic-pausing hack in voice.ts. Board actions come
- * back over the data channel as JSON, through the same normalizeAction the
- * streaming path uses — so the whiteboard renders them without knowing which
- * transport they arrived on.
+ * The model works on audio directly rather than transcribing first, so
+ * barge-in feels like interrupting a person instead of cancelling a playback —
+ * turn detection is OpenAI's own VAD, not the mic-pausing hack in voice.ts.
+ *
+ * Board actions come back over the data channel as JSON and go through the
+ * same normalizeAction the streaming path uses, so the whiteboard has no idea
+ * which transport a card arrived on.
+ *
+ * GA interface: the SDP offer goes to /v1/realtime/calls, and the events are
+ * the response.output_* names. The beta names are still recognised, because a
+ * session opened against an older deployment shouldn't silently fall mute.
  */
 
-export type RealtimeStatus =
-  | "idle"
-  | "connecting"
-  | "live"
-  | "error";
+export type RealtimeStatus = "idle" | "connecting" | "live" | "error";
 
 export interface UseRealtimeOptions {
   /** Board actions the tutor emits mid-conversation. */
@@ -45,12 +48,19 @@ export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
     channelRef.current?.close();
     pcRef.current?.close();
     streamRef.current?.getTracks().forEach((t) => t.stop());
+    if (audioRef.current) {
+      audioRef.current.srcObject = null;
+      audioRef.current = null;
+    }
     channelRef.current = null;
     pcRef.current = null;
     streamRef.current = null;
     setStatus("idle");
     setSpeaking(false);
   }, []);
+
+  // A page left open with a live session keeps the microphone on.
+  useEffect(() => stop, [stop]);
 
   const start = useCallback(
     async (apiKey: string, instructions: string) => {
@@ -67,10 +77,9 @@ export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
         const tokenBody = await tokenResponse.json().catch(() => ({}));
         if (!tokenResponse.ok) throw new Error(tokenBody.error ?? "Couldn't start.");
 
-        const ephemeral: string | undefined =
-          tokenBody.session?.client_secret?.value;
-        const model: string = tokenBody.session?.model ?? "gpt-4o-realtime-preview";
-        if (!ephemeral) throw new Error("No session token came back.");
+        const clientSecret: string | undefined = tokenBody.clientSecret;
+        const model: string = tokenBody.model ?? "gpt-realtime-2.1";
+        if (!clientSecret) throw new Error("No session credential came back.");
 
         const pc = new RTCPeerConnection();
         pcRef.current = pc;
@@ -83,7 +92,8 @@ export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
           audio.srcObject = event.streams[0];
         };
 
-        // The student's mic.
+        // The student's mic. Asked for before the offer, because the offer has
+        // to describe the track we intend to send.
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         streamRef.current = stream;
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
@@ -97,24 +107,53 @@ export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
           } catch {
             return;
           }
-          handleEvent(message, actionRef.current, transcriptRef.current, setSpeaking);
+          handleRealtimeEvent(message, {
+            onAction: (action) => actionRef.current(action),
+            onTranscript: (role, text) => transcriptRef.current(role, text),
+            onSpeaking: setSpeaking,
+            // Acknowledging a tool call matters: without an output item the
+            // model waits on it and the conversation stalls mid-sentence.
+            onToolResult: (callId) => {
+              if (channel.readyState === "open") {
+                channel.send(toolResultMessage(callId));
+              }
+            },
+            onError: (detail) => transcriptRef.current("tutor", `[${detail}]`),
+          });
+        };
+
+        // A dropped connection should read as ended, not as still live.
+        pc.onconnectionstatechange = () => {
+          if (
+            pc.connectionState === "failed" ||
+            pc.connectionState === "disconnected"
+          ) {
+            setError("The connection dropped.");
+            stop();
+            setStatus("error");
+          }
         };
 
         const offer = await pc.createOffer();
         await pc.setLocalDescription(offer);
 
         const sdpResponse = await fetch(
-          `https://api.openai.com/v1/realtime?model=${encodeURIComponent(model)}`,
+          `https://api.openai.com/v1/realtime/calls?model=${encodeURIComponent(model)}`,
           {
             method: "POST",
             body: offer.sdp,
             headers: {
-              authorization: `Bearer ${ephemeral}`,
+              authorization: `Bearer ${clientSecret}`,
               "content-type": "application/sdp",
             },
           },
         );
-        if (!sdpResponse.ok) throw new Error("The audio connection was refused.");
+        if (!sdpResponse.ok) {
+          const detail = await sdpResponse.text().catch(() => "");
+          throw new Error(
+            `The audio connection was refused (${sdpResponse.status}). ${detail.slice(0, 160)}`,
+          );
+        }
 
         await pc.setRemoteDescription({
           type: "answer",
@@ -132,44 +171,4 @@ export function useRealtime({ onAction, onTranscript }: UseRealtimeOptions) {
   );
 
   return { status, error, speaking, start, stop };
-}
-
-/** Realtime emits many event types; these are the ones the board cares about. */
-function handleEvent(
-  message: Record<string, unknown>,
-  onAction: (action: TutorAction) => void,
-  onTranscript: (role: "student" | "tutor", text: string) => void,
-  setSpeaking: (value: boolean) => void,
-) {
-  const type = String(message.type ?? "");
-
-  if (type === "response.audio.delta") setSpeaking(true);
-  if (type === "response.audio.done" || type === "response.done") setSpeaking(false);
-
-  // What the student said.
-  if (type === "conversation.item.input_audio_transcription.completed") {
-    const text = String(message.transcript ?? "").trim();
-    if (text) onTranscript("student", text);
-  }
-
-  // What the tutor said out loud.
-  if (type === "response.audio_transcript.done") {
-    const text = String(message.transcript ?? "").trim();
-    if (text) onTranscript("tutor", text);
-  }
-
-  // Board actions ride the text channel as one JSON object per response.
-  if (type === "response.text.done") {
-    const raw = String(message.text ?? "").trim();
-    for (const line of raw.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("{")) continue;
-      try {
-        const action = normalizeAction(JSON.parse(trimmed));
-        if (action) onAction(action);
-      } catch {
-        // A half-formed object is not worth surfacing mid-conversation.
-      }
-    }
-  }
 }

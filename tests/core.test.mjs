@@ -30,6 +30,7 @@ import {
   blocksToXml, contentTypesXml, documentRelsXml, documentXml, esc, pxToEmu,
 } from "../.test-build/core/docx.js";
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
+import { handleRealtimeEvent, toolResultMessage } from "../.test-build/core/realtime-events.js";
 import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import {
   normalizeQuestion, normalizeReview, scoreOf, teachPrompt, weakTopics,
@@ -1172,6 +1173,118 @@ test("a subject with no material at all still appears", () => {
   const ranked = rankSubjects([subj("s1", "Empty", [])], [], []);
   assert.equal(ranked.length, 1);
   assert.equal(ranked[0].confident, false);
+});
+
+
+console.log("\n— live voice events —");
+
+function collect(message) {
+  const seen = { actions: [], lines: [], speaking: [], acks: [], errors: [] };
+  handleRealtimeEvent(message, {
+    onAction: (a) => seen.actions.push(a),
+    onTranscript: (role, text) => seen.lines.push([role, text]),
+    onSpeaking: (v) => seen.speaking.push(v),
+    onToolResult: (id) => seen.acks.push(id),
+    onError: (m) => seen.errors.push(m),
+  });
+  return seen;
+}
+
+test("GA audio events drive the speaking indicator", () => {
+  assert.deepEqual(collect({ type: "response.output_audio.delta" }).speaking, [true]);
+  assert.deepEqual(collect({ type: "response.output_audio.done" }).speaking, [false]);
+});
+
+test("the beta audio names still work", () => {
+  // A session against an older deployment must not fall mute.
+  assert.deepEqual(collect({ type: "response.audio.delta" }).speaking, [true]);
+  assert.deepEqual(collect({ type: "response.audio.done" }).speaking, [false]);
+});
+
+test("both transcript names are attributed to the tutor", () => {
+  for (const type of ["response.output_audio_transcript.done",
+                      "response.audio_transcript.done"]) {
+    assert.deepEqual(collect({ type, transcript: "Hello" }).lines, [["tutor", "Hello"]]);
+  }
+});
+
+test("the student's own transcript is attributed to them", () => {
+  const seen = collect({
+    type: "conversation.item.input_audio_transcription.completed",
+    transcript: "why does that work",
+  });
+  assert.deepEqual(seen.lines, [["student", "why does that work"]]);
+});
+
+test("an empty transcript produces no line", () => {
+  assert.equal(collect({ type: "response.output_audio_transcript.done", transcript: "  " }).lines.length, 0);
+});
+
+test("a write_on_board tool call becomes a board card", () => {
+  const seen = collect({
+    type: "response.function_call_arguments.done",
+    name: "write_on_board",
+    call_id: "call_1",
+    arguments: JSON.stringify({
+      action: JSON.stringify({ type: "write_equation", id: "e1",
+                               latex: "a^2 + b^2 = c^2", color: "cyan" }),
+    }),
+  });
+  assert.equal(seen.actions.length, 1);
+  assert.equal(seen.actions[0].type, "write_equation");
+  assert.equal(seen.actions[0].latex, "a^2 + b^2 = c^2");
+  assert.deepEqual(seen.acks, ["call_1"]);
+});
+
+test("a tool call sending the object directly also works", () => {
+  const seen = collect({
+    type: "response.function_call_arguments.done",
+    name: "write_on_board", call_id: "call_2",
+    arguments: JSON.stringify({
+      action: { type: "write_text", id: "t1", text: "Title", style: "title", color: "ink" },
+    }),
+  });
+  assert.equal(seen.actions.length, 1);
+  assert.equal(seen.actions[0].text, "Title");
+});
+
+test("a malformed tool call drops the card but still answers", () => {
+  const seen = collect({
+    type: "response.function_call_arguments.done",
+    name: "write_on_board", call_id: "call_3", arguments: "{not json",
+  });
+  assert.equal(seen.actions.length, 0);
+  assert.deepEqual(seen.acks, ["call_3"], "an unanswered call would stall the turn");
+});
+
+test("an unknown tool is still answered", () => {
+  const seen = collect({
+    type: "response.function_call_arguments.done",
+    name: "something_else", call_id: "call_4", arguments: "{}",
+  });
+  assert.equal(seen.actions.length, 0);
+  assert.deepEqual(seen.acks, ["call_4"]);
+});
+
+test("text output is still read for board actions", () => {
+  const seen = collect({
+    type: "response.output_text.done",
+    text: 'chatter\n{"type":"write_text","id":"t2","text":"From text","style":"body","color":"ink"}\n',
+  });
+  assert.equal(seen.actions.length, 1);
+  assert.equal(seen.actions[0].text, "From text");
+});
+
+test("server errors are surfaced, not swallowed", () => {
+  const seen = collect({ type: "error", error: { message: "session expired" } });
+  assert.deepEqual(seen.errors, ["session expired"]);
+});
+
+test("the tool answer is a function_call_output for that call", () => {
+  const msg = JSON.parse(toolResultMessage("call_9"));
+  assert.equal(msg.type, "conversation.item.create");
+  assert.equal(msg.item.type, "function_call_output");
+  assert.equal(msg.item.call_id, "call_9");
 });
 
 console.log(`\n${passed} checks passed\n`);

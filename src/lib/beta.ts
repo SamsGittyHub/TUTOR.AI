@@ -14,8 +14,16 @@ export const BETA = true;
 export const BETA_PROVIDER: ProviderId = "openai";
 export const BETA_MODEL = "gpt-5.6-terra";
 
-/** Live voice runs on OpenAI's realtime model — same shared key. */
-export const BETA_REALTIME_MODEL = "gpt-5.6-terra";
+/**
+ * Live voice runs on OpenAI's speech-to-speech model, on the same shared key.
+ * This is a different model from the chat one: the Realtime API works on audio
+ * directly rather than transcribing, which is what makes barge-in feel like
+ * interrupting a person instead of cancelling a playback.
+ */
+export const BETA_REALTIME_MODEL = "gpt-realtime-2.1";
+
+/** Output voice. Fixed for now; a picker is a settings question, not a code one. */
+export const BETA_REALTIME_VOICE = "alloy";
 
 /**
  * The key a call should use.

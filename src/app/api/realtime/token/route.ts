@@ -1,24 +1,29 @@
+import { createHash } from "node:crypto";
 import type { NextRequest } from "next/server";
 
-import { BETA, BETA_REALTIME_MODEL } from "@/lib/beta";
+import { BETA, BETA_REALTIME_MODEL, BETA_REALTIME_VOICE } from "@/lib/beta";
 import { currentUser } from "@/lib/server/auth";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
 
 /**
- * Mints an ephemeral Realtime session token.
+ * Mints an ephemeral Realtime client secret.
  *
- * The browser cannot open a WebRTC session against OpenAI with a raw API key
- * without exposing it in the SDP exchange, so the key is posted here, used
- * once, and never stored — the response is a token that expires in about a
- * minute. This is the one place a provider key touches the server, and it is
- * deliberately write-only: nothing logs it, nothing persists it.
+ * A browser can't hold the real key: WebRTC exchanges an SDP offer directly
+ * with OpenAI, so whatever authorises that call is visible to the page. This
+ * route is the only thing that touches the real key, and it hands back a
+ * credential that expires in about a minute.
+ *
+ * GA interface, not the beta one:
+ *   - POST /v1/realtime/client_secrets, not /v1/realtime/sessions
+ *   - no OpenAI-Beta header
+ *   - session.type is required, and output audio lives under session.audio.output
  *
  * In the free beta the key is the server's, so nothing is asked of the student
- * at all. Outside it, the student's key still comes from their own browser and
- * the BYOK stance holds: we are a relay for one call, not a key holder.
+ * at all. Outside it, the student's key comes from their own browser and the
+ * BYOK stance holds: we are a relay for one call, not a key holder.
  */
 
-const REALTIME_SESSIONS = "https://api.openai.com/v1/realtime/sessions";
+const CLIENT_SECRETS = "https://api.openai.com/v1/realtime/client_secrets";
 
 export async function POST(request: NextRequest) {
   const user = await currentUser();
@@ -26,7 +31,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
 
-  // The shared key wins when it exists: in beta the browser sends none at all.
+  // The shared key wins when it exists: in beta the browser sends none.
   const clientKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
   const apiKey = hasBetaOpenAiKey() ? BETA_OPENAI_KEY : clientKey;
 
@@ -42,23 +47,61 @@ export async function POST(request: NextRequest) {
   }
 
   const model =
-    typeof body.model === "string" && body.model
-      ? body.model
-      : BETA
-        ? BETA_REALTIME_MODEL
-        : "gpt-4o-realtime-preview";
+    typeof body.model === "string" && body.model ? body.model : BETA_REALTIME_MODEL;
+  const voice =
+    typeof body.voice === "string" && body.voice ? body.voice : BETA_REALTIME_VOICE;
 
-  const response = await fetch(REALTIME_SESSIONS, {
+  const response = await fetch(CLIENT_SECRETS, {
     method: "POST",
     headers: {
       authorization: `Bearer ${apiKey}`,
       "content-type": "application/json",
+      // Recommended for apps with individual end users, so enforcement can
+      // target one account rather than the whole organisation. Hashed, because
+      // OpenAI needs a stable handle, not the student's identity.
+      "OpenAI-Safety-Identifier": createHash("sha256")
+        .update(`tutorai:${user.id}`)
+        .digest("hex")
+        .slice(0, 32),
     },
     body: JSON.stringify({
-      model,
-      voice: typeof body.voice === "string" ? body.voice : "alloy",
-      instructions: typeof body.instructions === "string" ? body.instructions : undefined,
-      modalities: ["audio", "text"],
+      session: {
+        type: "realtime",
+        model,
+        instructions:
+          typeof body.instructions === "string" ? body.instructions : undefined,
+        audio: {
+          output: { voice },
+        },
+        /*
+         * Board cards arrive as a tool call, not as text.
+         *
+         * A speech-to-speech session's output is audio; asking it to also emit
+         * a stream of JSON in the same turn fights the modality and produces a
+         * model that sometimes reads the JSON aloud. A function call is the
+         * channel built for structured output while it talks.
+         */
+        tools: [
+          {
+            type: "function",
+            name: "write_on_board",
+            description:
+              "Write one card onto the whiteboard the student is looking at. Call this while you talk — never say the JSON out loud.",
+            parameters: {
+              type: "object",
+              properties: {
+                action: {
+                  type: "string",
+                  description:
+                    'One board action as a JSON object, e.g. {"type":"write_equation","id":"e1","latex":"\\int u\\,dv = uv - \\int v\\,du","color":"cyan"} or {"type":"write_text","id":"t1","text":"Integration by parts","style":"title","color":"ink"}. Raw LaTeX only, no $ delimiters.',
+                },
+              },
+              required: ["action"],
+            },
+          },
+        ],
+        tool_choice: "auto",
+      },
     }),
   });
 
@@ -76,6 +119,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const session = await response.json();
-  return Response.json({ session });
+  const created = (await response.json()) as {
+    value?: string;
+    expires_at?: number;
+    // Older shapes nested it; accept either rather than failing on a rename.
+    client_secret?: { value?: string };
+    session?: { model?: string };
+  };
+
+  const secret = created.value ?? created.client_secret?.value;
+  if (!secret) {
+    return Response.json(
+      { error: "No client secret came back from OpenAI." },
+      { status: 502 },
+    );
+  }
+
+  return Response.json({
+    clientSecret: secret,
+    model: created.session?.model ?? model,
+    expiresAt: created.expires_at ?? null,
+  });
 }
