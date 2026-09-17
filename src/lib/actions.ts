@@ -206,9 +206,46 @@ function str(value: unknown, fallback = ""): string {
   return fallback;
 }
 
+/**
+ * Turns a literal backslash-n into an actual line break.
+ *
+ * Models over-escape. Asked to emit JSON containing LaTeX — where every
+ * backslash must be doubled — they start doubling all of them, so a label
+ * meant to read
+ *
+ *   P: n x n
+ *   full matrix
+ *
+ * arrives as "P: n x n \\nfull matrix" and JSON.parse leaves a literal
+ * backslash followed by an n. It then renders as the characters "\n" in the
+ * middle of a diagram node.
+ *
+ * Fixed here rather than in the renderer so the board, the PNG, the PDF, the
+ * Word export and the Markdown notes all agree. LaTeX is deliberately left
+ * alone: \newline, \neq and friends are real commands, so only a backslash-n
+ * that isn't the start of a longer word is treated as a break.
+ */
+export function unescapeBreaks(value: string): string {
+  return value
+    .replace(/\\r\\n/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\\t/g, " ");
+}
+
+/**
+ * For anything a human reads as words. Never for `latex` or `expr`, where a
+ * backslash-n is \neq or \nabla and turning it into a line break would quietly
+ * destroy the maths.
+ */
+function prose(value: unknown, fallback = ""): string {
+  const raw = str(value, fallback);
+  return raw ? unescapeBreaks(raw) : raw;
+}
+
 function strArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
-  return value.map((v) => str(v)).filter((v) => v.length > 0);
+  // These are always prose — plan steps, table cells, answer choices.
+  return value.map((v) => prose(v)).filter((v) => v.length > 0);
 }
 
 function color(value: unknown, fallback: PenColor = "ink"): PenColor {
@@ -267,7 +304,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       return {
         ...base,
         type: "lesson_plan",
-        title: str(r.title, "Lesson plan"),
+        title: prose(r.title, "Lesson plan"),
         steps,
       };
     }
@@ -283,7 +320,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
     case "write_text":
     case "text":
     case "write": {
-      const text = str(r.text ?? r.content ?? r.value);
+      const text = prose(r.text ?? r.content ?? r.value);
       if (!text.trim()) return null;
       const rawStyle = str(r.style).toLowerCase();
       const style =
@@ -304,7 +341,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
         ...base,
         type: "write_equation",
         latex: latex.trim(),
-        label: str(r.label) || undefined,
+        label: prose(r.label) || undefined,
         color: color(r.color, "cyan"),
       };
     }
@@ -319,9 +356,9 @@ export function normalizeAction(raw: unknown): TutorAction | null {
           if (!s || typeof s !== "object") return {};
           const o = s as Record<string, unknown>;
           return {
-            text: str(o.text ?? o.description ?? o.content) || undefined,
+            text: prose(o.text ?? o.description ?? o.content) || undefined,
             latex: str(o.latex ?? o.equation ?? o.math) || undefined,
-            note: str(o.note ?? o.reason ?? o.why) || undefined,
+            note: prose(o.note ?? o.reason ?? o.why) || undefined,
           };
         })
         .filter((s) => s.text || s.latex || s.note);
@@ -329,7 +366,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       return {
         ...base,
         type: "write_steps",
-        title: str(r.title) || undefined,
+        title: prose(r.title) || undefined,
         steps,
         color: color(r.color),
       };
@@ -346,7 +383,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       return {
         ...base,
         type: "write_table",
-        title: str(r.title) || undefined,
+        title: prose(r.title) || undefined,
         headers,
         rows,
       };
@@ -361,14 +398,14 @@ export function normalizeAction(raw: unknown): TutorAction | null {
           if (typeof n === "string") {
             return {
               id: `n${i + 1}`,
-              label: n,
+              label: unescapeBreaks(n),
               shape: "box",
               color: "ink",
             };
           }
           if (!n || typeof n !== "object") return null;
           const o = n as Record<string, unknown>;
-          const label = str(o.label ?? o.text ?? o.name ?? o.id);
+          const label = prose(o.label ?? o.text ?? o.name ?? o.id);
           if (!label) return null;
           const shapeRaw = str(o.shape).toLowerCase();
           const shape: DiagramNode["shape"] =
@@ -401,7 +438,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
           return {
             from,
             to,
-            label: str(o.label ?? o.text) || undefined,
+            label: prose(o.label ?? o.text) || undefined,
             dashed: Boolean(o.dashed),
           };
         })
@@ -420,7 +457,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       return {
         ...base,
         type: "draw_diagram",
-        title: str(r.title) || undefined,
+        title: prose(r.title) || undefined,
         layout,
         nodes,
         edges,
@@ -444,7 +481,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
           if (!expr) return null;
           return {
             expr,
-            label: str(o.label) || undefined,
+            label: prose(o.label) || undefined,
             color: color(o.color, i === 0 ? "cyan" : "pink"),
           };
         })
@@ -459,7 +496,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
           return {
             x: num(o.x, 0),
             y: num(o.y, 0),
-            label: str(o.label) || undefined,
+            label: prose(o.label) || undefined,
             color: color(o.color, "pink"),
           };
         })
@@ -486,7 +523,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
       return {
         ...base,
         type: "draw_plot",
-        title: str(r.title) || undefined,
+        title: prose(r.title) || undefined,
         xRange: xRange[0] < xRange[1] ? xRange : [-10, 10],
         yRange: yRange && yRange[0] < yRange[1] ? yRange : undefined,
         curves,
@@ -505,7 +542,7 @@ export function normalizeAction(raw: unknown): TutorAction | null {
         ...base,
         type: "highlight",
         targetId,
-        note: str(r.note ?? r.text) || undefined,
+        note: prose(r.note ?? r.text) || undefined,
       };
     }
 
@@ -528,8 +565,8 @@ export function normalizeAction(raw: unknown): TutorAction | null {
         type: "ask_question",
         question,
         choices: choices.length >= 2 ? choices : undefined,
-        answer: str(r.answer ?? r.correct) || undefined,
-        explanation: str(r.explanation ?? r.why) || undefined,
+        answer: prose(r.answer ?? r.correct) || undefined,
+        explanation: prose(r.explanation ?? r.why) || undefined,
       };
     }
 

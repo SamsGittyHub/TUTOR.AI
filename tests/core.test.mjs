@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { JsonObjectStream, extractFirstJson } from "../.test-build/core/stream-json.js";
-import { normalizeAction } from "../.test-build/core/actions.js";
+import { normalizeAction, unescapeBreaks } from "../.test-build/core/actions.js";
 import { compileExpression } from "../.test-build/core/expr.js";
 import {
   DAY_MS,
@@ -1019,6 +1019,61 @@ test("the teach prompt carries the student's own answer and the error", () => {
   assert.ok(prompt.includes("x^2"));
   assert.ok(prompt.includes("differentiated instead of integrating"));
   assert.ok(/not just the correction/.test(prompt), "it asks only for the fix");
+});
+
+
+console.log("\n— over-escaped line breaks —");
+
+test("a literal backslash-n becomes a real break", () => {
+  assert.equal(unescapeBreaks("P: n x n \\nfull matrix"), "P: n x n \nfull matrix");
+  assert.equal(unescapeBreaks("a\\r\\nb"), "a\nb");
+});
+
+test("text with no escapes is returned untouched", () => {
+  assert.equal(unescapeBreaks("plain label"), "plain label");
+});
+
+test("diagram node labels are unescaped", () => {
+  const action = normalizeAction({
+    type: "draw_diagram", layout: "row",
+    nodes: [{ id: "a", label: "P: n x n \\nfull matrix", shape: "round", color: "pink" }],
+    edges: [],
+  });
+  assert.ok(action.nodes[0].label.includes("\n"), "label kept the literal escape");
+  assert.ok(!action.nodes[0].label.includes("\\n"), "a literal backslash-n survived");
+});
+
+test("a bare-string node label is unescaped too", () => {
+  const action = normalizeAction({
+    type: "draw_diagram", layout: "row", nodes: ["one\\ntwo"], edges: [],
+  });
+  assert.ok(action.nodes[0].label.includes("\n"));
+});
+
+test("LaTeX is never touched — \\neq stays a command", () => {
+  const action = normalizeAction({
+    type: "write_equation", latex: "a \\neq b \\nabla f", color: "cyan",
+  });
+  assert.equal(action.latex, "a \\neq b \\nabla f");
+  assert.ok(!action.latex.includes("\n"), "a backslash command became a line break");
+});
+
+test("steps keep their latex while their prose is unescaped", () => {
+  const action = normalizeAction({
+    type: "write_steps", color: "ink",
+    steps: [{ text: "first\\nsecond", latex: "x \\neq y" }],
+  });
+  assert.ok(action.steps[0].text.includes("\n"), "step prose kept the escape");
+  assert.equal(action.steps[0].latex, "x \\neq y");
+});
+
+test("plot expressions are left alone", () => {
+  const action = normalizeAction({
+    type: "draw_plot", xRange: [0, 1],
+    curves: [{ expr: "x*exp(x)", label: "f\\ng", color: "cyan" }], points: [],
+  });
+  assert.equal(action.curves[0].expr, "x*exp(x)");
+  assert.ok(action.curves[0].label.includes("\n"));
 });
 
 console.log(`\n${passed} checks passed\n`);

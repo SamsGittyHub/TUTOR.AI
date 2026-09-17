@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import type { DiagramAction, DiagramNode } from "@/lib/actions";
+import { unescapeBreaks, type DiagramAction, type DiagramNode } from "@/lib/actions";
 import { inkColor, type BoardTheme } from "./ink";
 
 interface Placed {
@@ -18,24 +18,54 @@ const LINE_H = 18;
 const PAD_X = 22;
 const PAD_Y = 16;
 const MAX_CHARS = 20;
+/** Edge labels sit in the gap between two nodes, so they wrap much sooner. */
+const EDGE_CHARS = 14;
 
-function wrap(label: string): string[] {
-  const words = label.split(/\s+/);
+/** Greedy wrap of one paragraph, at most `maxLines` lines. */
+function wrapOne(text: string, maxChars: number, maxLines: number): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
   const lines: string[] = [];
   let current = "";
   for (const word of words) {
     if (!current.length) current = word;
-    else if (current.length + word.length + 1 <= MAX_CHARS) current += ` ${word}`;
+    else if (current.length + word.length + 1 <= maxChars) current += ` ${word}`;
     else {
       lines.push(current);
       current = word;
     }
-    if (lines.length === 2 && current.length > MAX_CHARS) {
-      current = `${current.slice(0, MAX_CHARS - 1)}…`;
+    if (lines.length === maxLines - 1 && current.length > maxChars) {
+      current = `${current.slice(0, maxChars - 1)}…`;
       break;
     }
   }
   if (current) lines.push(current);
+  return lines.slice(0, maxLines);
+}
+
+/**
+ * A label's own line breaks are honoured before any wrapping.
+ *
+ * Models write two-line node labels — a name, then a qualifier — and the break
+ * is the whole point of the layout. Splitting only on whitespace turned that
+ * into one long run, which is why "P: n x n" and "full matrix" ended up on the
+ * same line with a stray escape between them.
+ */
+function wrap(label: string): string[] {
+  // Also unescaped here, not only in normalizeAction: lessons saved before
+  // that fix replay their stored text verbatim, so a board a student already
+  // has would keep showing the literal escape forever.
+  const paragraphs = unescapeBreaks(label)
+    .split(/\r?\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+  if (paragraphs.length <= 1) {
+    return wrapOne(label.trim(), MAX_CHARS, 3);
+  }
+  const lines: string[] = [];
+  for (const paragraph of paragraphs) {
+    if (lines.length >= 3) break;
+    lines.push(...wrapOne(paragraph, MAX_CHARS, 3 - lines.length));
+  }
   return lines.slice(0, 3);
 }
 
@@ -69,8 +99,26 @@ function layout(action: DiagramAction): {
   height: number;
 } {
   const measured = action.nodes.map((node) => ({ node, ...measure(node) }));
-  const gapY = 62;
-  const gapX = 44;
+
+  // Labelled edges need room to sit in. The widest wrapped label decides how
+  // much: without this a row layout packs nodes 44px apart and the labels
+  // overlap each other across the middle node.
+  const labelWidth = Math.max(
+    0,
+    ...action.edges
+      .filter((e) => e.label)
+      .map(
+        (e) =>
+          Math.max(
+            ...wrapOne(unescapeBreaks(e.label!), EDGE_CHARS, 2).map(
+              (l) => l.length,
+            ),
+          ) *
+          CHAR_W,
+      ),
+  );
+  const gapY = Math.max(62, labelWidth ? 74 : 62);
+  const gapX = Math.max(44, Math.round(labelWidth) + 26);
 
   if (action.layout === "row") {
     let x = 0;
@@ -251,9 +299,23 @@ export function Diagram({ action, theme }: Props) {
               }
             />
             {edge.label ? (
+              /*
+               * Wrapped, and stacked upward from the line.
+               *
+               * A long label centred on a short edge overruns both nodes, and
+               * on a row layout two of them grow toward each other until they
+               * overlap in the middle — which is what "compressed model" and
+               * "multiply by transpose" were doing. Wrapping keeps each label
+               * inside roughly its own span.
+               */
               <text
                 x={midX}
-                y={midY - 6}
+                y={
+                  midY -
+                  8 -
+                  (wrapOne(unescapeBreaks(edge.label), EDGE_CHARS, 2).length - 1) *
+                    13
+                }
                 textAnchor="middle"
                 className="hand"
                 fontSize="13"
@@ -262,7 +324,11 @@ export function Diagram({ action, theme }: Props) {
                 strokeWidth="5"
                 paintOrder="stroke"
               >
-                {edge.label}
+                {wrapOne(unescapeBreaks(edge.label), EDGE_CHARS, 2).map((line, i) => (
+                  <tspan key={i} x={midX} dy={i === 0 ? 0 : 13}>
+                    {line}
+                  </tspan>
+                ))}
               </text>
             ) : null}
           </g>
