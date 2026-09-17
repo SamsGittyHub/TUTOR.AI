@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
 import { Logo } from "@/components/Logo";
@@ -19,7 +19,11 @@ interface Props {
 
 export function AuthForm({ mode }: Props) {
   const router = useRouter();
+  const params = useSearchParams();
   const signup = mode === "signup";
+  // The proxy stashes where they were headed before the gate bounced them.
+  const next = params.get("next");
+  const destination = next?.startsWith("/") ? next : "/app";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -46,7 +50,7 @@ export function AuthForm({ mode }: Props) {
         return;
       }
       // A fresh cookie means every server component must re-read it.
-      router.replace("/app");
+      router.replace(destination);
       router.refresh();
     } catch {
       setError("Couldn't reach the server. Check your connection.");
@@ -143,7 +147,10 @@ export function AuthForm({ mode }: Props) {
           <p className="mt-6 text-center text-[13px] text-muted">
             {signup ? "Already have an account? " : "New here? "}
             <Link
-              href={signup ? "/login" : "/signup"}
+              href={{
+                pathname: signup ? "/login" : "/signup",
+                query: next ? { next } : undefined,
+              }}
               className="font-bold text-cyan transition hover:opacity-80"
             >
               {signup ? "Sign in" : "Create one free"}

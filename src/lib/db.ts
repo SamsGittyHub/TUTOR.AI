@@ -5,20 +5,16 @@ import type { ProviderId } from "./providers/types";
 import type { ReviewCard } from "./srs";
 
 /**
- * Everything a student uploads or studies lives in their own browser.
- * IndexedDB, five stores, no sync, no server copy. Deleting a material
- * deletes its chunks — and every review card and quiz attempt that cites it —
- * in the same transaction: "user-deletable" from the PRD's open questions,
- * answered by making deletion the only way the data exists.
+ * The client's view of the student's data — now a thin wrapper over the API.
+ *
+ * This file used to own an IndexedDB with five stores. Postgres is the source
+ * of truth now, so every function here is the same signature calling a route
+ * instead. Signatures were already async when the backing store was IndexedDB,
+ * which is the only reason this swap doesn't ripple through every caller.
+ *
+ * Reads are memoized per-load: useTutor and useQuizLab both list materials on
+ * mount, and without this a single page open would fire the same query twice.
  */
-
-const DB_NAME = "chalk";
-const DB_VERSION = 2;
-const MATERIALS = "materials";
-const CHUNKS = "chunks";
-const SESSIONS = "sessions";
-const CARDS = "cards";
-const ATTEMPTS = "attempts";
 
 export type MaterialKind =
   | "pdf"
@@ -120,90 +116,57 @@ export interface Session {
   boardTheme: "paper" | "chalk";
 }
 
-let dbPromise: Promise<IDBDatabase> | null = null;
+/* -------------------------------------------------------------------------- */
+/* Transport                                                                   */
+/* -------------------------------------------------------------------------- */
 
-function open(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      const db = request.result;
-      if (!db.objectStoreNames.contains(MATERIALS)) {
-        db.createObjectStore(MATERIALS, { keyPath: "id" });
-      }
-      if (!db.objectStoreNames.contains(CHUNKS)) {
-        const store = db.createObjectStore(CHUNKS, { keyPath: "id" });
-        store.createIndex("materialId", "materialId", { unique: false });
-      }
-      if (!db.objectStoreNames.contains(SESSIONS)) {
-        const store = db.createObjectStore(SESSIONS, { keyPath: "id" });
-        store.createIndex("updatedAt", "updatedAt", { unique: false });
-      }
-      // v2: the study loop. Review cards are scheduled by src/lib/srs.ts,
-      // attempts are finished quizzes kept for the progress panel.
-      if (!db.objectStoreNames.contains(CARDS)) {
-        db.createObjectStore(CARDS, { keyPath: "id" });
-      }
-      if (!db.objectStoreNames.contains(ATTEMPTS)) {
-        db.createObjectStore(ATTEMPTS, { keyPath: "id" });
-      }
-    };
-    // A version upgrade blocks while any older connection stays open. Fail
-    // loudly instead of leaving boot pending forever, and drop the cached
-    // promise so a reload after closing the other tab retries cleanly.
-    request.onblocked = () => {
-      dbPromise = null;
-      reject(
-        new Error(
-          "Another open Chalk tab is holding the study database. Close it and reload.",
-        ),
-      );
-    };
-    request.onsuccess = () => {
-      const db = request.result;
-      // Let this connection step aside when another tab upgrades the schema.
-      db.onversionchange = () => db.close();
-      resolve(db);
-    };
-    request.onerror = () => {
-      dbPromise = null;
-      reject(request.error);
-    };
-  });
-  return dbPromise;
+export class NotSignedInError extends Error {
+  constructor() {
+    super("Not signed in.");
+    this.name = "NotSignedInError";
+  }
 }
 
-function tx<T>(
-  stores: string[],
-  mode: IDBTransactionMode,
-  run: (t: IDBTransaction) => Promise<T> | T,
-): Promise<T> {
-  return open().then(
-    (db) =>
-      new Promise<T>((resolve, reject) => {
-        const transaction = db.transaction(stores, mode);
-        let result: T;
-        transaction.oncomplete = () => resolve(result);
-        transaction.onerror = () => reject(transaction.error);
-        transaction.onabort = () => reject(transaction.error);
-        Promise.resolve(run(transaction)).then(
-          (value) => {
-            result = value;
-          },
-          (error) => {
-            reject(error);
-            transaction.abort();
-          },
-        );
-      }),
-  );
+async function api<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`/api${path}`, {
+    ...init,
+    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+  });
+  if (response.status === 401) throw new NotSignedInError();
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error ?? `Request failed (${response.status}).`);
+  return body as T;
 }
 
-function req<T>(request: IDBRequest<T>): Promise<T> {
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+const post = <T,>(path: string, body: unknown) =>
+  api<T>(path, { method: "POST", body: JSON.stringify(body) });
+
+/**
+ * Short-lived read cache. Writes invalidate the keys they touch, so a put
+ * followed by a list never serves a stale answer.
+ */
+const cache = new Map<string, Promise<unknown>>();
+
+function cached<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const hit = cache.get(key);
+  if (hit) return hit as Promise<T>;
+  const promise = load().catch((error) => {
+    cache.delete(key);
+    throw error;
   });
+  cache.set(key, promise);
+  return promise;
+}
+
+function invalidate(...prefixes: string[]) {
+  for (const key of [...cache.keys()]) {
+    if (prefixes.some((p) => key.startsWith(p))) cache.delete(key);
+  }
+}
+
+/** Called after sign-in or sign-out — the next read must not be another user's. */
+export function resetCache(): void {
+  cache.clear();
 }
 
 /* --- materials ----------------------------------------------------------- */
@@ -211,119 +174,122 @@ function req<T>(request: IDBRequest<T>): Promise<T> {
 export async function putMaterial(
   material: Material,
   chunks: MaterialChunk[],
+  courseId?: string | null,
 ): Promise<void> {
-  await tx([MATERIALS, CHUNKS], "readwrite", async (t) => {
-    t.objectStore(MATERIALS).put(material);
-    const store = t.objectStore(CHUNKS);
-    for (const chunk of chunks) store.put(chunk);
-  });
+  await post("/materials", { material, chunks, courseId });
+  invalidate("materials", `chunks:${material.id}`);
 }
 
 export async function listMaterials(): Promise<Material[]> {
-  const materials = await tx([MATERIALS], "readonly", (t) =>
-    req(t.objectStore(MATERIALS).getAll() as IDBRequest<Material[]>),
+  return cached("materials", async () =>
+    (await api<{ materials: Material[] }>("/materials")).materials,
   );
-  return materials.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export async function getChunks(materialId: string): Promise<MaterialChunk[]> {
-  const chunks = await tx([CHUNKS], "readonly", (t) =>
-    req(
-      t.objectStore(CHUNKS).index("materialId").getAll(materialId) as IDBRequest<
-        MaterialChunk[]
-      >,
-    ),
+  return cached(`chunks:${materialId}`, async () =>
+    (await post<{ chunks: MaterialChunk[] }>("/chunks", {
+      materialIds: [materialId],
+    })).chunks,
   );
-  return chunks.sort((a, b) => a.order - b.order);
 }
 
 export async function getChunksFor(materialIds: string[]): Promise<MaterialChunk[]> {
-  const all = await Promise.all(materialIds.map(getChunks));
-  return all.flat();
+  if (!materialIds.length) return [];
+  // One round trip for the whole lesson rather than one per material.
+  const key = `chunks:${[...materialIds].sort().join(",")}`;
+  return cached(key, async () =>
+    (await post<{ chunks: MaterialChunk[] }>("/chunks", { materialIds })).chunks,
+  );
 }
 
 export async function deleteMaterial(materialId: string): Promise<void> {
-  await tx([MATERIALS, CHUNKS, CARDS, ATTEMPTS], "readwrite", async (t) => {
-    t.objectStore(MATERIALS).delete(materialId);
-    const index = t.objectStore(CHUNKS).index("materialId");
-    const keys = await req(index.getAllKeys(materialId));
-    const chunkStore = t.objectStore(CHUNKS);
-    for (const key of keys) chunkStore.delete(key);
+  await api(`/materials/${encodeURIComponent(materialId)}`, { method: "DELETE" });
+  // Cards and chunks cascade server-side, so their caches must go too.
+  invalidate("materials", "chunks", "cards", "attempts");
+}
 
-    // Review cards and quiz attempts that cite the material go with it.
-    const cardStore = t.objectStore(CARDS);
-    const cards = await req(cardStore.getAll() as IDBRequest<ReviewCard[]>);
-    for (const card of cards) {
-      if (card.materialIds.includes(materialId)) cardStore.delete(card.id);
-    }
-    const attemptStore = t.objectStore(ATTEMPTS);
-    const attempts = await req(attemptStore.getAll() as IDBRequest<QuizAttempt[]>);
-    for (const attempt of attempts) {
-      if (attempt.materialIds.includes(materialId)) attemptStore.delete(attempt.id);
-    }
-  });
+/* --- courses ------------------------------------------------------------- */
+
+export interface Course {
+  id: string;
+  name: string;
+  term?: string;
+  color: string;
+  createdAt: number;
+}
+
+export async function listCourses(): Promise<Course[]> {
+  return cached("courses", async () =>
+    (await api<{ courses: Course[] }>("/courses")).courses,
+  );
+}
+
+export async function createCourse(
+  name: string,
+  term?: string,
+  color = "cyan",
+): Promise<Course> {
+  const { course } = await post<{ course: Course }>("/courses", { name, term, color });
+  invalidate("courses");
+  return course;
+}
+
+export async function deleteCourse(id: string): Promise<void> {
+  await api(`/courses/${encodeURIComponent(id)}`, { method: "DELETE" });
+  invalidate("courses", "materials");
 }
 
 /* --- sessions ------------------------------------------------------------ */
 
 export async function putSession(session: Session): Promise<void> {
-  await tx([SESSIONS], "readwrite", (t) => {
-    t.objectStore(SESSIONS).put(session);
-  });
+  await post("/lessons", { session });
+  invalidate("sessions", `session:${session.id}`);
 }
 
 export async function getSession(id: string): Promise<Session | undefined> {
-  return tx([SESSIONS], "readonly", (t) =>
-    req(t.objectStore(SESSIONS).get(id) as IDBRequest<Session | undefined>),
+  const { session } = await api<{ session: Session | null }>(
+    `/lessons/${encodeURIComponent(id)}`,
   );
+  return session ?? undefined;
 }
 
 export async function listSessions(): Promise<Session[]> {
-  const sessions = await tx([SESSIONS], "readonly", (t) =>
-    req(t.objectStore(SESSIONS).getAll() as IDBRequest<Session[]>),
+  return cached("sessions", async () =>
+    (await api<{ sessions: Session[] }>("/lessons")).sessions,
   );
-  return sessions.sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
 export async function deleteSession(id: string): Promise<void> {
-  await tx([SESSIONS], "readwrite", (t) => {
-    t.objectStore(SESSIONS).delete(id);
-  });
+  await api(`/lessons/${encodeURIComponent(id)}`, { method: "DELETE" });
+  invalidate("sessions", `session:${id}`);
 }
 
-/* --- review cards & attempts ---------------------------------------------- */
+/* --- review cards & attempts --------------------------------------------- */
 
 export async function putCard(card: ReviewCard): Promise<void> {
-  await tx([CARDS], "readwrite", (t) => {
-    t.objectStore(CARDS).put(card);
-  });
+  await post("/cards", { card });
+  invalidate("cards");
 }
 
 export async function listCards(): Promise<ReviewCard[]> {
-  return tx([CARDS], "readonly", (t) =>
-    req(t.objectStore(CARDS).getAll() as IDBRequest<ReviewCard[]>),
+  return cached("cards", async () =>
+    (await api<{ cards: ReviewCard[] }>("/cards")).cards,
   );
 }
 
 export async function putAttempt(attempt: QuizAttempt): Promise<void> {
-  await tx([ATTEMPTS], "readwrite", (t) => {
-    t.objectStore(ATTEMPTS).put(attempt);
-  });
+  await post("/attempts", { attempt });
+  invalidate("attempts");
 }
 
 export async function listAttempts(): Promise<QuizAttempt[]> {
-  const attempts = await tx([ATTEMPTS], "readonly", (t) =>
-    req(t.objectStore(ATTEMPTS).getAll() as IDBRequest<QuizAttempt[]>),
+  return cached("attempts", async () =>
+    (await api<{ attempts: QuizAttempt[] }>("/attempts")).attempts,
   );
-  return attempts.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 export async function wipeEverything(): Promise<void> {
-  await tx([MATERIALS, CHUNKS, SESSIONS, CARDS, ATTEMPTS], "readwrite", (t) => {
-    t.objectStore(MATERIALS).clear();
-    t.objectStore(CHUNKS).clear();
-    t.objectStore(SESSIONS).clear();
-    t.objectStore(CARDS).clear();
-    t.objectStore(ATTEMPTS).clear();
-  });
+  await post("/account/wipe", {});
+  resetCache();
 }

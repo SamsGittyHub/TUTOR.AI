@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/Logo";
 import { SettingsModal } from "@/components/app/SettingsModal";
+import { AccountMenu } from "@/components/auth/AccountMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuizLab } from "@/lib/useQuizLab";
 import { findModel, formatCost } from "@/lib/providers";
@@ -65,6 +66,7 @@ export default function QuizPage() {
           >
             Back to the board
           </Link>
+          <AccountMenu />
         </div>
       </header>
 

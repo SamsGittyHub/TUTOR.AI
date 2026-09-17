@@ -9,6 +9,7 @@ import { ProgressPanel } from "@/components/app/ProgressPanel";
 import { ReviewModal } from "@/components/app/ReviewModal";
 import { SettingsModal } from "@/components/app/SettingsModal";
 import { Sidebar } from "@/components/app/Sidebar";
+import { AccountMenu } from "@/components/auth/AccountMenu";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Whiteboard } from "@/components/board/Whiteboard";
 import { findModel, formatCost, getProvider } from "@/lib/providers";
@@ -152,6 +153,7 @@ export default function AppPage() {
             "Add your API key"
           )}
         </button>
+        <AccountMenu />
       </header>
 
       {tutor.error ? (

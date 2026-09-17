@@ -1,0 +1,35 @@
+import { NextResponse, type NextRequest } from "next/server";
+
+/**
+ * Route gate.
+ *
+ * Postgres is the source of truth now, so the study routes need an account.
+ * This only checks that a session cookie exists — cheap, and it runs before
+ * render so a signed-out visitor never sees a flash of the board. The cookie
+ * is not trusted here: every API route re-reads it against auth_sessions, and
+ * an expired or forged one still gets a 401 there.
+ *
+ * Next 16 renamed this convention from `middleware` to `proxy`.
+ */
+
+const SESSION_COOKIE = "chalk_session";
+const PROTECTED = ["/app", "/quiz", "/materials", "/courses", "/progress",
+                   "/review", "/sessions", "/calendar", "/voice", "/settings"];
+
+export function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (!PROTECTED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return NextResponse.next();
+  }
+  if (request.cookies.has(SESSION_COOKIE)) return NextResponse.next();
+
+  const login = new URL("/login", request.url);
+  // Come back to whatever they were reaching for once they're in.
+  login.searchParams.set("next", pathname);
+  return NextResponse.redirect(login);
+}
+
+export const config = {
+  // Everything except Next's own assets and the public folder.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$).*)"],
+};
