@@ -9,6 +9,7 @@ import type {
 } from "@/lib/db";
 import type { CalendarEvent, EventKind, StudyBlock } from "@/lib/calendar";
 import { gradeExam, type ExamResponses, type ExamResult, type PracticeExam } from "@/lib/exam";
+import { sanitizeDeep, sanitizeText } from "@/lib/sanitize";
 import type { ReviewCard } from "@/lib/srs";
 
 import { hintFor, open, seal } from "./crypto";
@@ -191,14 +192,14 @@ export async function putMaterial(
         material.id,
         userId,
         courseId ?? material.courseId ?? null,
-        material.name,
+        sanitizeText(material.name),
         material.kind,
         material.sizeBytes,
         material.charCount,
         material.chunkCount,
         material.unitCount ?? null,
-        material.preview,
-        material.note ?? null,
+        sanitizeText(material.preview),
+        material.note ? sanitizeText(material.note) : null,
         material.createdAt || Date.now(),
       ],
     );
@@ -212,7 +213,13 @@ export async function putMaterial(
       await client.query(
         `insert into material_chunks (id, material_id, locator, text, order_index)
          values ($1, $2, $3, $4, $5)`,
-        [chunk.id, material.id, chunk.locator, chunk.text, chunk.order],
+        [
+          chunk.id,
+          material.id,
+          sanitizeText(chunk.locator),
+          sanitizeText(chunk.text),
+          chunk.order,
+        ],
       );
     }
   });
@@ -336,13 +343,15 @@ export async function putSession(userId: string, s: Session): Promise<void> {
     [
       s.id,
       userId,
-      s.title,
+      sanitizeText(s.title),
       s.materialIds,
       s.providerId,
       s.model,
-      JSON.stringify(s.actions ?? []),
-      JSON.stringify(s.transcript ?? []),
-      s.plan ? JSON.stringify(s.plan) : null,
+      // jsonb refuses U+0000 exactly as text does, and board actions are built
+      // from the same extracted material.
+      JSON.stringify(sanitizeDeep(s.actions ?? [])),
+      JSON.stringify(sanitizeDeep(s.transcript ?? [])),
+      s.plan ? JSON.stringify(sanitizeDeep(s.plan)) : null,
       JSON.stringify(s.usage ?? {}),
       s.boardTheme,
       s.createdAt || Date.now(),
@@ -430,13 +439,13 @@ export async function putCard(userId: string, c: ReviewCard): Promise<void> {
     [
       c.id,
       userId,
-      c.promptKey,
+      sanitizeText(c.promptKey),
       c.materialIds,
-      c.prompt,
-      c.choices ?? null,
-      c.answer,
-      c.explanation ?? null,
-      c.sourceLocator ?? null,
+      sanitizeText(c.prompt),
+      c.choices ? c.choices.map(sanitizeText) : null,
+      sanitizeText(c.answer),
+      c.explanation ? sanitizeText(c.explanation) : null,
+      c.sourceLocator ? sanitizeText(c.sourceLocator) : null,
       c.dueAt,
       c.intervalDays,
       c.ease,
@@ -871,12 +880,12 @@ export async function putExam(userId: string, exam: PracticeExam): Promise<void>
     [
       exam.id,
       userId,
-      exam.title,
+      sanitizeText(exam.title),
       exam.sessionIds,
       exam.materialIds,
       exam.minutes,
-      JSON.stringify(exam.sections),
-      JSON.stringify(exam.focus),
+      JSON.stringify(sanitizeDeep(exam.sections)),
+      JSON.stringify(sanitizeDeep(exam.focus)),
       exam.createdAt || Date.now(),
     ],
   );

@@ -2,6 +2,7 @@
 
 import type { Material, MaterialChunk, MaterialImage, MaterialKind } from "../db";
 import { toTranscribableChunks } from "./audio";
+import { sanitizeText } from "../sanitize";
 import { chunkUnits, type SourceUnit } from "./chunk";
 
 /**
@@ -346,6 +347,11 @@ export async function extractMaterial(input: ExtractInput): Promise<ExtractResul
 
   if (!units.length) throw new ExtractionError("Nothing readable came out of that file.");
 
+  // Every format funnels through here, so this is the one place that has to
+  // strip what Postgres can't store. A PDF whose text layer carries nulls is
+  // common and opens fine everywhere else — it must not fail the upload.
+  units = units.map((unit) => ({ ...unit, text: sanitizeText(unit.text) }));
+
   const chunks = chunkUnits(id, units);
   const charCount = units.reduce((sum, u) => sum + u.text.length, 0);
   const preview = units
@@ -356,7 +362,7 @@ export async function extractMaterial(input: ExtractInput): Promise<ExtractResul
 
   const material: Material = {
     id,
-    name: input.file.name,
+    name: sanitizeText(input.file.name),
     kind,
     createdAt: Date.now(),
     sizeBytes: input.file.size,
@@ -385,7 +391,7 @@ export function materialFromText(name: string, text: string): ExtractResult {
       sizeBytes: new Blob([text]).size,
       charCount: text.length,
       chunkCount: chunks.length,
-      preview: text.replace(/\s+/g, " ").slice(0, 260),
+      preview: sanitizeText(text.replace(/\s+/g, " ")).slice(0, 260),
     },
     chunks,
   };

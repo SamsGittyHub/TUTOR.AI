@@ -27,6 +27,7 @@ import {
   blocksToXml, contentTypesXml, documentRelsXml, documentXml, esc, pxToEmu,
 } from "../.test-build/core/docx.js";
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
+import { needsSanitizing, sanitizeDeep, sanitizeText } from "../.test-build/core/sanitize.js";
 import { actionToMarkdown, exportFilename, lessonToMarkdown } from "../.test-build/core/export.js";
 import { encodeWav, secondsPerChunk, TRANSCRIBE_LIMIT_BYTES } from "../.test-build/core/materials/audio.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
@@ -857,6 +858,66 @@ test("a card that failed to rasterise is dropped, not shipped empty", () => {
   const out = attachImages(blocks, [{ data: new Uint8Array(), widthPx: 0, heightPx: 0 }]);
   assert.equal(out.filter((b) => b.kind === "image").length, 0,
     "a zero-byte image would make Word refuse the file");
+});
+
+
+console.log("\n— storage sanitizing —");
+
+const NUL = String.fromCharCode(0);
+
+test("the null byte Postgres rejects is stripped", () => {
+  assert.equal(sanitizeText(`page${NUL} one`), "page one");
+  assert.ok(!sanitizeText(`a${NUL}b`).includes(NUL));
+});
+
+test("whitespace collapse alone would never have caught it", () => {
+  // This is what every extractor already did, and why the bug survived.
+  assert.ok(`a${NUL}b`.replace(/\s+/g, " ").includes(NUL));
+});
+
+test("tabs and newlines survive — they are real formatting", () => {
+  assert.equal(sanitizeText("a\tb\nc\r\nd"), "a\tb\nc\r\nd");
+});
+
+test("other C0 controls and DEL are stripped", () => {
+  const junk = String.fromCharCode(1, 8, 11, 12, 27, 31, 127);
+  assert.equal(sanitizeText(`x${junk}y`), "xy");
+});
+
+test("lone surrogates go; real astral characters stay", () => {
+  assert.equal(sanitizeText("a\uD800b"), "ab");
+  assert.equal(sanitizeText("a\uDC00b"), "ab");
+  assert.equal(sanitizeText("emoji \u{1F600} ok"), "emoji \u{1F600} ok");
+});
+
+test("ordinary text is returned untouched", () => {
+  const text = "Nucleophilic addition — ∫u dv = uv − ∫v du (page 214)";
+  assert.equal(sanitizeText(text), text);
+});
+
+test("needsSanitizing detects, and does not drift between calls", () => {
+  assert.equal(needsSanitizing("clean"), false);
+  assert.equal(needsSanitizing(`dirty${NUL}`), true);
+  // Global regexes keep lastIndex; calling twice must give the same answer.
+  assert.equal(needsSanitizing(`dirty${NUL}`), true);
+  assert.equal(needsSanitizing("clean"), false);
+});
+
+test("sanitizeDeep cleans nested strings, keys, and arrays", () => {
+  const dirty = {
+    [`k${NUL}ey`]: `v${NUL}alue`,
+    list: [`a${NUL}`, { deep: `b${NUL}` }],
+    number: 42,
+    nothing: null,
+  };
+  const clean = sanitizeDeep(dirty);
+  assert.deepEqual(clean, { key: "value", list: ["a", { deep: "b" }], number: 42, nothing: null });
+  assert.ok(!JSON.stringify(clean).includes(NUL), "a null survived into the jsonb payload");
+});
+
+test("sanitizeDeep leaves a clean board action identical", () => {
+  const action = { id: "eq1", type: "write_equation", latex: "\\int u\\,dv", color: "cyan" };
+  assert.deepEqual(sanitizeDeep(action), action);
 });
 
 console.log(`\n${passed} checks passed\n`);
