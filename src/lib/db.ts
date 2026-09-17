@@ -42,6 +42,8 @@ export interface MaterialImage {
 
 export interface Material {
   id: string;
+  /** The course this belongs to, when the student has filed it. */
+  courseId?: string;
   name: string;
   kind: MaterialKind;
   createdAt: number;

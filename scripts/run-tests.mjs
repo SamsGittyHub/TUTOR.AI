@@ -23,6 +23,7 @@ const TARGETS = [
       "src/lib/expr.ts",
       "src/lib/srs.ts",
       "src/lib/progress.ts",
+      "src/lib/planner.ts",
       "src/lib/materials/chunk.ts",
       "src/lib/materials/retrieve.ts",
     ],

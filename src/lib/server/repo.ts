@@ -7,6 +7,7 @@ import type {
   QuizAttempt,
   Session,
 } from "@/lib/db";
+import type { CalendarEvent, EventKind, StudyBlock } from "@/lib/calendar";
 import type { ReviewCard } from "@/lib/srs";
 
 import { query, transaction } from "./db";
@@ -95,6 +96,7 @@ interface MaterialRow {
 function toMaterial(r: MaterialRow, images: MaterialImage[]): Material {
   return {
     id: r.id,
+    courseId: r.course_id ?? undefined,
     name: r.name,
     kind: r.kind,
     createdAt: ms(r.created_at),
@@ -167,7 +169,7 @@ export async function putMaterial(
       [
         material.id,
         userId,
-        courseId ?? null,
+        courseId ?? material.courseId ?? null,
         material.name,
         material.kind,
         material.sizeBytes,
@@ -481,4 +483,168 @@ export async function wipeEverything(userId: string): Promise<void> {
       await client.query(`delete from ${table} where user_id = $1`, [userId]);
     }
   });
+}
+
+/* -------------------------------------------------------------------------- */
+/* Calendar & study planning                                                   */
+/* -------------------------------------------------------------------------- */
+
+export type { CalendarEvent, EventKind, StudyBlock };
+
+interface EventRow {
+  id: string;
+  course_id: string | null;
+  kind: EventKind;
+  title: string;
+  starts_at: Date;
+  ends_at: Date | null;
+  all_day: boolean;
+  location: string | null;
+  notes: string | null;
+  topics: string[];
+  source: "manual" | "syllabus";
+}
+
+const toEvent = (r: EventRow): CalendarEvent => ({
+  id: r.id,
+  courseId: r.course_id ?? undefined,
+  kind: r.kind,
+  title: r.title,
+  startsAt: ms(r.starts_at),
+  endsAt: r.ends_at ? ms(r.ends_at) : undefined,
+  allDay: r.all_day,
+  location: r.location ?? undefined,
+  notes: r.notes ?? undefined,
+  topics: r.topics ?? [],
+  source: r.source,
+});
+
+const EVENT_COLUMNS = `id, course_id, kind, title, starts_at, ends_at, all_day,
+                       location, notes, topics, source`;
+
+export async function listEvents(userId: string): Promise<CalendarEvent[]> {
+  const rows = await query<EventRow>(
+    `select ${EVENT_COLUMNS} from calendar_events where user_id = $1 order by starts_at asc`,
+    [userId],
+  );
+  return rows.map(toEvent);
+}
+
+export async function putEvent(userId: string, e: CalendarEvent): Promise<void> {
+  await query(
+    `insert into calendar_events
+       (id, user_id, course_id, kind, title, starts_at, ends_at, all_day,
+        location, notes, topics, source)
+     values ($1,$2,$3,$4,$5, to_timestamp($6 / 1000.0),
+             case when $7::bigint is null then null else to_timestamp($7 / 1000.0) end,
+             $8,$9,$10,$11,$12)
+     on conflict (id) do update set
+       course_id = excluded.course_id,
+       kind = excluded.kind,
+       title = excluded.title,
+       starts_at = excluded.starts_at,
+       ends_at = excluded.ends_at,
+       all_day = excluded.all_day,
+       location = excluded.location,
+       notes = excluded.notes,
+       topics = excluded.topics
+     where calendar_events.user_id = $2`,
+    [
+      e.id,
+      userId,
+      e.courseId ?? null,
+      e.kind,
+      e.title,
+      e.startsAt,
+      e.endsAt ?? null,
+      e.allDay,
+      e.location ?? null,
+      e.notes ?? null,
+      e.topics ?? [],
+      e.source,
+    ],
+  );
+}
+
+export async function deleteEvent(userId: string, id: string): Promise<void> {
+  await query("delete from calendar_events where id = $1 and user_id = $2", [id, userId]);
+}
+
+interface BlockRow {
+  id: string;
+  event_id: string | null;
+  course_id: string | null;
+  title: string;
+  topic: string | null;
+  starts_at: Date;
+  minutes: number;
+  material_ids: string[];
+  status: StudyBlock["status"];
+}
+
+const toBlock = (r: BlockRow): StudyBlock => ({
+  id: r.id,
+  eventId: r.event_id ?? undefined,
+  courseId: r.course_id ?? undefined,
+  title: r.title,
+  topic: r.topic ?? undefined,
+  startsAt: ms(r.starts_at),
+  minutes: r.minutes,
+  materialIds: r.material_ids ?? [],
+  status: r.status,
+});
+
+export async function listBlocks(userId: string): Promise<StudyBlock[]> {
+  const rows = await query<BlockRow>(
+    `select id, event_id, course_id, title, topic, starts_at, minutes,
+            material_ids, status
+       from study_blocks where user_id = $1 order by starts_at asc`,
+    [userId],
+  );
+  return rows.map(toBlock);
+}
+
+/** Replaces the plan for one exam — regenerating must not double it up. */
+export async function replaceBlocksForEvent(
+  userId: string,
+  eventId: string,
+  blocks: StudyBlock[],
+): Promise<void> {
+  await transaction(async (client) => {
+    await client.query(
+      "delete from study_blocks where user_id = $1 and event_id = $2",
+      [userId, eventId],
+    );
+    for (const b of blocks) {
+      await client.query(
+        `insert into study_blocks
+           (id, user_id, event_id, course_id, title, topic, starts_at, minutes,
+            material_ids, status)
+         values ($1,$2,$3,$4,$5,$6, to_timestamp($7 / 1000.0),$8,$9,$10)`,
+        [
+          b.id,
+          userId,
+          eventId,
+          b.courseId ?? null,
+          b.title,
+          b.topic ?? null,
+          b.startsAt,
+          b.minutes,
+          b.materialIds ?? [],
+          b.status,
+        ],
+      );
+    }
+  });
+}
+
+export async function setBlockStatus(
+  userId: string,
+  id: string,
+  status: StudyBlock["status"],
+): Promise<void> {
+  await query(
+    "update study_blocks set status = $3 where id = $1 and user_id = $2",
+    [id, userId, status],
+  );
 }

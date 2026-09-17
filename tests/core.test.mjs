@@ -18,6 +18,7 @@ import {
   masteryForMaterial,
   recentAttemptAccuracy,
 } from "../.test-build/core/progress.js";
+import { buildPlan, describePlan, studyDays } from "../.test-build/core/planner.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
 import { retrieve } from "../.test-build/core/materials/retrieve.js";
 
@@ -305,6 +306,77 @@ test("forecast buckets by local day and drops past the window", () => {
     { ...newCard("c4", { prompt: "p4", answer: "a" }, [], true, NOON), dueAt: tomorrow + 6 * DAY_MS }, // day 8 → out
   ];
   assert.deepEqual(bucketForecast(cards, NOON, 7), [1, 1, 0, 0, 0, 0, 1]);
+});
+
+
+console.log("\n— study planner —");
+
+const DAY = 86_400_000;
+// A Monday noon, so day boundaries are unambiguous.
+const MON = new Date("2026-03-02T12:00:00Z").getTime();
+
+test("study days stop before the exam day itself", () => {
+  const days = studyDays(MON + 3 * DAY, MON);
+  assert.equal(days.length, 3);
+});
+
+test("no days left means no plan", () => {
+  assert.deepEqual(buildPlan({ examAt: MON + 3600_000, topics: ["a"], now: MON }), []);
+});
+
+test("no topics means no plan", () => {
+  assert.deepEqual(buildPlan({ examAt: MON + 5 * DAY, topics: [], now: MON }), []);
+});
+
+test("every topic gets a first pass before any gets a second", () => {
+  const blocks = buildPlan({
+    examAt: MON + 6 * DAY, topics: ["Alkenes", "Alkynes", "Aromatics"], now: MON,
+  });
+  const firstSecond = blocks.findIndex((b) => b.pass === 2);
+  const lastFirst = blocks.map((b) => b.pass).lastIndexOf(1);
+  assert.ok(firstSecond > lastFirst, "a second pass started before first passes finished");
+});
+
+test("a tight calendar drops second passes, not first ones", () => {
+  const blocks = buildPlan({
+    examAt: MON + 2 * DAY, topics: ["a", "b", "c", "d"], now: MON, minutesPerDay: 45,
+  });
+  assert.ok(blocks.every((b) => b.pass !== 2), "kept a second pass while first passes were cut");
+});
+
+test("the day before the exam ends on a full review", () => {
+  const blocks = buildPlan({ examAt: MON + 5 * DAY, topics: ["a", "b"], now: MON });
+  assert.equal(blocks.at(-1).pass, "review");
+});
+
+test("blocks are chronological and never land on the exam day", () => {
+  const examAt = MON + 5 * DAY;
+  const blocks = buildPlan({ examAt, topics: ["a", "b", "c"], now: MON });
+  const times = blocks.map((b) => b.startsAt);
+  assert.deepEqual(times, [...times].sort((x, y) => x - y));
+  assert.ok(blocks.every((b) => b.startsAt < examAt));
+});
+
+test("sittings spread across the window instead of packing the first days", () => {
+  const blocks = buildPlan({
+    examAt: MON + 10 * DAY, topics: ["a", "b", "c", "d"], now: MON, minutesPerDay: 180,
+  });
+  const used = new Set(blocks.filter((b) => b.pass !== "review").map((b) => Math.floor(b.startsAt / DAY)));
+  // Eight teaching blocks over nine free days should touch at least four of them,
+  // not sit on the two that 4-per-day packing would use.
+  assert.ok(used.size >= 4, `teaching landed on only ${used.size} days`);
+});
+
+test("more minutes a day means more sittings", () => {
+  const args = { examAt: MON + 4 * DAY, topics: ["a", "b", "c", "d"], now: MON };
+  const light = buildPlan({ ...args, minutesPerDay: 45 });
+  const heavy = buildPlan({ ...args, minutesPerDay: 180 });
+  assert.ok(heavy.length > light.length);
+});
+
+test("describePlan counts days and hours, and says so when there is no time", () => {
+  assert.match(describePlan(buildPlan({ examAt: MON + 4 * DAY, topics: ["a"], now: MON })), /sittings across/);
+  assert.match(describePlan([]), /No time left/);
 });
 
 console.log(`\n${passed} checks passed\n`);

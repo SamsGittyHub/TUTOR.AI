@@ -23,9 +23,17 @@ interface Props {
   onChange: (settings: Settings) => void;
   onKeysChanged: () => void;
   onClose: () => void;
+  /** "page" drops the overlay and header chrome — /settings renders it inline. */
+  variant?: "modal" | "page";
 }
 
-export function SettingsModal({ settings, onChange, onKeysChanged, onClose }: Props) {
+export function SettingsModal({
+  settings,
+  onChange,
+  onKeysChanged,
+  onClose,
+  variant = "modal",
+}: Props) {
   const [active, setActive] = useState<ProviderId>(settings.providerId);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [checking, setChecking] = useState<ProviderId | null>(null);
@@ -56,31 +64,43 @@ export function SettingsModal({ settings, onChange, onKeysChanged, onClose }: Pr
     }
   };
 
+  const page = variant === "page";
+
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
-      onClick={onClose}
+      className={
+        page
+          ? ""
+          : "fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/80 p-4 backdrop-blur-sm"
+      }
+      onClick={page ? undefined : onClose}
     >
       <div
-        onClick={(event) => event.stopPropagation()}
-        className="my-8 w-full max-w-2xl overflow-hidden rounded-lg border border-line bg-panel"
+        onClick={page ? undefined : (event) => event.stopPropagation()}
+        className={
+          page
+            ? "overflow-hidden rounded-md border border-line bg-panel"
+            : "my-8 w-full max-w-2xl overflow-hidden rounded-lg border border-line bg-panel"
+        }
       >
-        <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
-          <div>
-            <h2 className="text-base font-extrabold">Your key, your model</h2>
-            <p className="text-xs text-dim">
-              Keys stay in this browser and go straight to the provider. There is no
-              server in the middle.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full border border-line px-3 py-1 text-xs font-bold text-muted hover:text-fg"
-          >
-            done
-          </button>
-        </header>
+        {!page && (
+          <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
+            <div>
+              <h2 className="text-base font-extrabold">Your key, your model</h2>
+              <p className="text-xs text-dim">
+                Keys stay in this browser and go straight to the provider. There is no
+                server in the middle.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-line px-3 py-1 text-xs font-bold text-muted hover:text-fg"
+            >
+              done
+            </button>
+          </header>
+        )}
 
         <div className="flex gap-1 border-b border-line px-3 py-2">
           {PROVIDER_LIST.map((item) => (
