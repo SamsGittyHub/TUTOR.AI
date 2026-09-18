@@ -16,6 +16,7 @@ import {
   type ReviewedQuestion,
   type Verdict,
 } from "@/lib/exam-review";
+import { downscaleImage } from "@/lib/image-resize";
 import { loadKeys } from "@/lib/keys";
 import type { ImagePart } from "@/lib/providers";
 import { loadSettings } from "@/lib/settings";
@@ -44,21 +45,29 @@ interface Page {
   mediaType: string;
 }
 
-async function readPage(file: File): Promise<Page> {
-  const base64 = await new Promise<string>((resolve, reject) => {
+function readAsBase64(blob: Blob, sourceName: string): Promise<string> {
+  return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
       const result = String(reader.result);
       resolve(result.slice(result.indexOf(",") + 1));
     };
-    reader.onerror = () => reject(new Error(`Couldn't read ${file.name}.`));
-    reader.readAsDataURL(file);
+    reader.onerror = () => reject(new Error(`Couldn't read ${sourceName}.`));
+    reader.readAsDataURL(blob);
   });
+}
+
+async function readPage(file: File): Promise<Page> {
+  // The preview keeps the original photo — this is what the student sees and
+  // it costs nothing extra. Only the copy sent to the model is shrunk, since
+  // that's what's re-billed on every future turn that touches this page.
+  const shrunk = await downscaleImage(file);
+  const base64 = await readAsBase64(shrunk, file.name);
   return {
     file,
     url: URL.createObjectURL(file),
     base64,
-    mediaType: file.type || "image/jpeg",
+    mediaType: shrunk.type || file.type || "image/jpeg",
   };
 }
 

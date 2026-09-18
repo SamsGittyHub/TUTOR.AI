@@ -152,7 +152,12 @@ export async function runTutorTurn(request: TurnRequest): Promise<TurnResult> {
       model: request.model,
       system,
       messages: passMessages,
-      maxTokens: 8000,
+      // A turn is "two to five board cards, then done" by design — a few
+      // hundred tokens in the typical case. 4000 is still generous headroom
+      // for a verbose write_steps or a wide table, not a number chosen to be
+      // tight; it's a backstop against a genuinely runaway response rather
+      // than a limit anyone should expect to hit teaching normally.
+      maxTokens: 4000,
       effort: "low",
       signal: request.signal,
       onText: (delta) => {

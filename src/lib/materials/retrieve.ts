@@ -27,6 +27,20 @@ function terms(text: string): string[] {
     .filter((w) => w.length > 1 && !STOPWORDS.has(w));
 }
 
+/**
+ * How much of the student's material one turn is allowed to carry, in
+ * characters (~4 chars/token). This is the single largest input-token cost in
+ * a typed turn — larger than the system prompt and the conversation history
+ * combined — and unlike either of those, it can't benefit from prompt
+ * caching, because retrieval pulls different chunks on every question.
+ *
+ * BM25/hybrid retrieval front-loads the most relevant chunks first, so the
+ * far end of this budget is doing much less work than the front of it —
+ * cutting it costs more in reach (how much of a long document one turn can
+ * see) than it does in relevance (which chunks show up at all).
+ */
+export const DEFAULT_CHAR_BUDGET = 12_000;
+
 export interface RetrievalResult {
   chunks: MaterialChunk[];
   /** True when the whole material fit and nothing was selected away. */
@@ -43,7 +57,7 @@ export interface RetrievalResult {
 export function retrieve(
   chunks: MaterialChunk[],
   query: string,
-  charBudget = 24_000,
+  charBudget = DEFAULT_CHAR_BUDGET,
 ): RetrievalResult {
   if (!chunks.length) return { chunks: [], complete: true, totalChunks: 0, matched: false };
 
@@ -150,7 +164,7 @@ export function retrieveHybrid(
   chunks: MaterialChunk[],
   query: string,
   queryVector: number[] | null,
-  charBudget = 24_000,
+  charBudget = DEFAULT_CHAR_BUDGET,
 ): RetrievalResult {
   const lexical = retrieve(chunks, query, charBudget);
   if (!queryVector?.length) return lexical;

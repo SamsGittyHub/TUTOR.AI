@@ -2,6 +2,7 @@
 
 import type { Material, MaterialChunk, MaterialImage, MaterialKind } from "../db";
 import { toTranscribableChunks } from "./audio";
+import { downscaleImage } from "../image-resize";
 import { BETA, BETA_STT_MODEL } from "../beta";
 import { sanitizeText } from "../sanitize";
 import { chunkUnits, type SourceUnit } from "./chunk";
@@ -331,11 +332,15 @@ export async function extractMaterial(input: ExtractInput): Promise<ExtractResul
     }
     case "image": {
       input.onProgress?.("Preparing image");
+      // A phone photo arrives at whatever resolution the camera shot it at —
+      // routinely 3000px+ wide, and this is resent to the model on every
+      // future turn that cites it, not just this one.
+      const shrunk = await downscaleImage(input.file);
       images = [
         {
           locator: input.file.name,
-          mediaType: input.file.type || "image/png",
-          base64: await toBase64(input.file),
+          mediaType: shrunk.type || input.file.type || "image/png",
+          base64: await toBase64(shrunk),
         },
       ];
       units = [

@@ -58,7 +58,9 @@ import {
 import { actionToMarkdown, exportFilename, lessonToMarkdown } from "../.test-build/core/export.js";
 import { encodeWav, secondsPerChunk, TRANSCRIBE_LIMIT_BYTES } from "../.test-build/core/materials/audio.js";
 import { chunkUnits } from "../.test-build/core/materials/chunk.js";
-import { retrieve, retrieveHybrid } from "../.test-build/core/materials/retrieve.js";
+import {
+  DEFAULT_CHAR_BUDGET, retrieve, retrieveHybrid,
+} from "../.test-build/core/materials/retrieve.js";
 import { cosine, fuseRankings } from "../.test-build/core/materials/vector.js";
 
 let passed = 0;
@@ -2364,6 +2366,29 @@ test("rewording a string invalidates every cached translation", () => {
   const before = sourceHash();
   assert.match(before, /^[a-z0-9]+$/);
   assert.equal(sourceHash(), before, "the same dictionary hashes the same");
+});
+
+console.log("\n— the material budget, now that spend isn't capped —");
+
+test("the default retrieval budget was actually halved, not just documented", () => {
+  // The whole point of this constant is that it's the one number controlling
+  // the dominant, uncacheable input-token cost. A test that only checked the
+  // comment would miss a regression back to the old value.
+  assert.equal(DEFAULT_CHAR_BUDGET, 12_000);
+});
+
+test("retrieve() and retrieveHybrid() actually use the shared default, not a stale copy", () => {
+  const chunk = (id, text) => ({ id, materialId: "m1", locator: id, text, order: Number(id) });
+  const big = Array.from({ length: 40 }, (_, i) =>
+    chunk(String(i), "photosynthesis converts light into chemical energy ".repeat(30)));
+
+  const a = retrieve(big, "photosynthesis", undefined);
+  const usedChars = a.chunks.reduce((sum, c) => sum + c.text.length, 0);
+  assert.ok(usedChars <= DEFAULT_CHAR_BUDGET + 2000, "retrieve() drifted from the shared budget");
+
+  const b = retrieveHybrid(big, "photosynthesis", null, undefined);
+  const usedCharsHybrid = b.chunks.reduce((sum, c) => sum + c.text.length, 0);
+  assert.ok(usedCharsHybrid <= DEFAULT_CHAR_BUDGET + 2000, "retrieveHybrid() drifted from the shared budget");
 });
 
 console.log(`\n${passed} checks passed\n`);
