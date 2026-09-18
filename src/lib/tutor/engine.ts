@@ -14,6 +14,8 @@ import {
   REPAIR_INSTRUCTION,
 } from "./prompts";
 
+import { shouldOfferPicture } from "../illustration-pace";
+
 export interface TurnRequest {
   providerId: ProviderId;
   model: string;
@@ -49,6 +51,17 @@ include a show_image of it in this turn. Don't mention that you're drawing it
 and don't wait for it. If the topic is purely symbolic, skip it.
 </drawing>`;
 
+/*
+ * The other half of the cadence. Without this the model keeps drawing on hold
+ * turns and every one of them has to be thrown away below, which wastes the
+ * tokens it spent describing a picture nobody will see.
+ */
+const HOLD_REMINDER = `<drawing>
+You drew a picture recently, so don't draw one this turn — teach it with
+words, worked steps, and the board's own tables and diagrams instead. The
+exception is being asked outright for something to look at; then draw it.
+</drawing>`;
+
 const MAX_TRANSCRIPT_ENTRIES = 16;
 const MAX_IMAGES = 4;
 
@@ -78,7 +91,7 @@ function collectImages(
   return images;
 }
 
-function buildMessages(request: TurnRequest): ChatMessage[] {
+function buildMessages(request: TurnRequest, mayDraw: boolean): ChatMessage[] {
   const history = request.transcript.slice(-MAX_TRANSCRIPT_ENTRIES);
   const messages: ChatMessage[] = history.map((entry) => ({
     role: entry.role === "student" ? "user" : "assistant",
@@ -113,7 +126,7 @@ function buildMessages(request: TurnRequest): ChatMessage[] {
    * Phrased as a test the model applies to this specific topic, so algebra
    * still doesn't get a picture it doesn't need.
    */
-  blocks.push(DRAW_REMINDER);
+  blocks.push(mayDraw ? DRAW_REMINDER : HOLD_REMINDER);
   blocks.push(request.studentMessage);
 
   messages.push({
@@ -147,7 +160,14 @@ export async function runTutorTurn(request: TurnRequest): Promise<TurnResult> {
   // Appended rather than prepended: the action protocol has to lead, or a
   // weaker model starts treating the language note as the thing being asked.
   const system = baseSystem + languageInstruction();
-  const messages = buildMessages(request);
+  /*
+   * Decided once, up front, and then enforced in three places: what the model
+   * is told, what it's allowed to emit, and whether the fallback pass runs at
+   * all. Deciding it once is the point — three independent judgements about
+   * the same turn is how it ended up drawing on all of them.
+   */
+  const mayDraw = shouldOfferPicture(request.transcript, request.studentMessage);
+  const messages = buildMessages(request, mayDraw);
 
   const actions: TutorAction[] = [];
   const seenIds = new Set<string>();
@@ -156,6 +176,12 @@ export async function runTutorTurn(request: TurnRequest): Promise<TurnResult> {
   const consume = (raw: unknown) => {
     const action = normalizeAction(raw);
     if (!action) return;
+    /*
+     * A hold turn is by definition one where the student didn't ask for a
+     * picture — shouldOfferPicture returns true whenever they did — so
+     * dropping this can't swallow something that was actually requested.
+     */
+    if (action.type === "show_image" && !mayDraw) return;
     // Models reuse ids across turns; keep them unique so highlight/erase and
     // React keys stay honest.
     if (seenIds.has(action.id)) action.id = `${action.id}_${actions.length}`;
@@ -242,7 +268,7 @@ export async function runTutorTurn(request: TurnRequest): Promise<TurnResult> {
    * Never allowed to break a lesson: any failure here is swallowed, because a
    * missing picture is a worse outcome than a missing picture *and* an error.
    */
-  if (!actions.some((a) => a.type === "show_image")) {
+  if (mayDraw && !actions.some((a) => a.type === "show_image")) {
     try {
       await illustrate(request, provider, (action) => {
         actions.push(action);

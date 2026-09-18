@@ -1,3 +1,4 @@
+import { askedForPicture, pictureIsDue } from "./illustration-pace";
 import { normalizeImageRequest, type ImageRequest } from "./board-image";
 import { briefLearning, type LearningProfile } from "./learning";
 import type { Material, MaterialChunk, QuizAttempt, Session } from "./db";
@@ -44,6 +45,22 @@ export interface VoiceContext {
   learning?: LearningProfile;
   /** Writes something new into that memory. */
   remember?: (note: string) => void;
+  /**
+   * How the drawings get paced, since a spoken conversation has no turn
+   * boundary to count.
+   *
+   * A voice tutor with a drawing tool will use it on every single answer
+   * given the chance: each tool call is decided on its own, with no sense of
+   * how recently the last picture went up. The unit here is the student's own
+   * questions — the thing they actually notice — rather than tutor turns,
+   * which a realtime model splits unpredictably.
+   */
+  pacing?: {
+    /** Student questions since the last picture; null if none has been drawn. */
+    questionsSincePicture: number | null;
+    /** Their most recent question, so asking to see something still works. */
+    lastQuestion: string;
+  };
 }
 
 /* -------------------------------------------------------------------------- */
@@ -181,7 +198,7 @@ export const VOICE_TOOLS = [
     type: "function" as const,
     name: "draw_image",
     description:
-      "Draw a picture on the whiteboard — an illustration, a labelled cross-section, an apparatus setup, a map, anything the board's shapes and equations can't show. Takes a few seconds and appears on its own, so keep talking after you call it. Use it whenever a student would understand faster from seeing the thing.",
+      "Draw a picture on the whiteboard — an illustration, a labelled cross-section, an apparatus setup, a map, anything the board's shapes and equations can't show. Takes a few seconds and appears on its own, so keep talking after you call it. Save it for the things that genuinely need seeing rather than illustrating every answer: roughly one explanation in three, or whenever the student asks to see something.",
     parameters: {
       type: "object",
       properties: {
@@ -296,6 +313,18 @@ export function runVoiceTool(
     const request = normalizeImageRequest(args);
     if ("error" in request) return request.error;
     if (!context.drawImage) return "The board can't take a drawing right now.";
+
+    /*
+     * Paced exactly as the typed board is. Refused in words rather than
+     * silently ignored: the model is mid-sentence waiting on a tool result,
+     * and telling it why keeps it talking instead of leaving a gap where it
+     * expected a picture to be announced.
+     */
+    const pacing = context.pacing;
+    const wanted = pacing ? askedForPicture(pacing.lastQuestion) : true;
+    if (pacing && !wanted && !pictureIsDue(pacing.questionsSincePicture)) {
+      return "Not this one — there's been a picture recently, so explain this with words and the board's own shapes. Don't mention that you considered drawing.";
+    }
 
     context.drawImage(request);
     // Said back to a model that is mid-sentence: it needs to know the picture

@@ -129,6 +129,14 @@ sentence, only once you've seen it more than once, and never out loud.`;
 export default function VoicePage() {
   const [actions, setActions] = useState<TutorAction[]>([]);
   const [lines, setLines] = useState<{ role: "student" | "tutor"; text: string }[]>([]);
+  /*
+   * What the drawing tool is paced against. null means nothing has been drawn
+   * yet, which is the one state where a picture is always allowed.
+   */
+  const [pacing, setPacing] = useState<{
+    questionsSincePicture: number | null;
+    lastQuestion: string;
+  }>({ questionsSincePicture: null, lastQuestion: "" });
   const [theme, setTheme] = useState<"paper" | "chalk">("paper");
   const [keyMissing, setKeyMissing] = useState(false);
 
@@ -280,6 +288,9 @@ export default function VoicePage() {
         height: planned.height,
       },
     ]);
+    // The clock restarts when the picture is asked for, not when it arrives:
+    // it's already on the board as a placeholder, and the student has seen it.
+    setPacing((prev) => ({ ...prev, questionsSincePicture: 0 }));
     void requestImage(planned.id, request).then((result) => {
       if (result.error) {
         setActions((list) => applyDrawnImage(list, cardId, { error: result.error }));
@@ -289,6 +300,14 @@ export default function VoicePage() {
 
   const onTranscript = useCallback((role: "student" | "tutor", text: string) => {
     setLines((list) => [...list, { role, text }]);
+    if (role !== "student") return;
+    setPacing((prev) => ({
+      // Still null while nothing has been drawn — counting starts at the
+      // first picture, not at the first question.
+      questionsSincePicture:
+        prev.questionsSincePicture === null ? null : prev.questionsSincePicture + 1,
+      lastQuestion: text,
+    }));
   }, []);
 
   const context: VoiceContext = useMemo(
@@ -303,10 +322,11 @@ export default function VoicePage() {
       drawImage,
       learning: learning.profile,
       remember: learning.remember,
+      pacing,
     }),
     [
       lib.materials, chunks, lib.sessions, lib.courses, lib.cards, lib.attempts,
-      lib.papers, drawImage, learning.profile, learning.remember,
+      lib.papers, drawImage, learning.profile, learning.remember, pacing,
     ],
   );
 

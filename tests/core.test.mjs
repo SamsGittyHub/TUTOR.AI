@@ -1,8 +1,16 @@
 import assert from "node:assert/strict";
 import { JsonObjectStream, extractFirstJson } from "../.test-build/core/stream-json.js";
-import { isBoardAction, normalizeAction, unescapeBreaks } from "../.test-build/core/actions.js";
+import { actionToText, isBoardAction, normalizeAction, unescapeBreaks } from "../.test-build/core/actions.js";
 import { compileExpression } from "../.test-build/core/expr.js";
 import { requestImage } from "../.test-build/core/draw-image.js";
+import {
+  askedForPicture,
+  pictureIsDue,
+  shouldOfferPicture,
+  turnsSincePicture,
+  PICTURE_IN_TRANSCRIPT,
+  TURNS_BETWEEN_PICTURES,
+} from "../.test-build/core/illustration-pace.js";
 import {
   DAY_MS,
   isDue,
@@ -1637,6 +1645,47 @@ test("a bad draw_image call is explained, and nothing is drawn", () => {
   assert.match(out, /nothing to draw/);
 });
 
+test("the live tutor is refused a picture when it's just drawn one", () => {
+  // Voice was the worse offender: every tool call is decided on its own, so a
+  // realtime model with a drawing tool illustrates every single answer.
+  const drawn = [];
+  const out = runVoiceTool(
+    "draw_image",
+    { prompt: "a nephron" },
+    voiceContext({
+      drawImage: (r) => drawn.push(r),
+      pacing: { questionsSincePicture: 1, lastQuestion: "and what does ADH do" },
+    }),
+  );
+  assert.equal(drawn.length, 0, "nothing should have been drawn");
+  assert.match(out, /Not this one/, "and it has to be told why, mid-sentence");
+  assert.match(out, /Don't mention/, "without narrating the refusal to the student");
+});
+
+test("the live tutor still draws when the student asks to see something", () => {
+  const drawn = [];
+  runVoiceTool(
+    "draw_image",
+    { prompt: "a nephron" },
+    voiceContext({
+      drawImage: (r) => drawn.push(r),
+      // Same hold as above — only the question differs.
+      pacing: { questionsSincePicture: 1, lastQuestion: "show me what that looks like" },
+    }),
+  );
+  assert.equal(drawn.length, 1, "being asked has to beat the cadence");
+});
+
+test("the live tutor draws freely before anything has been drawn", () => {
+  const drawn = [];
+  runVoiceTool("draw_image", { prompt: "a nephron" },
+    voiceContext({
+      drawImage: (r) => drawn.push(r),
+      pacing: { questionsSincePicture: null, lastQuestion: "explain the nephron" },
+    }));
+  assert.equal(drawn.length, 1);
+});
+
 test("draw_image on a board that can't take one says so instead of throwing", () => {
   const out = runVoiceTool("draw_image", { prompt: "a cell" }, voiceContext());
   assert.match(out, /can't take a drawing/);
@@ -2423,8 +2472,20 @@ const promptFor = () =>
 test("the prompt tells the tutor to draw, and says when not to", () => {
   const prompt = promptFor();
   assert.match(prompt, /show_image/, "the action has to be documented at all");
-  assert.match(prompt, /draw often/i);
+  assert.match(prompt, /Draw the thing itself/i);
   assert.match(prompt, /purely symbolic/i, "it needs an exception, or it draws for algebra");
+});
+
+test("the standing prompt sets no frequency of its own", () => {
+  /*
+   * How often to draw is decided per turn and stated in the <drawing> note.
+   * The standing prompt used to insist on "a majority of the lessons you
+   * teach", which simply overrode the pacing on every turn it was held back.
+   */
+  const flat = promptFor().replace(/\s+/g, " ");
+  assert.doesNotMatch(flat, /draw often/i, "frequency belongs to the per-turn note");
+  assert.doesNotMatch(flat, /majority of the lessons/i);
+  assert.match(flat, /decided for you, per turn/i, "and it has to say where it is decided");
 });
 
 test("the card budget doesn't quietly cap drawings", () => {
@@ -2536,6 +2597,106 @@ test("a dropped connection is not reported as a failed drawing", () =>
     assert.equal(out.error, undefined, "a dropped request must not claim the drawing failed");
     assert.equal(out.unresolved, true);
   }));
+
+console.log("\n— how often it draws —");
+
+const tutorSaid = (text) => ({ role: "tutor", text });
+const studentSaid = (text) => ({ role: "student", text });
+const drewA = (thing) => tutorSaid(`[board:im1] picture of ${thing} — "a label"`);
+
+test("the marker matches what a drawing actually writes into the transcript", () => {
+  // The pacer reads the transcript the model reads. If actionToText ever
+  // rewords a picture line, the pacing silently stops working and the tutor
+  // goes back to drawing on every turn — so pin the two together.
+  const line = actionToText({
+    type: "show_image",
+    id: "im1",
+    prompt: "a labelled cross-section of a leaf",
+    caption: "leaf",
+  });
+  assert.match(line, PICTURE_IN_TRANSCRIPT, "actionToText and the pacer have drifted apart");
+});
+
+test("the first question of a lesson can always have a picture", () => {
+  assert.equal(turnsSincePicture([]), null);
+  assert.ok(shouldOfferPicture([], "explain the nephron"));
+});
+
+test("it won't draw twice in a row", () => {
+  const transcript = [studentSaid("what is a nephron"), drewA("a nephron")];
+  assert.equal(turnsSincePicture(transcript), 1);
+  assert.ok(!shouldOfferPicture(transcript, "and what does it filter"));
+});
+
+test("it holds off for two turns, then draws again", () => {
+  // `taught` is how many turns have been taught since the picture went up, so
+  // the decision below is the one being made for the turn after those.
+  const after = (taught) => [
+    drewA("a nephron"),
+    ...Array.from({ length: taught }, (_, i) => tutorSaid(`[board:c${i}] plain teaching`)),
+  ];
+  assert.ok(!shouldOfferPicture(after(0), "go on"), "never twice in a row");
+  assert.ok(!shouldOfferPicture(after(1), "go on"), "one turn later is still too soon");
+  assert.ok(shouldOfferPicture(after(2), "go on"), "two turns of teaching, then it's due");
+  assert.equal(TURNS_BETWEEN_PICTURES, 3, "pictures land three turns apart");
+});
+
+test("asking to see something beats the cadence", () => {
+  const justDrew = [drewA("a nephron")];
+  for (const asked of [
+    "show me what that looks like",
+    "can you draw the loop of Henle",
+    "is there a diagram of this",
+    "what does a glomerulus look like",
+    "sketch it for me",
+  ]) {
+    assert.ok(askedForPicture(asked), `"${asked}" is a request for a picture`);
+    assert.ok(shouldOfferPicture(justDrew, asked), `"${asked}" should override the hold`);
+  }
+});
+
+test("ordinary questions aren't mistaken for asking to see something", () => {
+  for (const plain of [
+    "why does that happen",
+    "can you go over the second step again",
+    "what's the difference between the two",
+  ]) {
+    assert.ok(!askedForPicture(plain), `"${plain}" is not a request for a picture`);
+  }
+});
+
+test("talking about a picture is not the same as drawing one", () => {
+  // Otherwise the tutor referring back to the leaf it drew earlier would keep
+  // resetting the clock and it would never draw again.
+  const transcript = [
+    drewA("a leaf"),
+    tutorSaid("Look back at the picture of the leaf on the left."),
+    tutorSaid("[board:c2] The cuticle sits above the palisade layer."),
+    tutorSaid("[board:c3] Water leaves through the stomata."),
+  ];
+  assert.equal(turnsSincePicture(transcript), 4, "only the drawn one counts");
+  assert.ok(shouldOfferPicture(transcript, "keep going"));
+});
+
+test("the student's own turns don't count toward the gap", () => {
+  // A student who sends three short messages in a row hasn't been taught
+  // three times, and shouldn't earn a picture for it.
+  const transcript = [
+    drewA("a nephron"),
+    studentSaid("ok"),
+    studentSaid("wait"),
+    studentSaid("carry on"),
+  ];
+  assert.equal(turnsSincePicture(transcript), 1);
+  assert.ok(!shouldOfferPicture(transcript, "carry on"));
+});
+
+test("the voice side reads the same rule off its own counter", () => {
+  assert.ok(pictureIsDue(null), "nothing drawn yet");
+  assert.ok(!pictureIsDue(0), "just drew one");
+  assert.ok(!pictureIsDue(2));
+  assert.ok(pictureIsDue(3));
+});
 
 await Promise.all(pending);
 
