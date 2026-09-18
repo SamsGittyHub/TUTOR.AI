@@ -7,6 +7,8 @@ import { BETA_REALTIME_MODEL } from "./beta";
 import { VOICE_TOOLS } from "./voice-tools";
 import {
   handleRealtimeEvent,
+  inputBufferClearMessage,
+  responseCancelMessage,
   sessionUpdateMessage,
   toolResultMessages,
 } from "./realtime-events";
@@ -50,6 +52,16 @@ export function useRealtime({
   const [status, setStatus] = useState<RealtimeStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const [paused, setPaused] = useState(false);
+  // Read by togglePause, which must not be rebuilt on every pause.
+  const pausedRef = useRef(false);
+  pausedRef.current = paused;
+  // Whether a response is actually in flight. Cancelling one that isn't is an
+  // error the session reports back, and this hook renders those as tutor
+  // lines — so pausing during a silence would have written "cancellation
+  // failed" into the student's own conversation.
+  const speakingRef = useRef(false);
+  speakingRef.current = speaking;
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const channelRef = useRef<RTCDataChannel | null>(null);
@@ -75,7 +87,42 @@ export function useRealtime({
     streamRef.current = null;
     setStatus("idle");
     setSpeaking(false);
+    setPaused(false);
   }, []);
+
+  /**
+   * Holds the session open with nothing going either way.
+   *
+   * Deliberately not a disconnect. Reconnecting costs the student the
+   * greeting, the briefing and several seconds of waiting, and loses what the
+   * tutor had in mind — so the session, the board and the conversation all
+   * stay exactly as they are, and only the audio stops.
+   *
+   * Both directions, because muting one is the wrong half either way: mute
+   * only the microphone and the tutor keeps talking to an empty room; mute
+   * only the speaker and it talks anyway, billed by the second, and is
+   * somehow already finished when the student comes back.
+   */
+  const setPausedTo = useCallback((next: boolean) => {
+    const channel = channelRef.current;
+    // A disabled track still sends, as silence — so the far end hears a quiet
+    // room rather than a dropped connection, and the session stays healthy.
+    streamRef.current?.getAudioTracks().forEach((track) => {
+      track.enabled = !next;
+    });
+    if (audioRef.current) audioRef.current.muted = next;
+
+    if (channel?.readyState === "open") {
+      if (!next) channel.send(inputBufferClearMessage());
+      else if (speakingRef.current) channel.send(responseCancelMessage());
+    }
+    if (next) setSpeaking(false);
+    setPaused(next);
+  }, []);
+
+  const togglePause = useCallback(() => {
+    setPausedTo(!pausedRef.current);
+  }, [setPausedTo]);
 
   // A page left open with a live session keeps the microphone on.
   useEffect(() => stop, [stop]);
@@ -223,5 +270,5 @@ export function useRealtime({
     [stop],
   );
 
-  return { status, error, speaking, start, stop };
+  return { status, error, speaking, paused, togglePause, start, stop };
 }

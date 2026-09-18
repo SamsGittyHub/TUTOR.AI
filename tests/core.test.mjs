@@ -40,8 +40,8 @@ import {
 } from "../.test-build/core/docx.js";
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
 import {
-  AUDIO_INPUT, handleRealtimeEvent, LISTENING, sessionUpdateMessage, spokenOnly,
-  toolResultMessages,
+  AUDIO_INPUT, handleRealtimeEvent, inputBufferClearMessage, LISTENING,
+  responseCancelMessage, sessionUpdateMessage, spokenOnly, toolResultMessages,
 } from "../.test-build/core/realtime-events.js";
 import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
 import {
@@ -1956,6 +1956,17 @@ test("the session update sets how sensitive the microphone is", () => {
   assert.ok(audio.input.turn_detection.silence_duration_ms > 500,
     "a pause for thought must not hand the turn back");
   assert.equal(audio.input.noise_reduction.type, "near_field");
+});
+
+test("pausing ends the tutor's turn rather than muting it", () => {
+  // Muting alone would leave the model generating into a silenced speaker,
+  // billed by the second and somehow already finished on the way back.
+  assert.deepEqual(JSON.parse(responseCancelMessage()), { type: "response.cancel" });
+});
+
+test("coming back discards whatever the mic half-heard", () => {
+  assert.deepEqual(JSON.parse(inputBufferClearMessage()),
+    { type: "input_audio_buffer.clear" });
 });
 
 test("the minted session and the update can't disagree about the microphone", () => {

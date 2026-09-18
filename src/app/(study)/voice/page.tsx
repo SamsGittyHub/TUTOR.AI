@@ -403,21 +403,33 @@ export default function VoicePage() {
             />
             <span
               className={`flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider ${
-                live ? "text-good" : rt.status === "error" ? "text-pink" : "text-dim"
+                live
+                  ? rt.paused
+                    ? "text-warn"
+                    : "text-good"
+                  : rt.status === "error"
+                    ? "text-pink"
+                    : "text-dim"
               }`}
             >
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   live
-                    ? rt.speaking
-                      ? "animate-pulse bg-good"
-                      : "bg-good"
+                    ? rt.paused
+                      ? "bg-warn"
+                      : rt.speaking
+                        ? "animate-pulse bg-good"
+                        : "bg-good"
                     : rt.status === "error"
                       ? "bg-pink"
                       : "bg-dim"
                 }`}
               />
-              {rt.status === "connecting" ? "connecting" : rt.status}
+              {live && rt.paused
+                ? "paused"
+                : rt.status === "connecting"
+                  ? "connecting"
+                  : rt.status}
             </span>
           </header>
 
@@ -478,13 +490,35 @@ export default function VoicePage() {
 
           <div className="border-t border-line p-3">
             {live ? (
-              <button
-                type="button"
-                onClick={rt.stop}
-                className="w-full rounded-full border border-line px-5 py-3 text-[13px] font-semibold text-muted transition hover:border-pink/50 hover:text-pink"
-              >
-                End session
-              </button>
+              /*
+               * Pause leads and ending is the quieter of the two. Someone who
+               * needs the tutor to stop right now — a person walked in, a
+               * phone rang — will hit whichever button is most obvious, and
+               * ending the session to answer a question costs them the
+               * greeting, the briefing and everything the tutor had in mind.
+               */
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={rt.togglePause}
+                  aria-pressed={rt.paused}
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-full px-5 py-3 text-[13px] font-semibold transition ${
+                    rt.paused
+                      ? "grad text-white hover:opacity-90"
+                      : "border border-line-2 text-fg hover:border-warn/60 hover:text-warn"
+                  }`}
+                >
+                  <span aria-hidden>{rt.paused ? "▶" : "❚❚"}</span>
+                  {rt.paused ? "Resume" : "Pause"}
+                </button>
+                <button
+                  type="button"
+                  onClick={rt.stop}
+                  className="rounded-full border border-line px-5 py-3 text-[13px] font-semibold text-muted transition hover:border-pink/50 hover:text-pink"
+                >
+                  End
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -495,9 +529,17 @@ export default function VoicePage() {
                 {rt.status === "connecting" ? "Connecting…" : "Start talking"}
               </button>
             )}
-            <p className="mt-2 text-center text-[11px] leading-relaxed text-dim">
-              Your mic streams straight to OpenAI. TUTOR AI only mints the session
-              token — it never stores your key.
+            <p
+              className={`mt-2 text-center text-[11px] leading-relaxed ${
+                live && rt.paused ? "text-warn" : "text-dim"
+              }`}
+            >
+              {live && rt.paused
+                ? // The one thing worth being unambiguous about: a paused
+                  // session is still open, and people assume an open session
+                  // is still listening.
+                  "Microphone off. Nothing is being sent or heard — your lesson and the board are exactly where you left them."
+                : "Your mic streams straight to OpenAI. TUTOR AI only mints the session token — it never stores your key."}
             </p>
           </div>
         </aside>

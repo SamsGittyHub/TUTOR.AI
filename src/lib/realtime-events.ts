@@ -336,6 +336,28 @@ export const AUDIO_INPUT = {
   turn_detection: LISTENING,
 } as const;
 
+/**
+ * Stops the tutor talking, now.
+ *
+ * Pausing can't just mute the speaker: the model would carry on generating
+ * into a muted element, which the student pays for by the second and then
+ * comes back to find already finished. Cancelling ends the turn instead, so
+ * "pause" means what it says.
+ */
+export function responseCancelMessage(): string {
+  return JSON.stringify({ type: "response.cancel" });
+}
+
+/**
+ * Throws away whatever the microphone had half-heard.
+ *
+ * Sent when coming back, so a syllable caught on the way to the pause button
+ * isn't waiting to be treated as the first word of the next question.
+ */
+export function inputBufferClearMessage(): string {
+  return JSON.stringify({ type: "input_audio_buffer.clear" });
+}
+
 export function sessionUpdateMessage(
   instructions: string,
   tools: unknown[],
