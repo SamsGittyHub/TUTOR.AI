@@ -1,50 +1,23 @@
 import "server-only";
 
-import { query, queryOne } from "./db";
-import { dailyTokenLimit } from "./beta-key";
+import { query } from "./db";
 
-/** Per-user, per-day metering for the shared beta key. */
+/**
+ * Per-user, per-day spend, recorded but not enforced.
+ *
+ * The beta has no usage cap — the product is meant to be used until a student
+ * has actually learned the thing, and rationing that on a token count works
+ * against the point of the app. This is the operator's own ledger: run
+ *
+ *   select user_id, day, input_tokens, output_tokens, requests
+ *     from usage_daily order by day desc, input_tokens + output_tokens desc;
+ *
+ * to see what the shared key is actually costing, without any of it reaching
+ * a student as a limit or a warning.
+ */
 
-export interface UsageToday {
-  total: number;
-  requests: number;
-  limit: number;
-  remaining: number;
-  exceeded: boolean;
-}
-
-/** UTC, so the reset moment is the same for everyone and easy to explain. */
 function today(): string {
   return new Date().toISOString().slice(0, 10);
-}
-
-export async function usageToday(userId: string): Promise<UsageToday> {
-  const row = await queryOne<{
-    input_tokens: string;
-    output_tokens: string;
-    requests: number;
-    daily_token_limit: number | null;
-  }>(
-    `select coalesce(u.input_tokens, 0)::text  as input_tokens,
-            coalesce(u.output_tokens, 0)::text as output_tokens,
-            coalesce(u.requests, 0)            as requests,
-            usr.daily_token_limit
-       from users usr
-       left join usage_daily u on u.user_id = usr.id and u.day = $2
-      where usr.id = $1`,
-    [userId, today()],
-  );
-
-  const total = Number(row?.input_tokens ?? 0) + Number(row?.output_tokens ?? 0);
-  const limit = row?.daily_token_limit ?? dailyTokenLimit();
-
-  return {
-    total,
-    requests: row?.requests ?? 0,
-    limit,
-    remaining: Math.max(0, limit - total),
-    exceeded: total >= limit,
-  };
 }
 
 export async function recordUsage(
@@ -62,9 +35,4 @@ export async function recordUsage(
        updated_at    = now()`,
     [userId, today(), Math.max(0, inputTokens), Math.max(0, outputTokens)],
   );
-}
-
-/** The message a capped tester sees. Kept in one place so it reads the same everywhere. */
-export function limitMessage(usage: UsageToday): string {
-  return `You've used today's free allowance (${usage.total.toLocaleString()} of ${usage.limit.toLocaleString()} tokens). It resets at midnight UTC.`;
 }

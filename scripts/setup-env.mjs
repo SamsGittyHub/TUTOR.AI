@@ -74,22 +74,12 @@ const apiKey = ensureValue(
   "",
 );
 
-const dailyLimit = ensureValue(
-  process.env.TUTOR_AI_DAILY_TOKEN_LIMIT ??
-    args.dailyLimit ??
-    existing.TUTOR_AI_DAILY_TOKEN_LIMIT,
-  "300000",
-);
-
 const finalEnv = {
   DATABASE_URL: databaseUrl,
   TUTOR_AI_KEY_SECRET: keySecret,
   TUTOR_AI_STORAGE_DIR: storageDir,
   PGPOOL_MAX: ensureValue(existing.PGPOOL_MAX, "10"),
   OPENAI_API_KEY: apiKey,
-  // Per user, per UTC day. The shared key is the operator's money, so this is
-  // the only thing standing between one enthusiastic tester and the budget.
-  TUTOR_AI_DAILY_TOKEN_LIMIT: dailyLimit,
 };
 
 const hasExisting = fs.existsSync(envPath);
@@ -129,12 +119,11 @@ On Railway, set these in the app service's Variables tab
   DATABASE_URL                 \${{Postgres.DATABASE_URL}}
   TUTOR_AI_KEY_SECRET          ${keySecret}
   OPENAI_API_KEY               the shared key everyone's usage runs on
-  TUTOR_AI_DAILY_TOKEN_LIMIT   ${dailyLimit}   (per user, per UTC day)
 
 Attach a volume too — its mount path is picked up automatically, and
 without one every uploaded file is lost on the next deploy.
 
-The beta runs on one key, so TUTOR_AI_DAILY_TOKEN_LIMIT is what stops a
-single tester spending the whole budget. Raise it for individuals with
-  update users set daily_token_limit = 2000000 where email = '...';
+The beta runs on one shared key with no per-student cap — usage is logged to
+the usage_daily table for your own visibility, but nothing is ever throttled.
+Watch your OpenAI dashboard's spend, not this app, for the number that matters.
 `);

@@ -255,10 +255,6 @@ export const STRINGS = {
   "share.copied": "Link copied",
   "share.stop": "stop sharing",
 
-  /* allowance ---------------------------------------------------------------- */
-  "allowance.left": "{percent}% left today",
-  "allowance.out": "out until midnight",
-
   /* the tour ------------------------------------------------------------- */
   "tour.app.title": "The board",
   "tour.app.what": "This is the lesson itself. You ask a question on the right and the tutor explains it out loud while writing on the whiteboard — equations, worked steps, diagrams, even pictures it draws for you.",

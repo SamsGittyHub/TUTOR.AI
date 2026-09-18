@@ -4,7 +4,7 @@ import { BETA_TTS_MODEL, BETA_TTS_VOICE } from "@/lib/beta";
 import { stripForSpeech, TUTOR_VOICE_INSTRUCTIONS } from "@/lib/speech";
 import { currentUser } from "@/lib/server/auth";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
-import { limitMessage, recordUsage, usageToday } from "@/lib/server/usage";
+import { recordUsage } from "@/lib/server/usage";
 
 /**
  * The tutor's voice on the typed board.
@@ -41,11 +41,6 @@ export async function POST(request: NextRequest) {
       { error: "The tutor's voice needs an OpenAI key, and this server doesn't have one." },
       { status: 503 },
     );
-  }
-
-  const usage = await usageToday(user.id);
-  if (usage.exceeded) {
-    return Response.json({ error: limitMessage(usage) }, { status: 429 });
   }
 
   const upstream = await fetch(ENDPOINT, {

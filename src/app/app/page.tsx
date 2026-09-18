@@ -20,7 +20,6 @@ import { TEACH_REQUEST_KEY } from "@/lib/useQuizLab";
 import { useTutor } from "@/lib/useTutor";
 import { buildQuizReviewMessage } from "@/lib/tutor/prompts";
 import { BoardExport } from "@/components/board/BoardExport";
-import { Allowance } from "@/components/shell/Allowance";
 import { Feedback } from "@/components/shell/Feedback";
 import { Tour } from "@/components/shell/Tour";
 import { useVoice } from "@/lib/voice";
@@ -178,7 +177,6 @@ export default function AppPage() {
           </span>
         ) : null}
 
-        <Allowance />
         <Feedback lessonId={tutor.session.id} compact />
         <Tour compact />
 

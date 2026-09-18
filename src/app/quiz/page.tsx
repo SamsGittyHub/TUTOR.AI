@@ -11,7 +11,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { useQuizLab } from "@/lib/useQuizLab";
 import { findModel, formatCost } from "@/lib/providers";
 import { loadKeys } from "@/lib/keys";
-import { Allowance } from "@/components/shell/Allowance";
 import { Feedback } from "@/components/shell/Feedback";
 import { Tour } from "@/components/shell/Tour";
 import { useVoice } from "@/lib/voice";
@@ -36,7 +35,6 @@ export default function QuizPage() {
 
         <NavLinks />
         <div className="flex items-center gap-2">
-          <Allowance />
           <Feedback compact />
           <Tour compact />
           <span className="hidden shrink-0 rounded-full border border-line px-2.5 py-1 text-[11px] font-bold text-dim md:block">

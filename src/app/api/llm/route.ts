@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 
 import { currentUser } from "@/lib/server/auth";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
-import { limitMessage, recordUsage, usageToday } from "@/lib/server/usage";
+import { recordUsage } from "@/lib/server/usage";
 
 /**
  * The beta's single API gateway.
@@ -49,12 +49,6 @@ export async function POST(request: NextRequest) {
       { error: "The OpenAI API key is not configured on this server." },
       { status: 503 },
     );
-  }
-
-  // Checked before the upstream call, so a capped account never costs anything.
-  const usage = await usageToday(user.id);
-  if (usage.exceeded) {
-    return Response.json({ error: limitMessage(usage) }, { status: 429 });
   }
 
   const body =

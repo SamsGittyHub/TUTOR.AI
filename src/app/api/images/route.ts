@@ -10,7 +10,7 @@ import {
 import { currentUser } from "@/lib/server/auth";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
 import { storeFile } from "@/lib/server/storage";
-import { limitMessage, recordUsage, usageToday } from "@/lib/server/usage";
+import { recordUsage } from "@/lib/server/usage";
 
 /**
  * Draws a picture for the board.
@@ -50,12 +50,6 @@ export async function POST(request: NextRequest) {
       { error: "Drawing needs an OpenAI key, and this server doesn't have one." },
       { status: 503 },
     );
-  }
-
-  // Checked before the upstream call, so a capped account never costs anything.
-  const usage = await usageToday(user.id);
-  if (usage.exceeded) {
-    return Response.json({ error: limitMessage(usage) }, { status: 429 });
   }
 
   const upstream = await fetch(ENDPOINT, {
