@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server";
 
 import { BETA, BETA_REALTIME_MODEL, BETA_REALTIME_VOICE } from "@/lib/beta";
 import { currentUser } from "@/lib/server/auth";
+import { AUDIO_INPUT } from "@/lib/realtime-events";
 import { VOICE_TOOLS } from "@/lib/voice-tools";
 import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
 
@@ -73,6 +74,14 @@ export async function POST(request: NextRequest) {
           typeof body.instructions === "string" ? body.instructions : undefined,
         audio: {
           output: { voice },
+          /*
+           * Set here as well as in the session.update that follows, because
+           * the gap between them is real audio: the microphone is already
+           * live while the data channel is still opening, and a session that
+           * starts on the defaults spends those first seconds interrupting
+           * itself on room noise.
+           */
+          input: AUDIO_INPUT,
         },
         /*
          * The tutor can write on the board and look things up in the student's

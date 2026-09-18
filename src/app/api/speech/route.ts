@@ -21,12 +21,27 @@ import { recordUsage } from "@/lib/server/usage";
 
 export const runtime = "nodejs";
 
+/** A sentence of narration, not a paragraph — this should never be slow. */
+export const maxDuration = 60;
+
+/** Below the browser's own deadline, so a stall is described rather than cut. */
+const UPSTREAM_TIMEOUT_MS = 20_000;
+
 const ENDPOINT = "https://api.openai.com/v1/audio/speech";
 
 /** Charged against the daily allowance, roughly per sentence. */
 const SPEECH_TOKEN_COST = 200;
 
 export async function POST(request: NextRequest) {
+  try {
+    return await speak(request);
+  } catch (err) {
+    console.error("[speech] unhandled failure", err);
+    return Response.json({ error: "The tutor's voice failed on the server." }, { status: 500 });
+  }
+}
+
+async function speak(request: NextRequest) {
   const user = await currentUser();
   if (!user) return Response.json({ error: "Not signed in." }, { status: 401 });
 
@@ -43,21 +58,40 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const upstream = await fetch(ENDPOINT, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: BETA_TTS_MODEL,
-      voice: typeof body.voice === "string" && body.voice ? body.voice : BETA_TTS_VOICE,
-      input,
-      instructions: TUTOR_VOICE_INSTRUCTIONS,
-      response_format: "mp3",
-    }),
-    signal: request.signal,
-  });
+  // Bounded, for the same reason the browser bounds its side: a clip that
+  // never arrives is worse than one that fails, because the queue waiting on
+  // it is what makes the tutor speak at all.
+  const timeout = new AbortController();
+  const expired = setTimeout(() => timeout.abort(), UPSTREAM_TIMEOUT_MS);
+  const stop = () => timeout.abort();
+  request.signal.addEventListener("abort", stop);
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(ENDPOINT, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: BETA_TTS_MODEL,
+        voice: typeof body.voice === "string" && body.voice ? body.voice : BETA_TTS_VOICE,
+        input,
+        instructions: TUTOR_VOICE_INSTRUCTIONS,
+        response_format: "mp3",
+      }),
+      signal: timeout.signal,
+    });
+  } catch {
+    if (request.signal.aborted) {
+      return Response.json({ error: "That line was cancelled." }, { status: 499 });
+    }
+    return Response.json({ error: "The tutor's voice didn't answer in time." }, { status: 504 });
+  } finally {
+    clearTimeout(expired);
+    request.signal.removeEventListener("abort", stop);
+  }
 
   if (!upstream.ok) {
     const detail = await upstream.text().catch(() => "");
@@ -72,9 +106,18 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  await recordUsage(user.id, 0, SPEECH_TOKEN_COST);
-
   const audio = await upstream.arrayBuffer();
+
+  /*
+   * After the audio is in hand, and never fatal. This used to run first and
+   * unguarded, so a database hiccup threw away a clip that had already been
+   * generated and paid for — and the tutor simply went quiet for that line.
+   */
+  try {
+    await recordUsage(user.id, 0, SPEECH_TOKEN_COST);
+  } catch (err) {
+    console.error("[speech] spoke but didn't record usage", err);
+  }
   return new Response(audio, {
     headers: {
       "content-type": "audio/mpeg",

@@ -114,7 +114,23 @@ export function useRealtime({
 
         // The student's mic. Asked for before the offer, because the offer has
         // to describe the track we intend to send.
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        /*
+         * The typed board has always asked for these; live voice was taking
+         * whatever the browser felt like, which is the difference between the
+         * two. Echo cancellation is the important one by far: without it the
+         * tutor's own voice comes back in through the laptop speakers, the
+         * detector hears a student talking, and the tutor interrupts itself —
+         * which reads as "it randomly stops talking", not as an echo problem.
+         * Automatic gain is off deliberately: it hunts for something to
+         * amplify in a quiet room and finds the room.
+         */
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: false,
+          },
+        });
         streamRef.current = stream;
         stream.getTracks().forEach((track) => pc.addTrack(track, stream));
 

@@ -40,7 +40,8 @@ import {
 } from "../.test-build/core/docx.js";
 import { attachImages, boardToBlocks } from "../.test-build/core/board-doc.js";
 import {
-  handleRealtimeEvent, sessionUpdateMessage, spokenOnly, toolResultMessages,
+  AUDIO_INPUT, handleRealtimeEvent, LISTENING, sessionUpdateMessage, spokenOnly,
+  toolResultMessages,
 } from "../.test-build/core/realtime-events.js";
 import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
 import {
@@ -1939,6 +1940,31 @@ test("the session update carries the instructions and the tools", () => {
     ["write_on_board", "draw_image", "remember_this", "search_material",
      "get_progress", "list_lessons"],
   );
+});
+
+test("the session update sets how sensitive the microphone is", () => {
+  /*
+   * Left unset, this runs on defaults meant for someone alone at a desk in
+   * headphones, and a student in a room with any noise in it gets a tutor
+   * that stops mid-sentence. The failure doesn't look like a microphone
+   * problem from the outside — it looks like the tutor randomly giving up.
+   */
+  const { audio } = JSON.parse(sessionUpdateMessage("be a tutor", VOICE_TOOLS)).session;
+  assert.equal(audio.input.turn_detection.type, "server_vad");
+  assert.ok(audio.input.turn_detection.threshold > 0.5,
+    "the whole point is a higher bar than the default");
+  assert.ok(audio.input.turn_detection.silence_duration_ms > 500,
+    "a pause for thought must not hand the turn back");
+  assert.equal(audio.input.noise_reduction.type, "near_field");
+});
+
+test("the minted session and the update can't disagree about the microphone", () => {
+  // Both read the same object. If they ever stopped, a session would spend
+  // its first seconds on the defaults and settle down only once the data
+  // channel opened — intermittent by construction, and horrible to diagnose.
+  assert.equal(AUDIO_INPUT.turn_detection, LISTENING);
+  const { audio } = JSON.parse(sessionUpdateMessage("x", [])).session;
+  assert.deepEqual(audio.input, JSON.parse(JSON.stringify(AUDIO_INPUT)));
 });
 
 console.log("\n— the board's voice —");

@@ -300,6 +300,42 @@ export function toolResultMessages(callId: string, output: string): string[] {
  * session missing this talks perfectly well and never touches the board, which
  * is exactly how it presented.
  */
+/**
+ * How hard the student has to try before the tutor treats it as an interruption.
+ *
+ * The defaults are tuned for someone alone at a desk with a headset. A student
+ * works in a kitchen, a library, a room with a television on, and on the
+ * laptop speakers rather than headphones — and every one of those makes the
+ * tutor stop mid-sentence, because the detector cannot tell a housemate, or
+ * the tutor's own voice coming back out of the speakers, from the student
+ * deciding to cut in.
+ *
+ * So: a higher bar to start hearing speech at all, and a longer pause before
+ * a turn is called finished, so an "um" mid-thought doesn't hand the turn
+ * back. Interruption itself stays on — talking over the tutor is the whole
+ * point of live voice, and this only changes how sure it has to be.
+ */
+export const LISTENING = {
+  type: "server_vad",
+  /** 0.5 by default; this is a noticeably louder bar than a room's hum. */
+  threshold: 0.75,
+  /** Keep the run-up, so a raised first syllable isn't clipped off. */
+  prefix_padding_ms: 300,
+  /** 500 by default — long enough to mistake thinking for finishing. */
+  silence_duration_ms: 800,
+} as const;
+
+/**
+ * Audio input settings, shared by the minted session and the update that
+ * follows it so the two can't disagree about how sensitive the mic is.
+ */
+export const AUDIO_INPUT = {
+  // Suppresses steady background — a fan, traffic, a room's hum — before the
+  // detector above ever sees it.
+  noise_reduction: { type: "near_field" },
+  turn_detection: LISTENING,
+} as const;
+
 export function sessionUpdateMessage(
   instructions: string,
   tools: unknown[],
@@ -311,6 +347,7 @@ export function sessionUpdateMessage(
       instructions,
       tools,
       tool_choice: "auto",
+      audio: { input: AUDIO_INPUT },
     },
   });
 }

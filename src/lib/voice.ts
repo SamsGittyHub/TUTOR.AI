@@ -48,18 +48,44 @@ export function micSupported(): boolean {
 /* Speaking                                                                    */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Long enough for a slow clip, short enough that the tutor doesn't go mute.
+ *
+ * This is the whole reason the tutor used to stop talking and stay stopped.
+ * A request with no deadline can hang, and the queue below advances only when
+ * one settles — so a single hung clip left the "speaking" flag raised
+ * permanently, every later line queueing silently behind it and the
+ * microphone never reopening. Nothing recovered it short of toggling voice
+ * off and on again, which is exactly how it presented: sometimes fine,
+ * sometimes mute for the rest of the lesson.
+ */
+const SPEECH_TIMEOUT_MS = 20_000;
+
 async function fetchSpeech(text: string, signal: AbortSignal): Promise<Blob | null> {
-  const response = await fetch("/api/speech", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      text,
-      apiKey: BETA ? undefined : (loadKeys().openai ?? ""),
-    }),
-    signal,
-  });
-  if (!response.ok) return null;
-  return response.blob();
+  const timeout = new AbortController();
+  const expired = setTimeout(() => timeout.abort(), SPEECH_TIMEOUT_MS);
+  const stop = () => timeout.abort();
+  signal.addEventListener("abort", stop);
+  try {
+    const response = await fetch("/api/speech", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        text,
+        apiKey: BETA ? undefined : (loadKeys().openai ?? ""),
+      }),
+      signal: timeout.signal,
+    });
+    if (!response.ok) return null;
+    return await response.blob();
+  } catch {
+    // Including the timeout. Null means "no clip", which the caller already
+    // knows how to carry on from; a throw here would skip a line instead.
+    return null;
+  } finally {
+    clearTimeout(expired);
+    signal.removeEventListener("abort", stop);
+  }
 }
 
 /**
@@ -169,7 +195,16 @@ export function useVoice({ onTranscript }: UseVoiceOptions) {
         objectUrl.current = url;
         const audio = new Audio(url);
         playing.current = audio;
+        /*
+         * Exactly once. All three of these can fire for one clip — a rejected
+         * play() followed by an error event, say — and each extra call shifts
+         * another line off the queue, so a double fire silently swallowed the
+         * sentence after the one that failed.
+         */
+        let stepped = false;
         const step = () => {
+          if (stepped) return;
+          stepped = true;
           playing.current = null;
           releaseUrl();
           pump.current();
