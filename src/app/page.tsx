@@ -23,28 +23,125 @@ const SUBJECTS = [
 const STEPS = [
   {
     n: "1",
-    title: "Bring your own key",
-    body: "Paste an Anthropic, OpenAI, Google, or OpenRouter key. It stays in your browser and talks straight to the provider — there's no server of ours in between, and no subscription on top of what you already pay for tokens.",
+    title: "Make a free account",
+    body: "Email and a password, and you're in. No API key, no card, nothing to configure. Everything you do is saved to your account, so you can start on a laptop and pick it up on your phone at the exact card you stopped on.",
   },
   {
     n: "2",
     title: "Upload what you're actually studying",
-    body: "Lecture PDFs, slide decks, a Word doc, a photo of the notes you took in the margin, even a recording of the lecture. It gets read, split by page or slide or timestamp, and kept ready to cite.",
+    body: "Lecture PDFs, slide decks, a Word doc, a photo of the notes you scrawled in the margin, even a recording of the lecture itself. It gets read, split by page or slide or timestamp, and kept ready to quote back at you.",
   },
   {
     n: "3",
-    title: "Get taught, and interrupt",
-    body: "The tutor plans the lesson, then works it out on a live whiteboard — equations line by line, diagrams drawn edge by edge, plots sketched. Cut in whenever. It keeps its place.",
+    title: "Get taught — and interrupt",
+    body: "It plans the lesson, then works it out on a live whiteboard: equations line by line, diagrams drawn edge by edge, plots sketched to scale. Cut in whenever you're lost. It answers, then says where it's picking back up.",
   },
 ];
 
-const TESTIMONIALS = [
-  { name: "Amara K.", role: "Junior, biochem", quote: "I uploaded four weeks of lecture slides the night before a midterm and it taught me the whole unit off my own deck. It cited slide numbers. I could check it." },
-  { name: "Dev P.", role: "First-year, CS", quote: "The interrupt thing is what got me. I asked 'wait, where did that 2 come from' and it circled the exact line and re-derived it." },
-  { name: "Sofia R.", role: "Sophomore, econ", quote: "I already pay for an API key for work. Running my tutor on it costs about eleven cents an hour, which is roughly nothing." },
-  { name: "Malik J.", role: "Senior, mech eng", quote: "It plots the function while it explains the function. My textbook doesn't do that." },
-  { name: "Yuki T.", role: "Grad student", quote: "Quiz generation from my own papers, then it walks me through the ones I missed on the board. That loop is the whole product." },
-  { name: "Grace O.", role: "High school, AP chem", quote: "Photographed my handwritten notes and it read them. Actually read them, badly-written arrows and all." },
+/** What the app actually does, in the order a student meets it. */
+const FEATURES = [
+  {
+    title: "A whiteboard, not a wall of text",
+    body: "Every lesson is written out as you watch — titles, equations in real LaTeX, worked steps one line at a time, comparison tables, flowcharts, and graphs plotted to scale. You can wipe the board mid-lesson without ending the lesson.",
+  },
+  {
+    title: "It talks, and you can talk back",
+    body: "Live voice is a real conversation: it explains out loud while writing on the board, and you interrupt it the way you'd interrupt a person — mid-sentence, not by waiting for a beep. It can search your notes while you're still talking.",
+  },
+  {
+    title: "It draws things that aren't shapes",
+    body: "When the thing you're stuck on is a real object — a titration setup, a leaf cross-section, a circuit, a map — it generates a properly labelled picture instead of approximating it with boxes and arrows.",
+  },
+  {
+    title: "Taught from your material, and it shows its sources",
+    body: "It teaches from your lecture slides in your professor's notation, not a generic curriculum. Every card it writes from your files is stamped with the file and the page, slide, or timestamp — so you can check it.",
+  },
+  {
+    title: "Flashcards that come back when you'd forget",
+    body: "Every quiz question you answer becomes a review card on a spaced schedule. Get it right and the gap stretches; miss it and it's back tomorrow. Anything you keep missing has a \"teach me this one\" button that opens a full lesson on it.",
+  },
+  {
+    title: "Practice exams aimed at your weak spots",
+    body: "A full paper — sections, marks per question, a real total — weighted toward what you actually got stuck on, read from your own lesson history: where you interrupted, where you said \"wait\", where a card has been missed three times.",
+  },
+  {
+    title: "It reads your marked paper back to you",
+    body: "Photograph an exam you've had marked and it goes through it question by question: what you wrote, what went wrong in the working, and what to do differently. Not the score — you already have the score.",
+  },
+  {
+    title: "Your exam dates become a study plan",
+    body: "Put your deadlines in with the topics they cover and say how many minutes a day you realistically have. It works backwards: every topic twice, spread across the days you've got, with a full review the day before.",
+  },
+  {
+    title: "It learns how you learn",
+    body: "It notices which explanations land for you — pictures, worked steps, being asked before being told — and leans on those next time. It keeps short notes on what trips you up. You can read all of it, and delete any of it, whenever you like.",
+  },
+  {
+    title: "Everything is searchable, and yours to keep",
+    body: "Search every file and every lesson by the words your notes actually use, including things only ever said out loud in a recorded lecture. Export any board as a PDF, Word file, image, or notes — or share a read-only link with a classmate.",
+  },
+];
+
+/** Honest, specific, and checkable — the things a human tutor genuinely can't do. */
+const VERSUS = [
+  {
+    label: "At 2am, the night before",
+    human: "Booked out, asleep, or £50 for an emergency hour",
+    ours: "Open. Same patience at 2am as at 2pm.",
+  },
+  {
+    label: "Asking the same thing six times",
+    human: "You stop asking around the third, because you can feel it",
+    ours: "It re-explains a different way. It has no opinion about you.",
+  },
+  {
+    label: "Knowing your actual course",
+    human: "Works from their material until you've paid enough hours",
+    ours: "Teaches from your slides, in your lecturer's notation, from lesson one",
+  },
+  {
+    label: "Remembering last term",
+    human: "Remembers you. Probably not which explanation worked in October.",
+    ours: "Knows which kinds of explanation land for you, measured over every session",
+  },
+  {
+    label: "Practice papers",
+    human: "Whatever they had time to prepare",
+    ours: "Unlimited, generated from your material, weighted to your weak spots",
+  },
+  {
+    label: "What's left afterwards",
+    human: "A wiped whiteboard and whatever you managed to copy down",
+    ours: "Every board saved, searchable, exportable, on any device you sign into",
+  },
+];
+
+/** Concrete scenarios, not fabricated customer quotes — this is a beta with no users yet. */
+const SCENARIOS = [
+  {
+    tag: "The night before",
+    body: "Upload four weeks of lecture slides at 11pm and have it teach you the unit off your own deck, citing slide numbers you can check against the lecture.",
+  },
+  {
+    tag: "Mid-derivation",
+    body: "\"Wait — where did that 2 come from?\" It highlights the exact line it came from and re-derives that step before carrying on.",
+  },
+  {
+    tag: "Out loud, hands free",
+    body: "Walk through a problem by talking. It explains aloud, writes the working on the board as it goes, and stops the moment you cut in.",
+  },
+  {
+    tag: "From a photo",
+    body: "Photograph a page of handwritten notes — badly-drawn arrows and all — and ask it to teach you what's on it.",
+  },
+  {
+    tag: "After a bad paper",
+    body: "Photograph the marked exam. Get a question-by-question breakdown of what went wrong in the working, then a fresh paper aimed at exactly those gaps.",
+  },
+  {
+    tag: "In your language",
+    body: "Pick any of 182 languages and it teaches, quizzes, and marks entirely in it — the board content written in your language, not translated after the fact.",
+  },
 ];
 
 export default function LandingPage() {
@@ -55,16 +152,16 @@ export default function LandingPage() {
           <Logo />
           <div className="hidden gap-6 text-[13px] font-bold text-muted sm:flex">
             <a href="#how" className="transition hover:text-fg">How it works</a>
-            <a href="#byok" className="transition hover:text-fg">Your key</a>
-            <a href="#board" className="transition hover:text-fg">The whiteboard</a>
+            <a href="#features" className="transition hover:text-fg">Features</a>
+            <a href="#versus" className="transition hover:text-fg">vs a tutor</a>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <ThemeToggle />
             <Link
-              href="/app"
+              href="/signup"
               className="rounded-full grad px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90"
             >
-              Open the board
+              Start free
             </Link>
           </div>
         </div>
@@ -79,7 +176,7 @@ export default function LandingPage() {
         <div className="relative mx-auto max-w-3xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-line bg-panel px-3.5 py-1.5 text-[11.5px] font-semibold uppercase tracking-wider text-muted">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan" />
-            Bring your own model
+            Free while in beta
           </span>
 
           <h1 className="mt-6 text-[42px] font-bold leading-[1.05] tracking-tight sm:text-[68px]">
@@ -90,31 +187,31 @@ export default function LandingPage() {
 
           <p className="mx-auto mt-5 max-w-xl text-[15px] leading-relaxed text-muted sm:text-base">
             Upload your notes, slides, or lecture recording. Get a 1:1 lesson taught
-            step by step on a live whiteboard — and interrupt it whenever you're lost.
-            It runs on your own API key, so you pick the model and pay cents, not a
-            subscription.
+            step by step on a live whiteboard — out loud, if you want — and interrupt
+            it the second you&apos;re lost. It teaches from your material, not a
+            generic syllabus.
           </p>
 
           <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
             <Link
-              href="/app"
+              href="/signup"
               className="w-full rounded-full grad px-7 py-3.5 text-sm font-semibold text-white transition hover:opacity-90 sm:w-auto"
             >
               Start a lesson — free
             </Link>
             <a
-              href="#byok"
+              href="#versus"
               className="w-full rounded-full border border-line px-7 py-3.5 text-sm font-bold text-muted transition hover:border-line-2 hover:text-fg sm:w-auto"
             >
-              Why your own key?
+              Why not a human tutor?
             </a>
           </div>
 
           <div className="mt-7 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px] font-semibold text-dim">
-            <span>✓ No account</span>
-            <span>✓ Nothing uploaded to a server</span>
-            <span>✓ Live voice — it talks, you ask</span>
-            <span>✓ Claude · GPT · Gemini · open models</span>
+            <span>✓ No card, no API key</span>
+            <span>✓ Teaches from your own notes</span>
+            <span>✓ Talks out loud — interrupt it</span>
+            <span>✓ Saved to your account, any device</span>
           </div>
         </div>
 
@@ -160,86 +257,103 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* byok ------------------------------------------------------------ */}
-      <section id="byok" className="scroll-mt-20 px-5 pb-20">
-        <div className="mx-auto max-w-5xl overflow-hidden rounded-xl border border-line bg-panel">
-          <div className="grid gap-8 p-8 sm:p-12 md:grid-cols-2">
-            <div>
-              <h2 className="text-[30px] font-bold leading-tight tracking-tight sm:text-[38px]">
-                Every other tutor app
-                <br />
-                <span className="grad-text">marks up your tokens</span>
-              </h2>
-              <p className="mt-4 text-[14px] leading-relaxed text-muted">
-                They bundle one model into a monthly fee and eat the inference cost —
-                which means they choose the cheapest model that survives a demo, and
-                you pay whether you study or not.
-              </p>
-              <p className="mt-3 text-[14px] leading-relaxed text-muted">
-                TUTOR AI asks for your key instead. Use a frontier model for a proof and a
-                cheap one for flashcards. Watch the running cost in the corner. When
-                you stop studying, you stop paying.
-              </p>
-              <Link
-                href="/app"
-                className="mt-6 inline-block rounded-full grad px-6 py-3 text-sm font-semibold text-white"
-              >
-                Paste a key, start teaching
-              </Link>
-            </div>
+      {/* features -------------------------------------------------------- */}
+      <section id="features" className="scroll-mt-20 border-t border-line px-5 py-20">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="text-center text-[32px] font-bold tracking-tight sm:text-[44px]">
+            Everything it does
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-[14.5px] leading-relaxed text-muted">
+            One account, one place. The lesson, the practice, the plan, and the record
+            of what you&apos;ve actually learned.
+          </p>
 
-            <div className="space-y-2.5">
-              {[
-                ["Anthropic", "Claude Opus 5, Sonnet 5, Haiku 4.5", "$2/M in"],
-                ["OpenAI", "GPT-4.1, 4o, o4-mini", "$0.40/M in"],
-                ["Google", "Gemini 2.5 Pro & Flash", "free tier"],
-                ["OpenRouter", "DeepSeek, Llama, Qwen, Mistral", "$0.05/M in"],
-              ].map(([name, models, price]) => (
-                <div
-                  key={name}
-                  className="flex items-center gap-3 rounded-md border border-line bg-panel-2 px-4 py-3"
-                >
-                  <span className="h-2 w-2 shrink-0 rounded-full grad" />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] font-semibold">{name}</p>
-                    <p className="truncate text-[11.5px] text-dim">{models}</p>
-                  </div>
-                  <span className="shrink-0 font-mono text-[11px] text-cyan">{price}</span>
-                </div>
-              ))}
-              <p className="pt-2 text-[11.5px] leading-relaxed text-dim">
-                Keys are held in your browser and sent only to the provider you chose.
-                Uploaded material is parsed on your machine and stored in your browser's
-                own database. Delete it any time from Settings — there's no copy
-                anywhere else.
-              </p>
-            </div>
+          <div className="mt-12 grid gap-4 sm:grid-cols-2">
+            {FEATURES.map((feature) => (
+              <article
+                key={feature.title}
+                className="rounded-lg border border-line bg-panel p-6 transition hover:border-line-2"
+              >
+                <h3 className="text-[15.5px] font-semibold leading-snug">{feature.title}</h3>
+                <p className="mt-2.5 text-[13.5px] leading-relaxed text-muted">{feature.body}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* testimonials ---------------------------------------------------- */}
+      {/* versus a human tutor -------------------------------------------- */}
+      <section id="versus" className="scroll-mt-20 border-t border-line px-5 py-20">
+        <div className="mx-auto max-w-5xl">
+          <h2 className="text-center text-[32px] font-bold leading-tight tracking-tight sm:text-[44px]">
+            A good tutor costs £40 an hour
+            <br />
+            <span className="grad-text">and goes home at six</span>
+          </h2>
+          <p className="mx-auto mt-4 max-w-xl text-center text-[14.5px] leading-relaxed text-muted">
+            This isn&apos;t a worse version of a human tutor that&apos;s cheaper.
+            There are specific things it does that a person sitting next to you
+            simply can&apos;t.
+          </p>
+
+          <div className="mt-12 overflow-hidden rounded-xl border border-line bg-panel">
+            <div className="hidden grid-cols-[1fr_1fr_1fr] gap-px border-b border-line bg-line text-[11px] font-semibold uppercase tracking-wider text-dim sm:grid">
+              <span className="bg-panel px-5 py-3" />
+              <span className="bg-panel px-5 py-3">An hour with a tutor</span>
+              <span className="bg-panel px-5 py-3 text-cyan">TUTOR AI</span>
+            </div>
+
+            {VERSUS.map((row) => (
+              <div
+                key={row.label}
+                className="grid gap-px border-b border-line bg-line last:border-b-0 sm:grid-cols-[1fr_1fr_1fr]"
+              >
+                <span className="bg-panel px-5 py-4 text-[13.5px] font-semibold text-fg">
+                  {row.label}
+                </span>
+                {/* The column headers are desktop-only, so each cell names its
+                    own side on a phone — otherwise the comparison stacks into
+                    three unlabelled lines and stops meaning anything. */}
+                <span className="bg-panel px-5 py-4 text-[13px] leading-relaxed text-dim">
+                  <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-wider text-dim sm:hidden">
+                    An hour with a tutor
+                  </span>
+                  {row.human}
+                </span>
+                <span className="bg-panel px-5 py-4 text-[13px] leading-relaxed text-fg/90">
+                  <span className="mb-1 block text-[10.5px] font-semibold uppercase tracking-wider text-cyan sm:hidden">
+                    TUTOR AI
+                  </span>
+                  {row.ours}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <p className="mx-auto mt-6 max-w-2xl text-center text-[12.5px] leading-relaxed text-dim">
+            A brilliant human tutor who knows you well is still a wonderful thing. Most
+            students don&apos;t have one, can&apos;t afford one weekly, and can&apos;t
+            call one at midnight. This is built for the other twenty-three hours.
+          </p>
+        </div>
+      </section>
+
+      {/* scenarios ------------------------------------------------------- */}
       <section className="overflow-hidden border-y border-line py-16">
         <h2 className="px-5 text-center text-[32px] font-bold tracking-tight sm:text-[44px]">
-          What studying with it feels like
+          What studying with it looks like
         </h2>
         <div className="mt-10 flex overflow-hidden [mask-image:linear-gradient(90deg,transparent,#000_8%,#000_92%,transparent)]">
           <div className="marquee-track flex gap-4" style={{ "--speed": "64s" } as React.CSSProperties}>
-            {[...TESTIMONIALS, ...TESTIMONIALS].map((item, index) => (
+            {[...SCENARIOS, ...SCENARIOS].map((item, index) => (
               <figure
                 key={index}
                 className="w-[330px] shrink-0 rounded-lg border border-line bg-panel p-5"
               >
-                <blockquote className="text-[13.5px] leading-relaxed text-fg/85">
-                  “{item.quote}”
-                </blockquote>
-                <figcaption className="mt-4 flex items-center gap-2.5">
-                  <span className="h-7 w-7 rounded-full grad opacity-80" />
-                  <span>
-                    <span className="block text-[12.5px] font-semibold">{item.name}</span>
-                    <span className="block text-[11px] text-dim">{item.role}</span>
-                  </span>
+                <figcaption className="text-[11px] font-semibold uppercase tracking-wider text-cyan">
+                  {item.tag}
                 </figcaption>
+                <p className="mt-3 text-[13.5px] leading-relaxed text-fg/85">{item.body}</p>
               </figure>
             ))}
           </div>
@@ -249,22 +363,29 @@ export default function LandingPage() {
       {/* closer ---------------------------------------------------------- */}
       <section className="px-5 py-24 text-center">
         <h2 className="mx-auto max-w-2xl text-[34px] font-bold leading-tight tracking-tight sm:text-[52px]">
-          Your material. Your model.
+          Your material. Your pace.
           <br />
-          <span className="grad-text">Your pace.</span>
+          <span className="grad-text">Until it actually clicks.</span>
         </h2>
+        <p className="mx-auto mt-5 max-w-lg text-[14.5px] leading-relaxed text-muted">
+          Free while it&apos;s in beta. Make an account and ask it something you&apos;re
+          stuck on.
+        </p>
         <Link
-          href="/app"
+          href="/signup"
           className="mt-8 inline-block rounded-full grad px-8 py-4 text-sm font-semibold text-white transition hover:opacity-90"
         >
-          Open the whiteboard
+          Start free
         </Link>
       </section>
 
       <footer className="border-t border-line px-5 py-8">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 text-[11.5px] text-dim sm:flex-row">
           <Logo size={20} />
-          <p>Runs entirely in your browser. Your keys and your notes never touch our servers.</p>
+          <p>
+            Your material and lessons are saved to your account so they follow you
+            between devices. Delete any of it, or the whole account, from Settings.
+          </p>
         </div>
       </footer>
     </main>
