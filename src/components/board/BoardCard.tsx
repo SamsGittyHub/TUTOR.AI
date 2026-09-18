@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BoardAction, SourceRef } from "@/lib/actions";
 import { Diagram } from "./Diagram";
 import { Equation } from "./Equation";
@@ -14,6 +14,9 @@ interface Props {
   onAnswer: (question: string, answer: string) => void;
   materialName: (id: string) => string;
 }
+
+/** Generation takes tens of seconds; back off rather than hammering the route. */
+const RETRY_DELAYS = [1500, 2500, 4000, 6000, 8000, 10000, 12000, 15000];
 
 export function BoardCard({ action, theme, highlighted, onAnswer, materialName }: Props) {
   const paper = theme === "paper";
@@ -247,43 +250,76 @@ function ImageCard({
   const ratio =
     action.width && action.height ? `${action.width} / ${action.height}` : "3 / 2";
 
+  /*
+   * The card knows its URL before the picture exists, so a 404 here means
+   * "not generated yet", not "broken". Retry on a slowing interval until it
+   * appears — which also means a lesson reopened while a drawing was still
+   * running picks it up rather than showing a permanent gap.
+   */
+  const [attempt, setAttempt] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
+  const retry = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (retry.current !== null) window.clearTimeout(retry.current);
+    },
+    [],
+  );
+
+  const onError = () => {
+    if (attempt >= RETRY_DELAYS.length) {
+      setGaveUp(true);
+      return;
+    }
+    retry.current = window.setTimeout(() => setAttempt((n) => n + 1), RETRY_DELAYS[attempt]);
+  };
+
+  const failed = action.error || gaveUp;
+  const waiting = !loaded && !failed;
+
   return (
     <figure>
-      {action.src ? (
-        // A plain img: the source is behind the session cookie, and the
-        // intrinsic size is whatever the image model returned.
-        <img
-          src={action.src}
-          alt={action.caption || action.prompt}
-          className={`w-full rounded-sm border ${frame} bg-white`}
-          style={{ aspectRatio: ratio }}
-        />
-      ) : action.error ? (
-        <div
-          className={`flex items-center justify-center rounded-sm border border-dashed ${frame} px-6 py-8`}
-          style={{ aspectRatio: ratio }}
-        >
-          <p className={`hand max-w-sm text-center text-[17px] ${subtle}`}>{action.error}</p>
-        </div>
-      ) : (
-        <div
-          className={`flex flex-col items-center justify-center gap-3 rounded-sm border border-dashed ${frame} px-6 py-8`}
-          style={{ aspectRatio: ratio }}
-        >
-          <span className="flex gap-1.5" aria-hidden>
-            {[0, 1, 2].map((i) => (
-              <span
-                key={i}
-                className="h-2 w-2 animate-pulse rounded-full bg-current opacity-40"
-                style={{ animationDelay: `${i * 160}ms` }}
-              />
-            ))}
-          </span>
-          <p className={`hand max-w-sm text-center text-[17px] ${subtle}`}>
-            drawing {action.prompt}…
-          </p>
-        </div>
-      )}
+      <div className="relative" style={{ aspectRatio: ratio }}>
+        {action.src && !action.error ? (
+          // A plain img: the source is behind the session cookie, and the
+          // intrinsic size is whatever the image model returned.
+          <img
+            key={attempt}
+            src={attempt ? `${action.src}?retry=${attempt}` : action.src}
+            alt={action.caption || action.prompt}
+            onLoad={() => setLoaded(true)}
+            onError={onError}
+            className={`h-full w-full rounded-sm border ${frame} bg-white transition-opacity ${
+              loaded ? "opacity-100" : "opacity-0"
+            }`}
+          />
+        ) : null}
+
+        {waiting || failed ? (
+          <div
+            className={`absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-sm border border-dashed ${frame} px-6`}
+          >
+            {waiting ? (
+              <span className="flex gap-1.5" aria-hidden>
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="h-2 w-2 animate-pulse rounded-full bg-current opacity-40"
+                    style={{ animationDelay: `${i * 160}ms` }}
+                  />
+                ))}
+              </span>
+            ) : null}
+            <p className={`hand max-w-sm text-center text-[17px] ${subtle}`}>
+              {failed
+                ? action.error || "That drawing didn't finish."
+                : `drawing ${action.prompt}…`}
+            </p>
+          </div>
+        ) : null}
+      </div>
 
       {action.caption ? (
         <figcaption className={`hand mt-2 text-center text-[17px] ${bodyInk} opacity-80`}>

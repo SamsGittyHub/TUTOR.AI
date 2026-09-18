@@ -18,7 +18,7 @@ import {
 import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
 import { applyDrawnImage, type ImageRequest } from "@/lib/board-image";
-import { requestImage } from "@/lib/draw-image";
+import { planImage, requestImage } from "@/lib/draw-image";
 import { useLearning } from "@/lib/useLearning";
 import { buildBriefing, runVoiceTool, type VoiceContext } from "@/lib/voice-tools";
 
@@ -163,48 +163,63 @@ export default function VoicePage() {
   const boardRef = useRef({ actions, lines });
   boardRef.current = { actions, lines };
 
+  /** Writes the board as it stands. Safe to call twice; the id is stable. */
+  const saveNow = useCallback(() => {
+    const { actions: cards, lines: said } = boardRef.current;
+    if (!cards.length) return;
+    if (!sessionId.current) {
+      sessionId.current = `s_${crypto.randomUUID()}`;
+      // Fixed once: re-stamping it on every save would make the lesson look
+      // as though it had started the moment it was last touched.
+      startedAt.current = Date.now();
+    }
+
+    const firstAsked = said.find((line) => line.role === "student")?.text;
+    const session: Session = {
+      id: sessionId.current,
+      title: (firstAsked ?? "Live voice lesson").slice(0, 60),
+      createdAt: startedAt.current,
+      updatedAt: Date.now(),
+      materialIds: [],
+      providerId: "openai",
+      model: BETA_REALTIME_MODEL,
+      actions: cards,
+      transcript: said.map((line) => ({
+        role: line.role === "student" ? ("student" as const) : ("tutor" as const),
+        text: line.text,
+        at: Date.now(),
+      })),
+      usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, turns: said.length },
+      boardTheme: theme,
+      mode: "voice",
+    };
+    void putSession(session).catch(() => {});
+  }, [theme]);
+
   useEffect(() => {
     if (!actions.length) return;
     if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
-    saveTimer.current = window.setTimeout(() => {
-      const { actions: cards, lines: said } = boardRef.current;
-      if (!cards.length) return;
-      if (!sessionId.current) {
-        sessionId.current = `s_${crypto.randomUUID()}`;
-        // Fixed once: re-stamping it on every save would make the lesson look
-        // as though it had started the moment it was last touched.
-        startedAt.current = Date.now();
-      }
+    saveTimer.current = window.setTimeout(saveNow, 1500);
+  }, [actions, lines, saveNow]);
 
-      const firstAsked = said.find((line) => line.role === "student")?.text;
-      const session: Session = {
-        id: sessionId.current,
-        title: (firstAsked ?? "Live voice lesson").slice(0, 60),
-        createdAt: startedAt.current,
-        updatedAt: Date.now(),
-        materialIds: [],
-        providerId: "openai",
-        model: BETA_REALTIME_MODEL,
-        actions: cards,
-        transcript: said.map((line) => ({
-          role: line.role === "student" ? ("student" as const) : ("tutor" as const),
-          text: line.text,
-          at: Date.now(),
-        })),
-        usage: { inputTokens: 0, outputTokens: 0, costUsd: 0, turns: said.length },
-        boardTheme: theme,
-        mode: "voice",
-      };
-      void putSession(session).catch(() => {});
-    }, 1500);
-  }, [actions, lines, theme]);
-
-  // Closing the tab mid-sentence must not lose the board.
+  /*
+   * Leaving mid-sentence must not lose the board — and until now this only
+   * cancelled the pending write rather than completing it, so ending a
+   * session within the debounce window dropped whatever had just been said
+   * or drawn.
+   */
   useEffect(() => {
-    return () => {
+    const flush = () => {
       if (saveTimer.current !== null) window.clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      saveNow();
     };
-  }, []);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [saveNow]);
 
   /*
    * Reopening a spoken lesson. Lessons links here rather than to the typed
@@ -244,14 +259,27 @@ export default function VoicePage() {
    * for — the tutor carries on talking over a card that says what's coming.
    */
   const drawImage = useCallback((request: ImageRequest) => {
-    const id = `img-${crypto.randomUUID()}`;
+    const cardId = `img-${crypto.randomUUID()}`;
+    // Same ordering as the typed board: the card carries its final URL from
+    // the start, so ending the session mid-drawing doesn't lose the picture.
+    const planned = planImage(request);
     setActions((list) => [
       ...list,
-      { type: "show_image", id, prompt: request.prompt, caption: request.caption },
+      {
+        type: "show_image",
+        id: cardId,
+        prompt: request.prompt,
+        caption: request.caption,
+        src: planned.src,
+        width: planned.width,
+        height: planned.height,
+      },
     ]);
-    void requestImage(request).then((result) =>
-      setActions((list) => applyDrawnImage(list, id, result)),
-    );
+    void requestImage(planned.id, request).then((result) => {
+      if (result.error) {
+        setActions((list) => applyDrawnImage(list, cardId, { error: result.error }));
+      }
+    });
   }, []);
 
   const onTranscript = useCallback((role: "student" | "tutor", text: string) => {

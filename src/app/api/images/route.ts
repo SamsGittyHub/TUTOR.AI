@@ -29,6 +29,8 @@ export const runtime = "nodejs";
 
 const ENDPOINT = "https://api.openai.com/v1/images/generations";
 
+const UUID = /^[0-9a-f-]{36}$/;
+
 /** What one picture is charged as, in tokens, against the daily allowance. */
 const IMAGE_TOKEN_COST = 4000;
 
@@ -109,7 +111,17 @@ export async function POST(request: NextRequest) {
     return Response.json({ error: "No image came back." }, { status: 502 });
   }
 
-  const id = randomUUID();
+  /*
+   * The caller names the id so its board card can carry the final URL from
+   * the moment it goes up, instead of waiting for this response. Validated
+   * as a plain UUID before it reaches the filesystem — storeFile's own
+   * safeSegment would neutralise anything stranger, but a path component
+   * arriving from a browser gets checked here too rather than relying on a
+   * guard two layers down.
+   */
+  const requested = typeof body.id === "string" ? body.id : "";
+  const id = UUID.test(requested) ? requested : randomUUID();
+
   await storeFile(user.id, "board-images", `${id}.png`, bytes);
   await recordUsage(user.id, 0, IMAGE_TOKEN_COST);
 

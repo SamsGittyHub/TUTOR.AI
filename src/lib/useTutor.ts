@@ -8,7 +8,7 @@ import {
   settleUnfinishedImages,
   type ImageRequest,
 } from "./board-image";
-import { requestImage } from "./draw-image";
+import { planImage, requestImage } from "./draw-image";
 import { describeLearning, isTeachingMode, type TeachingMode } from "./learning";
 import { useLearning } from "./useLearning";
 import { isConfusion } from "./weakpoints";
@@ -166,13 +166,37 @@ export function useTutor() {
     saveSettings(settings);
   }, [settings]);
 
-  /** Persist on a trailing edge — a streaming lesson writes constantly. */
+  /**
+   * Persist on a trailing edge — a streaming lesson writes constantly.
+   *
+   * The cleanup flushes rather than just cancelling: leaving a lesson within
+   * the debounce window used to drop whatever changed last, which is exactly
+   * when it matters — the final card of a turn, or a picture that just
+   * landed. Closing the tab is covered too, since that fires pagehide
+   * without ever running a React cleanup.
+   */
   useEffect(() => {
     if (!ready || (!session.actions.length && !session.materialIds.length)) return;
-    const handle = setTimeout(() => {
+
+    const save = () => {
       void putSession(session).then(() => listSessions().then(setSessions));
-    }, 700);
-    return () => clearTimeout(handle);
+    };
+    const handle = setTimeout(save, 700);
+    let done = false;
+    const flush = () => {
+      if (done) return;
+      done = true;
+      clearTimeout(handle);
+      save();
+    };
+
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      clearTimeout(handle);
+      // Only worth flushing if the timer hadn't already fired.
+      if (!done) save();
+    };
   }, [session, ready]);
 
   const apiKey = keys[settings.providerId];
@@ -250,14 +274,25 @@ export function useTutor() {
    * the last one. The patched session autosaves like any other change, which
    * is what makes the picture still be there tomorrow.
    */
-  const drawIntoSession = useCallback(async (id: string, request: ImageRequest) => {
-    const result = await requestImage(request);
-    setSession((prev) => ({
-      ...prev,
-      actions: applyDrawnImage(prev.actions, id, result),
-      updatedAt: Date.now(),
-    }));
-  }, []);
+  /**
+   * Runs the generation for a card that already knows its own URL.
+   *
+   * Only a refusal is written back — success is the picture loading, not this
+   * resolving, which is what lets a student close the lesson mid-draw and
+   * still find the image there later.
+   */
+  const drawIntoSession = useCallback(
+    async (cardId: string, imageId: string, request: ImageRequest) => {
+      const result = await requestImage(imageId, request);
+      if (!result.error) return;
+      setSession((prev) => ({
+        ...prev,
+        actions: applyDrawnImage(prev.actions, cardId, { error: result.error }),
+        updatedAt: Date.now(),
+      }));
+    },
+    [],
+  );
 
   /* --- turns ------------------------------------------------------------ */
 
@@ -373,26 +408,41 @@ export function useTutor() {
               ]
             : undefined,
           signal: controller.signal,
-          onAction: (action) => {
-            collected.push(action);
+          onAction: (incoming) => {
+            let action = incoming;
             setStatus("teaching");
-            // A picture card arrives with nothing in it: the tutor has asked
-            // for one and the drawing takes seconds the lesson doesn't wait
-            // for. It fills itself in while the rest of the turn streams.
             if (action.type === "remember") {
               learningRef.current.remember(action.note);
             }
             if (isTeachingMode(action.type)) {
               pendingModes.current = [...pendingModes.current, action.type];
             }
+            /*
+             * A picture card arrives empty — the tutor has asked for one and
+             * the drawing takes seconds the lesson doesn't wait for. Its URL
+             * is settled here and written onto the card *before* it goes on
+             * the board, so the card is saved pointing at a real address on
+             * the very next autosave rather than waiting on a generation that
+             * may well outlive the page. Patching it afterwards would race
+             * with the append below and quietly lose the src.
+             */
             if (action.type === "show_image" && !action.src && !action.error) {
-              void drawIntoSession(action.id, {
+              const request: ImageRequest = {
                 prompt: action.prompt,
                 caption: action.caption,
                 style: action.style ?? "diagram",
                 shape: action.shape ?? "wide",
-              });
+              };
+              const planned = planImage(request);
+              action = {
+                ...action,
+                src: planned.src,
+                width: planned.width,
+                height: planned.height,
+              };
+              void drawIntoSession(action.id, planned.id, request);
             }
+            collected.push(action);
             setSession((prev) => {
               const next: Session = { ...prev, actions: [...prev.actions, action] };
               if (action.type === "lesson_plan") {

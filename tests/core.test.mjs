@@ -36,7 +36,7 @@ import {
 import { buildBriefing, runVoiceTool, VOICE_TOOLS } from "../.test-build/core/voice-tools.js";
 import {
   applyDrawnImage, buildImagePrompt, dimensionsFor, IMAGE_MODEL,
-  imageRequestBody, normalizeImageRequest, settleUnfinishedImages, sizeFor,
+  imageRequestBody, imageSrcFor, normalizeImageRequest, settleUnfinishedImages, sizeFor,
 } from "../.test-build/core/board-image.js";
 import {
   advanceListening, IDLE_LISTENING, levelOf, LISTEN_DEFAULTS,
@@ -1591,7 +1591,8 @@ test("the posted body is complete and the size matches the shape asked for", () 
   assert.equal(tall.size, sizeFor("tall"));
   assert.equal(tall.n, 1);
   assert.match(tall.prompt, /Subject: a lighthouse/);
-  assert.deepEqual(Object.keys(tall).sort(), ["model", "n", "prompt", "size"]);
+  assert.deepEqual(Object.keys(tall).sort(), ["model", "n", "prompt", "quality", "size"]);
+  assert.equal(tall.quality, "medium", "generation time scales with this");
 });
 
 test("the built prompt carries the style, the subject and the legibility rules", () => {
@@ -2389,6 +2390,22 @@ test("retrieve() and retrieveHybrid() actually use the shared default, not a sta
   const b = retrieveHybrid(big, "photosynthesis", null, undefined);
   const usedCharsHybrid = b.chunks.reduce((sum, c) => sum + c.text.length, 0);
   assert.ok(usedCharsHybrid <= DEFAULT_CHAR_BUDGET + 2000, "retrieveHybrid() drifted from the shared budget");
+});
+
+test("an image's URL is knowable from its id alone, before it exists", () => {
+  // This is what lets a card be saved with a working src while the picture is
+  // still generating — the bug being that a student who closed the lesson
+  // mid-draw used to lose it, with the file sitting on the server orphaned.
+  assert.equal(imageSrcFor("d84431f0-1542-4445-8f9e-b9091c6d4cfd"),
+               "/api/images/d84431f0-1542-4445-8f9e-b9091c6d4cfd");
+});
+
+test("dimensions are known up front too, so the card reserves the right space", () => {
+  // Without these the board would jump when the picture finally lands.
+  for (const shape of ["square", "wide", "tall"]) {
+    const { width, height } = dimensionsFor(shape);
+    assert.ok(width > 0 && height > 0, shape);
+  }
 });
 
 console.log(`\n${passed} checks passed\n`);

@@ -122,12 +122,22 @@ export function imageRequestBody(request: ImageRequest): {
   model: string;
   prompt: string;
   size: string;
+  quality: string;
   n: number;
 } {
   return {
     model: IMAGE_MODEL,
     prompt: buildImagePrompt(request),
     size: sizeFor(request.shape),
+    /*
+     * Asked for explicitly rather than left to the model's default, because
+     * generation time scales with it and a board card is looked at around
+     * 700px wide. "medium" rather than "low": the prompt demands labels that
+     * are spelled correctly and legible, and label text is the first thing to
+     * fall apart at the bottom of the quality range. This is the dial to turn
+     * if drawings still feel slow.
+     */
+    quality: "medium",
     n: 1,
   };
 }
@@ -135,6 +145,17 @@ export function imageRequestBody(request: ImageRequest): {
 /* -------------------------------------------------------------------------- */
 /* Landing a picture on the board                                              */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Where an image will be served from, given its id.
+ *
+ * Knowable before the image exists, which is the point: the board card can
+ * carry its final src from the moment it goes up, so the lesson saves with a
+ * working URL rather than waiting on a generation that might outlive the page.
+ */
+export function imageSrcFor(id: string): string {
+  return `/api/images/${id}`;
+}
 
 /** What comes back once the image model has been asked. */
 export interface DrawnImage {
