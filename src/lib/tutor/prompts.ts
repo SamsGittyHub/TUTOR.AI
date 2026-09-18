@@ -229,3 +229,57 @@ Correct answer: ${correctAnswer}
 Teach me the step I'm missing on the board — don't just restate the answer.
 Finish by asking me a similar question so I can prove I've got it.`;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Deciding whether a turn wants a picture                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A separate, tiny call that runs when a turn drew nothing by itself.
+ *
+ * Asking the tutor to remember an optional branch of a fourteen-type schema,
+ * mid-stream, while also teaching, turned out not to work however the
+ * instruction was worded — it competed with the card budget and lost, and kept
+ * losing after the budget was fixed. This doesn't ask it to remember anything:
+ * it always runs, it answers one question, and the answer is a strict two-key
+ * object that a weak model can produce reliably.
+ *
+ * The bar is deliberately concrete. "Would a photograph or a labelled figure of
+ * a real thing help here" is answerable; "would a picture be nice" is not, and
+ * gets a yes for algebra.
+ */
+export const ILLUSTRATE_SYSTEM = `You decide whether a tutoring turn should be illustrated.
+
+Answer with one JSON object and nothing else.
+
+If the topic involves a physical thing a student could look at — apparatus, a
+specimen, an organ, a device, a place, a map, a mechanism, an artefact, a
+historical scene, a biological structure — answer:
+
+{"draw":true,"prompt":"<what to draw, fully described: the subject, what must be visible, and what to label>","caption":"<a short line for under the picture>","style":"diagram","shape":"wide"}
+
+style: "diagram" for a labelled figure (use this almost always), "sketch" for a
+hand-drawn marker look, "realistic" for a photograph of a real object.
+shape: "wide" normally, "tall" for something upright like a tower or a column.
+
+If the topic is purely symbolic — rearranging an equation, a proof, a
+definition, mental arithmetic, grammar — answer exactly:
+
+{"draw":false}
+
+Describe the subject properly when you do draw. "a leaf" is not a brief;
+"a labelled cross-section of a leaf showing cuticle, palisade mesophyll,
+spongy mesophyll, stomata and guard cells" is.`;
+
+/** The turn to judge, kept short — this call is meant to be cheap. */
+export function buildIllustrateMessage(
+  studentMessage: string,
+  boardSummary: string,
+): string {
+  const board = boardSummary.trim().slice(0, 1200);
+  return `The student asked: ${studentMessage}
+
+${board ? `What the tutor just put on the board:\n${board}` : "The tutor hasn't written anything yet."}
+
+Should this be illustrated?`;
+}

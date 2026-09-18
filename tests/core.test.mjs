@@ -48,7 +48,9 @@ import {
 } from "../.test-build/core/learning.js";
 import { isActive, NAV_LINKS } from "../.test-build/core/nav.js";
 import { TOUR_STEPS } from "../.test-build/core/tour.js";
-import { buildSystemPrompt } from "../.test-build/core/tutor/prompts.js";
+import {
+  buildIllustrateMessage, buildSystemPrompt, ILLUSTRATE_SYSTEM,
+} from "../.test-build/core/tutor/prompts.js";
 import { sourceHash, STRINGS } from "../.test-build/core/strings.js";
 import { excerpt, searchTerms, splitOnTerms } from "../.test-build/core/search.js";
 import { reminderText, shouldRemind } from "../.test-build/core/reminders.js";
@@ -2439,6 +2441,36 @@ test("nothing in the prompt rations pictures", () => {
   for (const phrase of ["one picture per turn at most", "at most one picture", "sparingly"]) {
     assert.ok(!prompt.includes(phrase), `the prompt still rations drawings: "${phrase}"`);
   }
+});
+
+test("the illustrate decision asks for an answer a weak model can actually give", () => {
+  // The whole point of this second call is that it's simpler than remembering
+  // an optional branch mid-lesson. If it grows into an essay prompt it stops
+  // being more reliable than the thing it replaced.
+  const flat = ILLUSTRATE_SYSTEM.replace(/\s+/g, " ");
+  assert.match(flat, /"draw":true/, "it must show the exact shape it wants back");
+  assert.match(flat, /\{"draw":false\}/, "the negative case needs to be trivial to emit");
+  assert.match(flat, /purely symbolic/i, "without an exception it illustrates algebra");
+  assert.ok(ILLUSTRATE_SYSTEM.length < 1400, "this call is supposed to be cheap");
+});
+
+test("the illustrate message carries the question and the board, and stays short", () => {
+  const msg = buildIllustrateMessage("how does a voltaic cell work", "[board:t1] The voltaic cell");
+  assert.match(msg, /voltaic cell work/);
+  assert.match(msg, /The voltaic cell/);
+  assert.match(msg, /Should this be illustrated\?$/);
+});
+
+test("a turn with nothing on the board yet still gets a decision", () => {
+  // The first turn of a lesson is exactly when a picture helps most.
+  const msg = buildIllustrateMessage("explain the eye", "");
+  assert.match(msg, /hasn't written anything yet/);
+  assert.match(msg, /explain the eye/);
+});
+
+test("a huge board summary is truncated before it's sent", () => {
+  const msg = buildIllustrateMessage("x", "card. ".repeat(2000));
+  assert.ok(msg.length < 1600, `decision call ballooned to ${msg.length} chars`);
 });
 
 console.log(`\n${passed} checks passed\n`);

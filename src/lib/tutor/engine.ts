@@ -7,8 +7,10 @@ import { getProvider, type ChatMessage, type ImagePart, type ProviderId, type Us
 import { languageInstruction } from "../language";
 import { extractFirstJson, JsonObjectStream } from "../stream-json";
 import {
+  buildIllustrateMessage,
   buildQuizPrompt,
   buildSystemPrompt,
+  ILLUSTRATE_SYSTEM,
   REPAIR_INSTRUCTION,
 } from "./prompts";
 
@@ -227,6 +229,30 @@ export async function runTutorTurn(request: TurnRequest): Promise<TurnResult> {
     }
   }
 
+  /*
+   * If the turn drew nothing, ask once, separately, whether it should have.
+   *
+   * Every attempt to get this out of the main turn failed — the instruction
+   * competed with the card budget, and kept losing after the budget was fixed,
+   * because remembering an optional branch of a fourteen-type schema while
+   * also teaching is a lot to ask of a cheap model. This asks one question and
+   * takes a two-key answer, which is about the simplest thing a model can be
+   * asked to do, and it always runs rather than needing to be remembered.
+   *
+   * Never allowed to break a lesson: any failure here is swallowed, because a
+   * missing picture is a worse outcome than a missing picture *and* an error.
+   */
+  if (!actions.some((a) => a.type === "show_image")) {
+    try {
+      await illustrate(request, provider, (action) => {
+        actions.push(action);
+        request.onAction(action);
+      });
+    } catch {
+      // A lesson without a drawing is still a lesson.
+    }
+  }
+
   const citedLocators = [
     ...new Set(
       actions.flatMap((a) => (a.sourceRefs ?? []).map((r) => r.locator)).filter(Boolean),
@@ -390,4 +416,52 @@ export function checkAnswer(question: QuizQuestion, response: string): boolean {
   }
   // Short answers: accept a response that contains the expected answer.
   return expected.length > 2 && given.includes(expected);
+}
+
+/**
+ * One cheap call deciding whether this turn wants a picture, and emitting it.
+ *
+ * Deliberately not streamed and deliberately capped short: the entire expected
+ * answer is a two-key object, so anything long means the model has gone off
+ * and the JSON extractor will reject it anyway.
+ */
+async function illustrate(
+  request: TurnRequest,
+  provider: ReturnType<typeof getProvider>,
+  emit: (action: TutorAction) => void,
+): Promise<void> {
+  let raw = "";
+  await provider.stream({
+    apiKey: request.apiKey,
+    model: request.model,
+    system: ILLUSTRATE_SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: buildIllustrateMessage(request.studentMessage, request.boardSummary),
+      },
+    ],
+    maxTokens: 300,
+    effort: "low",
+    signal: request.signal,
+    onText: (delta) => {
+      raw += delta;
+    },
+  });
+
+  const decision = extractFirstJson(raw) as
+    | { draw?: unknown; prompt?: unknown; caption?: unknown; style?: unknown; shape?: unknown }
+    | null;
+  if (!decision || decision.draw !== true) return;
+
+  const action = normalizeAction({
+    type: "show_image",
+    prompt: decision.prompt,
+    caption: decision.caption,
+    style: decision.style,
+    shape: decision.shape,
+  });
+  // normalizeAction drops a show_image with nothing to draw, which is exactly
+  // what a malformed decision looks like.
+  if (action) emit(action);
 }
