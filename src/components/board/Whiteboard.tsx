@@ -16,6 +16,13 @@ interface Props {
   onClear: () => void;
   materialName: (id: string) => string;
   emptyState: React.ReactNode;
+  /**
+   * Space to keep clear on the right, in px, for anything docked over the
+   * board. Reserved rather than overlaid: cards centre themselves in the
+   * width they're given, so without this a wide table would slide under a
+   * docked panel instead of sitting beside it.
+   */
+  insetRight?: number;
 }
 
 export function Whiteboard({
@@ -28,6 +35,7 @@ export function Whiteboard({
   onClear,
   materialName,
   emptyState,
+  insetRight = 0,
 }: Props) {
   const scroller = useRef<HTMLDivElement>(null);
   const pinnedToBottom = useRef(true);
@@ -123,6 +131,7 @@ export function Whiteboard({
         onScroll={onScroll}
         data-theme={theme === "chalk" ? "chalk" : undefined}
         className="board-surface min-h-0 flex-1 overflow-y-auto"
+        style={insetRight ? { paddingRight: insetRight } : undefined}
       >
         {visible.length === 0 ? (
           <div className="flex h-full items-center justify-center p-6">{emptyState}</div>

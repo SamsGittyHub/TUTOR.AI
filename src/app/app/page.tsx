@@ -5,8 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Logo } from "@/components/Logo";
 import { ChatRail } from "@/components/app/ChatRail";
-import { Resizer, useStoredWidth } from "@/components/app/Resizer";
-import { CHAT_WIDTH, SIDEBAR_WIDTH } from "@/lib/storage-keys";
+import { Resizer, useStoredFlag, useStoredWidth } from "@/components/app/Resizer";
+import { CHAT_DOCKED, CHAT_WIDTH, SIDEBAR_HIDDEN, SIDEBAR_WIDTH } from "@/lib/storage-keys";
 import { ProgressPanel } from "@/components/app/ProgressPanel";
 import { ReviewModal } from "@/components/app/ReviewModal";
 import { SettingsModal } from "@/components/app/SettingsModal";
@@ -35,6 +35,16 @@ const MIN_CHAT_WIDTH = 260;
 const MAX_CHAT_WIDTH = 720;
 const DEFAULT_CHAT_WIDTH = 330;
 
+/*
+ * Below this, the chat stops being its own column and docks onto the board
+ * instead. A board card is a fixed, fairly narrow measure — the right half of
+ * the whiteboard is almost always empty — so a squeezed chat column costs the
+ * lesson width it wasn't using anyway. Docked, the board gets the whole width
+ * back and the conversation floats over the part of it nothing was using.
+ */
+const DOCK_CHAT_BELOW = 300;
+const DOCKED_CHAT_WIDTH = 340;
+
 export default function AppPage() {
   const tutor = useTutor();
   const router = useRouter();
@@ -56,6 +66,9 @@ export default function AppPage() {
     MIN_CHAT_WIDTH,
     MAX_CHAT_WIDTH,
   );
+  const [sidebarHidden, setSidebarHidden] = useStoredFlag(SIDEBAR_HIDDEN, false);
+  const [chatDocked, setChatDocked] = useStoredFlag(CHAT_DOCKED, false);
+  const [dockedChatOpen, setDockedChatOpen] = useState(true);
   const [mobileView, setMobileView] = useState<MobileView>("board");
 
   const voice = useVoice({ onTranscript: handleTranscript });
@@ -145,6 +158,31 @@ export default function AppPage() {
   const busy = tutor.status === "thinking" || tutor.status === "teaching";
   const provider = getProvider(tutor.settings.providerId);
   const model = findModel(tutor.settings.providerId, tutor.settings.model);
+
+  /*
+   * Rendered either as its own column or docked onto the board, so the props
+   * live in one place — two copies of this list is two chances for the docked
+   * one to quietly stop matching.
+   */
+  const chatRail = (
+    <ChatRail
+            actions={tutor.session.actions}
+            transcript={tutor.session.transcript}
+            status={tutor.status}
+            onSend={tutor.send}
+            onStop={() => {
+              voice.stopSpeaking();
+              tutor.stop();
+            }}
+            disabled={!tutor.hasKey}
+            micSupported={voice.micSupported}
+            micOn={voice.micOn}
+            speaking={voice.speaking}
+            interim={voice.interim}
+            micError={voice.micError}
+            onToggleMic={voice.toggleMic}
+          />
+  );
 
   return (
     <div className="flex h-dvh flex-col bg-ink">
@@ -270,13 +308,31 @@ export default function AppPage() {
         // The chosen widths are honoured, but never at the cost of the board: on a
         // smaller screen a 536px panel would leave it too narrow to teach on, so
         // each side is capped as a share of the viewport.
-        className="grid min-h-0 flex-1 gap-2 p-2 lg:grid-cols-[min(var(--side-w),38vw)_10px_minmax(0,1fr)_10px_min(var(--chat-w),32vw)]"
+        className={`grid min-h-0 w-full min-w-0 flex-1 grid-cols-1 gap-2 overflow-hidden p-2 ${
+          sidebarHidden
+            ? chatDocked
+              ? "lg:grid-cols-[0px_10px_minmax(0,1fr)]"
+              : "lg:grid-cols-[0px_10px_minmax(0,1fr)_10px_min(var(--chat-w),32vw)]"
+            : chatDocked
+              ? "lg:grid-cols-[min(var(--side-w),38vw)_10px_minmax(0,1fr)]"
+              : "lg:grid-cols-[min(var(--side-w),38vw)_10px_minmax(0,1fr)_10px_min(var(--chat-w),32vw)]"
+        }`}
         style={{
           ["--chat-w" as string]: `${chatWidth}px`,
           ["--side-w" as string]: `${sidebarWidth}px`,
         }}
       >
-        <div className={`min-h-0 min-w-0 ${mobileView === "material" ? "block" : "hidden"} lg:block`}>
+        {/*
+          Hidden by clipping it to a zero-width column, not by display:none.
+          A display:none grid item stops occupying a cell, which shifts every
+          item after it one column left — the board would land in the 10px
+          divider track and render 10px wide.
+        */}
+        <div
+          className={`min-h-0 min-w-0 ${mobileView === "material" ? "block" : "hidden"} lg:block ${
+            sidebarHidden ? "lg:overflow-hidden" : ""
+          }`}
+        >
           <Sidebar
             materials={tutor.materials}
             selectedIds={tutor.session.materialIds}
@@ -314,9 +370,16 @@ export default function AppPage() {
           defaultWidth={DEFAULT_SIDEBAR_WIDTH}
           label="Resize the material panel"
           anchor="left"
+          collapsed={sidebarHidden}
+          onToggleCollapse={() => setSidebarHidden(!sidebarHidden)}
+          collapseLabel="material panel"
         />
 
-        <div className={`min-h-0 min-w-0 ${mobileView === "board" ? "block" : "hidden"} lg:block`}>
+        <div
+          className={`relative min-h-0 min-w-0 ${
+            mobileView === "board" ? "block" : "hidden"
+          } lg:block`}
+        >
           <Whiteboard
             actions={tutor.session.actions}
             theme={tutor.session.boardTheme}
@@ -326,6 +389,9 @@ export default function AppPage() {
             onToggleTheme={tutor.toggleBoardTheme}
             onClear={tutor.wipeBoard}
             materialName={tutor.materialName}
+            // Only while the panel is actually on screen — collapsed to the
+            // "Ask" pill, the board should have its full width back.
+            insetRight={chatDocked && dockedChatOpen ? DOCKED_CHAT_WIDTH + 24 : 0}
             emptyState={
               <EmptyBoard
                 hasKey={tutor.hasKey}
@@ -339,35 +405,114 @@ export default function AppPage() {
               />
             }
           />
+
+          {/*
+            The docked conversation. Only ever on large screens — the phone
+            layout already has it as a tab — and only when docked, so it can't
+            sit on top of a chat column that's also visible.
+
+            It's inset within the board rather than laid over the whole thing,
+            and the board's cards are a fixed narrow measure, so what it covers
+            is the empty right-hand side the lesson never used.
+          */}
+          {chatDocked ? (
+            // Starts below the board's own header rather than at its top
+            // edge: the chalk and wipe controls live up there, and a panel
+            // that covers the buttons of the thing it's docked to is worse
+            // than no panel.
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 top-[52px] z-20 hidden justify-end p-3 lg:flex">
+              {dockedChatOpen ? (
+                <div
+                  className="pointer-events-auto flex h-full flex-col overflow-hidden rounded-lg border border-line bg-panel/95 shadow-xl backdrop-blur-sm"
+                  style={{ width: DOCKED_CHAT_WIDTH }}
+                >
+                  <div className="flex shrink-0 items-center gap-1 border-b border-line px-2.5 py-1.5">
+                    <span className="flex-1 pl-1 text-[11px] font-semibold uppercase tracking-wider text-dim">
+                      Docked
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setChatDocked(false)}
+                      title="Put the chat back in its own column"
+                      aria-label="Put the chat back in its own column"
+                      className="tx press rounded-full px-2.5 py-1 text-[11.5px] font-medium text-muted hover:bg-[var(--tint)] hover:text-fg"
+                    >
+                      Undock
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDockedChatOpen(false)}
+                      title="Hide the chat"
+                      aria-label="Hide the chat"
+                      className="tx press flex h-7 w-7 items-center justify-center rounded-full text-muted hover:bg-[var(--tint)] hover:text-fg"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                        <path
+                          d="M9 6l6 6-6 6"
+                          stroke="currentColor"
+                          strokeWidth="2.2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1">{chatRail}</div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setDockedChatOpen(true)}
+                  title="Show the chat"
+                  aria-label="Show the chat"
+                  className="tx press pointer-events-auto flex h-10 items-center gap-2 self-start rounded-full border border-line bg-panel/95 px-4 text-[12.5px] font-semibold text-muted shadow-lg backdrop-blur-sm hover:text-fg"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+                    <path
+                      d="M21 12a8 8 0 0 1-8 8H8l-4 3v-4.6A8 8 0 1 1 21 12Z"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                  Ask
+                </button>
+              )}
+            </div>
+          ) : null}
         </div>
 
-        <Resizer
-          width={chatWidth}
-          onChange={setChatWidth}
-          min={MIN_CHAT_WIDTH}
-          max={MAX_CHAT_WIDTH}
-          defaultWidth={DEFAULT_CHAT_WIDTH}
-          label="Resize the chat panel"
-        />
-
-        <div className={`min-h-0 min-w-0 ${mobileView === "chat" ? "block" : "hidden"} lg:block`}>
-          <ChatRail
-            actions={tutor.session.actions}
-            transcript={tutor.session.transcript}
-            status={tutor.status}
-            onSend={tutor.send}
-            onStop={() => {
-              voice.stopSpeaking();
-              tutor.stop();
+        {chatDocked ? null : (
+          <Resizer
+            width={chatWidth}
+            onChange={(next) => {
+              // Dragged past the point where a column stops being worth it:
+              // dock rather than leaving a sliver too narrow to read.
+              if (next < DOCK_CHAT_BELOW) {
+                setChatDocked(true);
+                setDockedChatOpen(true);
+                return;
+              }
+              setChatWidth(next);
             }}
-            disabled={!tutor.hasKey}
-            micSupported={voice.micSupported}
-            micOn={voice.micOn}
-            speaking={voice.speaking}
-            interim={voice.interim}
-            micError={voice.micError}
-            onToggleMic={voice.toggleMic}
+            min={MIN_CHAT_WIDTH}
+            max={MAX_CHAT_WIDTH}
+            defaultWidth={DEFAULT_CHAT_WIDTH}
+            label="Resize the chat panel"
+            onToggleCollapse={() => {
+              setChatDocked(true);
+              setDockedChatOpen(true);
+            }}
+            collapseTitle="Dock the chat onto the board"
           />
+        )}
+
+        <div
+          className={`min-h-0 min-w-0 ${mobileView === "chat" ? "block" : "hidden"} ${
+            chatDocked ? "lg:hidden" : "lg:block"
+          }`}
+        >
+          {chatRail}
         </div>
       </div>
 

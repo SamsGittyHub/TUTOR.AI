@@ -25,6 +25,8 @@ export const QUIZ_SELECTION = `${PREFIX}.quiz.materials.v1`;
 export const TEACH_HANDOFF = `${PREFIX}.teach.v1`;
 export const CHAT_WIDTH = `${PREFIX}.chatwidth.v1`;
 export const SIDEBAR_WIDTH = `${PREFIX}.sidewidth.v1`;
+export const SIDEBAR_HIDDEN = `${PREFIX}.sidehidden.v1`;
+export const CHAT_DOCKED = `${PREFIX}.chatdocked.v1`;
 export const LANGUAGE = `${PREFIX}.language.v1`;
 
 function legacyNameFor(key: string): string {

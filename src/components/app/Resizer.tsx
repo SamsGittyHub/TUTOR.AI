@@ -35,6 +35,17 @@ interface Props {
    * pointer moves right; a right panel's grows as it moves left.
    */
   anchor?: "left" | "right";
+  /**
+   * Turns the divider into a collapse control as well as a drag handle. The
+   * chevron lives here because this is already the boundary the panel owns —
+   * a button anywhere else is a thing to hunt for.
+   */
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  /** Named for the button's tooltip, e.g. "material panel". */
+  collapseLabel?: string;
+  /** Overrides the tooltip entirely, when "Hide the X" isn't what happens. */
+  collapseTitle?: string;
 }
 
 export function Resizer({
@@ -45,6 +56,10 @@ export function Resizer({
   defaultWidth,
   label,
   anchor = "right",
+  collapsed = false,
+  onToggleCollapse,
+  collapseLabel,
+  collapseTitle,
 }: Props) {
   const [dragging, setDragging] = useState(false);
   const frame = useRef<number | null>(null);
@@ -134,20 +149,61 @@ export function Resizer({
       onPointerCancel={endDrag}
       onDoubleClick={() => onChange(defaultWidth)}
       onKeyDown={onKeyDown}
-      title="Drag to resize — double-click to reset"
-      className="group relative hidden cursor-col-resize touch-none items-stretch justify-center lg:flex"
+      title={collapsed ? undefined : "Drag to resize — double-click to reset"}
+      className={`group relative hidden touch-none items-stretch justify-center lg:flex ${
+        collapsed ? "cursor-default" : "cursor-col-resize"
+      }`}
     >
       {/* The grab target is wider than the line it draws, or this is a
-          pixel-hunt every time. */}
-      <span className="absolute inset-y-0 -left-2 -right-2" aria-hidden />
+          pixel-hunt every time. A collapsed panel has nothing to drag, so the
+          wide target would just be dead space that swallows clicks. */}
+      {collapsed ? null : (
+        <span className="absolute inset-y-0 -left-2 -right-2 z-0" aria-hidden />
+      )}
       <span
         aria-hidden
         className={`tx my-4 w-[3px] rounded-full ${
-          dragging
-            ? "bg-[var(--color-accent)]"
-            : "bg-[var(--hairline)] group-hover:bg-[var(--color-line-2)] group-focus-visible:bg-[var(--color-accent)]"
+          collapsed
+            ? "bg-transparent"
+            : dragging
+              ? "bg-[var(--color-accent)]"
+              : "bg-[var(--hairline)] group-hover:bg-[var(--color-line-2)] group-focus-visible:bg-[var(--color-accent)]"
         }`}
       />
+
+      {onToggleCollapse ? (
+        <button
+          type="button"
+          // The divider is a separator for assistive tech; the button inside
+          // it is the actual control, so the press must not also start a drag.
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleCollapse();
+          }}
+          title={collapseTitle ?? `${collapsed ? "Show" : "Hide"} the ${collapseLabel ?? "panel"}`}
+          aria-label={
+            collapseTitle ?? `${collapsed ? "Show" : "Hide"} the ${collapseLabel ?? "panel"}`
+          }
+          aria-expanded={!collapsed}
+          className="tx press absolute left-1/2 top-1/2 z-20 flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-line bg-panel text-muted opacity-0 shadow-sm transition hover:text-fg focus-visible:opacity-100 group-hover:opacity-100 data-[shown=true]:opacity-100"
+          data-shown={collapsed}
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d={
+                (anchor === "left") === !collapsed
+                  ? "M15 6l-6 6 6 6"
+                  : "M9 6l6 6-6 6"
+              }
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      ) : null}
     </div>
   );
 }
@@ -190,4 +246,37 @@ export function useStoredWidth(
   );
 
   return [width, update] as const;
+}
+
+/**
+ * Remembers a panel's open/closed state across reloads.
+ *
+ * Same shape and same reasoning as useStoredWidth: read in an effect, because
+ * the server can't know what this browser last chose and rendering it during
+ * the first pass would mean a hydration mismatch.
+ */
+export function useStoredFlag(
+  key: string,
+  fallback: boolean,
+): [boolean, (next: boolean) => void] {
+  const [value, setValue] = useState(fallback);
+
+  useEffect(() => {
+    const raw = readStored(localStorage, key);
+    if (raw === "1" || raw === "0") setValue(raw === "1");
+  }, [key]);
+
+  const update = useCallback(
+    (next: boolean) => {
+      setValue(next);
+      try {
+        localStorage.setItem(key, next ? "1" : "0");
+      } catch {
+        // Private mode: the choice just won't persist.
+      }
+    },
+    [key],
+  );
+
+  return [value, update];
 }

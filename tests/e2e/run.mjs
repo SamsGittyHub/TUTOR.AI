@@ -223,4 +223,40 @@ await run([
       await stranger.close();
     },
   },
+  {
+    name: "the material panel hides and comes back, and the chat docks onto the board",
+    async fn({ page }) {
+      // Both panels' states persist, so a regression here silently follows a
+      // student around rather than resetting on reload.
+      await page.getByRole("button", { name: /Hide the material panel/i }).click();
+      await page.waitForTimeout(500);
+      expect(
+        !(await page.getByText("Drop notes, slides").isVisible().catch(() => false)),
+        "the material panel didn't hide",
+      );
+
+      await page.getByRole("button", { name: /Dock the chat onto the board/i }).click();
+      await page.waitForTimeout(600);
+      expect(await page.getByText("Docked").isVisible(), "the chat didn't dock");
+      expect(
+        (await page.locator("textarea:visible").count()) === 1,
+        "docking should leave exactly one usable chat input",
+      );
+
+      await page.reload({ waitUntil: "networkidle" });
+      await page.waitForTimeout(1800);
+      expect(
+        await page.getByText("Docked").isVisible().catch(() => false),
+        "the docked chat didn't survive a reload",
+      );
+
+      await page.getByRole("button", { name: /Put the chat back/i }).click();
+      await page.getByRole("button", { name: /Show the material panel/i }).click();
+      await page.waitForTimeout(600);
+      expect(
+        await page.getByText("Drop notes, slides").isVisible(),
+        "the material panel didn't come back",
+      );
+    },
+  },
 ]);
