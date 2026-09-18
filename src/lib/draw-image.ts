@@ -55,10 +55,25 @@ export async function requestImage(
     });
     const body = await response.json().catch(() => ({}));
     if (!response.ok) {
-      return { error: body.error ?? "That drawing didn't come through." };
+      /*
+       * Every failure the server anticipates names itself. A response with no
+       * error field is therefore something it didn't anticipate — a crash, or
+       * a gateway that gave up on the request — and the status code is the
+       * only clue anyone gets, so it goes in the message rather than being
+       * swallowed into a sentence that fits every possible cause equally.
+       */
+      return { error: body.error ?? `That drawing didn't come through (${response.status}).` };
     }
     return { src: body.src, width: body.width, height: body.height };
   } catch {
-    return { error: "That drawing didn't come through." };
+    /*
+     * The request never completed — a dropped connection, a phone changing
+     * network mid-lesson. Crucially this is not evidence that the drawing
+     * failed: the server may have finished it and written it under the id we
+     * chose. Reporting a failure here would replace a picture that is sitting
+     * on disk with an error message, so say nothing and let the card keep
+     * asking for its image URL until it either appears or it's clearly late.
+     */
+    return { unresolved: true };
   }
 }

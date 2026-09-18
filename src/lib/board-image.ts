@@ -163,6 +163,13 @@ export interface DrawnImage {
   width?: number;
   height?: number;
   error?: string;
+  /**
+   * Set when the request neither clearly succeeded nor clearly failed — the
+   * connection dropped, so the server may well have finished drawing anyway.
+   * Never written onto a card: it means "don't decide yet", and the card's
+   * own polling of the image URL is what settles it.
+   */
+  unresolved?: boolean;
 }
 
 /** The shape of a board card, as far as this module needs to know. */

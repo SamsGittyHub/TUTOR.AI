@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { JsonObjectStream, extractFirstJson } from "../.test-build/core/stream-json.js";
 import { isBoardAction, normalizeAction, unescapeBreaks } from "../.test-build/core/actions.js";
 import { compileExpression } from "../.test-build/core/expr.js";
+import { requestImage } from "../.test-build/core/draw-image.js";
 import {
   DAY_MS,
   isDue,
@@ -2472,5 +2473,70 @@ test("a huge board summary is truncated before it's sent", () => {
   const msg = buildIllustrateMessage("x", "card. ".repeat(2000));
   assert.ok(msg.length < 1600, `decision call ballooned to ${msg.length} chars`);
 });
+
+console.log("\n— asking for a picture —");
+
+/* Drives the real requestImage against a stubbed server. Every one of these
+   used to come back as the identical sentence "That drawing didn't come
+   through", which is why a student reporting it told us nothing at all. */
+const drawAgainst = async (stub) => {
+  const saved = globalThis.fetch;
+  globalThis.fetch = stub;
+  try {
+    return await requestImage("11111111-1111-1111-1111-111111111111", {
+      prompt: "a titration setup",
+      caption: "Titration",
+      style: "diagram",
+      shape: "wide",
+    });
+  } finally {
+    globalThis.fetch = saved;
+  }
+};
+
+test("a picture that draws comes back with somewhere to find it", () =>
+  drawAgainst(async () =>
+    Response.json({ src: "/api/images/x", width: 1024, height: 640 }),
+  ).then((out) => {
+    assert.equal(out.src, "/api/images/x");
+    assert.equal(out.width, 1024);
+    assert.equal(out.error, undefined);
+  }));
+
+test("an error the server explains is passed through in its own words", () =>
+  drawAgainst(async () =>
+    Response.json({ error: "The picture was drawn but couldn't be saved on the server." }, { status: 500 }),
+  ).then((out) => {
+    assert.equal(out.error, "The picture was drawn but couldn't be saved on the server.");
+  }));
+
+test("a failure with no explanation still says what the status was", () =>
+  // A crash or a gateway giving up returns an HTML page, not JSON. The status
+  // is then the only evidence there is, so it has to reach the board.
+  drawAgainst(async () =>
+    new Response("<html>502 Bad Gateway</html>", {
+      status: 502,
+      headers: { "content-type": "text/html" },
+    }),
+  ).then((out) => {
+    assert.match(out.error, /502/, "a bare failure has to carry its status");
+  }));
+
+test("a dropped connection is not reported as a failed drawing", () =>
+  /*
+   * The important one. The id was chosen by the browser, so a request that
+   * dies on the way back may still have left a finished picture on the
+   * server under exactly that id — and the card is already polling for it.
+   * Calling this an error would paint an error message over a picture that
+   * exists.
+   */
+  drawAgainst(async () => {
+    throw new TypeError("Failed to fetch");
+  }).then((out) => {
+    assert.equal(out.error, undefined, "a dropped request must not claim the drawing failed");
+    assert.equal(out.unresolved, true);
+  }));
+
+await Promise.all(pending);
 
 console.log(`\n${passed} checks passed\n`);

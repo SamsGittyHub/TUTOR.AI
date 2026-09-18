@@ -15,8 +15,18 @@ interface Props {
   materialName: (id: string) => string;
 }
 
-/** Generation takes tens of seconds; back off rather than hammering the route. */
-const RETRY_DELAYS = [1500, 2500, 4000, 6000, 8000, 10000, 12000, 15000];
+/**
+ * Generation takes tens of seconds; back off rather than hammering the route.
+ *
+ * These have to outlast the server's own drawing budget, which is 105s. They
+ * used to run out at 59s, so a picture that was merely slow got written off as
+ * broken while the server was still drawing it — and worse, this polling is
+ * the only thing that finds a picture whose request dropped on the way back.
+ */
+const RETRY_DELAYS = [
+  1500, 2500, 4000, 6000, 8000, 10000, 12000, 15000, 15000, 15000, 15000, 15000,
+  15000,
+];
 
 export function BoardCard({ action, theme, highlighted, onAnswer, materialName }: Props) {
   const paper = theme === "paper";
