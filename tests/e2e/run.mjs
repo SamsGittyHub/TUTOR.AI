@@ -295,4 +295,51 @@ await run([
       );
     },
   },
+  {
+    name: "a lesson is tappable on a phone",
+    device: PHONE,
+    async fn({ page, base }) {
+      // The title link was an inline <a> with `truncate`, so it reported its
+      // full text width, overflowed its min-w-0 parent, and ended up under the
+      // row's action buttons — every tap hit Export or Delete instead.
+      const id = `s_${crypto.randomUUID()}`;
+      await page.evaluate(
+        ([id, base]) =>
+          fetch(`${base}/api/lessons`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              session: {
+                id,
+                title: "A lesson with a reasonably long title about voltaic cells",
+                createdAt: Date.now(), updatedAt: Date.now(),
+                materialIds: [], providerId: "openai", model: "m", mode: "typed",
+                actions: [{ type: "write_text", id: "t1", text: "Ohm", style: "title", color: "ink" }],
+                transcript: [], usage: {}, boardTheme: "paper",
+              },
+            }),
+          }).then((r) => r.json()),
+        [id, base],
+      );
+
+      await page.goto(`${base}/sessions`, { waitUntil: "networkidle" });
+      await page.waitForTimeout(1000);
+      const link = page.locator("a").filter({ hasText: /voltaic cells/i }).first();
+      expect(await link.count() === 1, "the lesson isn't listed");
+
+      const clear = await page.evaluate(() => {
+        const a = [...document.querySelectorAll("a")].find((x) => /voltaic cells/i.test(x.textContent || ""));
+        if (!a) return false;
+        const b = a.getBoundingClientRect();
+        return [0.2, 0.5, 0.8].every((f) => {
+          const top = document.elementFromPoint(b.x + b.width * f, b.y + b.height / 2);
+          return top && a.contains(top);
+        });
+      });
+      expect(clear, "the lesson title is covered by the row's buttons");
+
+      await link.click();
+      await page.waitForURL("**/app**", { timeout: 15000 });
+    },
+  },
 ]);

@@ -297,25 +297,22 @@ function ImageCard({
           />
         ) : null}
 
-        {waiting || failed ? (
+        {waiting ? (
           <div
-            className={`absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-sm border border-dashed ${frame} px-6`}
+            role="img"
+            aria-label={`Drawing ${action.caption || action.prompt}`}
+            className={`image-shimmer absolute inset-0 overflow-hidden rounded-sm border border-dashed ${frame} ${
+              theme === "paper" ? "bg-black/[.035]" : "bg-white/[.06]"
+            }`}
+          />
+        ) : null}
+
+        {failed ? (
+          <div
+            className={`absolute inset-0 flex items-center justify-center rounded-sm border border-dashed ${frame} px-6`}
           >
-            {waiting ? (
-              <span className="flex gap-1.5" aria-hidden>
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="h-2 w-2 animate-pulse rounded-full bg-current opacity-40"
-                    style={{ animationDelay: `${i * 160}ms` }}
-                  />
-                ))}
-              </span>
-            ) : null}
             <p className={`hand max-w-sm text-center text-[17px] ${subtle}`}>
-              {failed
-                ? action.error || "That drawing didn't finish."
-                : `drawing ${action.prompt}…`}
+              {action.error || "That drawing didn't finish."}
             </p>
           </div>
         ) : null}

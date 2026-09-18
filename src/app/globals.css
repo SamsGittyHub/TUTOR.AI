@@ -412,6 +412,30 @@ h2 {
   animation: float-slow 6s ease-in-out infinite;
 }
 
+/* A drawing on its way. Wordless on purpose: the card already reserves the
+   right shape, so a sweep across it reads as "this is coming" without naming
+   the prompt back at someone who just asked for it. */
+@keyframes image-shimmer {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+.image-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--color-fg) 9%, transparent) 50%,
+    transparent 100%
+  );
+  animation: image-shimmer 1.6s ease-in-out infinite;
+}
+
 @keyframes pulse-dot {
   0%,
   100% {
@@ -431,6 +455,7 @@ h2 {
   .card-in,
   .stroke-draw,
   .float-slow,
+  .image-shimmer::after,
   .thinking-dot,
   .pop-in,
   .rise-in,

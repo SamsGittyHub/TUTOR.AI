@@ -128,7 +128,10 @@ export default function SessionsPage() {
             return (
               <li
                 key={s.id}
-                className="flex items-start gap-4 surface rounded-md px-4 py-3.5"
+                // Stacks on a phone. Five controls and a title never fit on one
+                // 390px row, and when they tried, the actions landed on top of
+                // the title and the lesson became untappable.
+                className="flex flex-col items-stretch gap-3 surface rounded-md px-4 py-3.5 sm:flex-row sm:items-start sm:gap-4"
               >
                 <div className="min-w-0 flex-1">
                   {/* A spoken lesson reopens where it was taught. Dropping
@@ -136,7 +139,10 @@ export default function SessionsPage() {
                       don't recognise as the one they had. */}
                   <Link
                     href={`${s.mode === "voice" ? "/voice" : "/app"}?session=${encodeURIComponent(s.id)}`}
-                    className="truncate text-[14px] font-semibold text-fg transition hover:text-cyan"
+                    // block, or `truncate` does nothing: an inline anchor
+                    // reports its full text width and overflows the min-w-0
+                    // parent that's supposed to be containing it.
+                    className="block truncate text-[14px] font-semibold text-fg transition hover:text-cyan"
                   >
                     {s.title}
                   </Link>
@@ -153,7 +159,7 @@ export default function SessionsPage() {
                     </p>
                   )}
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-2">
                   {lib.courses.length > 0 && (
                     <select
                       value={s.courseId ?? ""}
