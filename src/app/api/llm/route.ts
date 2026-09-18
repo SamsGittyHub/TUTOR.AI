@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { currentUser } from "@/lib/server/auth";
-import { BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
+import { BETA_CHAT_MODEL, BETA_OPENAI_KEY, hasBetaOpenAiKey } from "@/lib/server/beta-key";
 import { recordUsage } from "@/lib/server/usage";
 
 /**
@@ -19,7 +19,9 @@ import { recordUsage } from "@/lib/server/usage";
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 const ALLOWED_PATHS = new Set(["/chat/completions", "/embeddings"]);
-const BETA_CHAT_MODEL = "gpt-5.6-terra";
+// Imported from beta-key.ts rather than declared here a second time — this
+// file used to carry its own copy of the model id, which is exactly the kind
+// of drift that put real traffic on the wrong realtime model earlier.
 const BETA_EMBED_MODEL = "text-embedding-3-small";
 
 export async function POST(request: NextRequest) {

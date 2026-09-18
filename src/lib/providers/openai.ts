@@ -112,12 +112,19 @@ export const openai: Provider = {
   allowsCustomModel: true,
   models: [
     {
+      id: "gpt-5.6-luna",
+      label: "GPT-5.6 Luna",
+      inputPrice: 0.2,
+      outputPrice: 1.2,
+      vision: true,
+      note: "The free beta's default — cheap enough to run unmetered.",
+    },
+    {
       id: "gpt-5.6-terra",
       label: "GPT-5.6 Terra",
-      inputPrice: 0,
-      outputPrice: 0,
+      inputPrice: 2,
+      outputPrice: 12,
       vision: true,
-      note: "Your requested default tutor model.",
     },
     { id: "gpt-4.1", label: "GPT-4.1", inputPrice: 2, outputPrice: 8, vision: true },
     {

@@ -12,7 +12,16 @@ import type { ProviderId } from "./providers/types";
 export const BETA = true;
 
 export const BETA_PROVIDER: ProviderId = "openai";
-export const BETA_MODEL = "gpt-5.6-terra";
+/**
+ * Cost-optimized: same GPT-5.6 family as Terra, at $0.20/$1.20 per M tokens
+ * against Terra's $2/$12 — roughly 90% cheaper on the typed board, which is
+ * most of what makes the free beta's per-user economics work. Traded for
+ * that: Luna is OpenAI's own "cost-sensitive workloads" tier, and this app's
+ * repair path (tutor/engine.ts, degraded: "repaired" | "plain-text") exists
+ * specifically because a weaker model holds the 14-branch board protocol
+ * less reliably. Watch the degraded rate after this ships, not just the bill.
+ */
+export const BETA_MODEL = "gpt-5.6-luna";
 
 /**
  * Live voice runs on OpenAI's speech-to-speech model, on the same shared key.
