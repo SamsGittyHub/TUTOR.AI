@@ -48,6 +48,7 @@ import {
 } from "../.test-build/core/learning.js";
 import { isActive, NAV_LINKS } from "../.test-build/core/nav.js";
 import { TOUR_STEPS } from "../.test-build/core/tour.js";
+import { buildSystemPrompt } from "../.test-build/core/tutor/prompts.js";
 import { sourceHash, STRINGS } from "../.test-build/core/strings.js";
 import { excerpt, searchTerms, splitOnTerms } from "../.test-build/core/search.js";
 import { reminderText, shouldRemind } from "../.test-build/core/reminders.js";
@@ -2405,6 +2406,38 @@ test("dimensions are known up front too, so the card reserves the right space", 
   for (const shape of ["square", "wide", "tall"]) {
     const { width, height } = dimensionsFor(shape);
     assert.ok(width > 0 && height > 0, shape);
+  }
+});
+
+console.log("\n— telling the tutor to draw —");
+
+// The prompt is a wrapped template literal, so assertions have to be made
+// against it unwrapped — otherwise a phrase that straddles a line break
+// silently fails to match and the test passes for the wrong reason.
+const promptFor = () =>
+  buildSystemPrompt({ materials: [], hasMaterialContext: false }).replace(/\s+/g, " ");
+
+test("the prompt tells the tutor to draw, and says when not to", () => {
+  const prompt = promptFor();
+  assert.match(prompt, /show_image/, "the action has to be documented at all");
+  assert.match(prompt, /draw often/i);
+  assert.match(prompt, /purely symbolic/i, "it needs an exception, or it draws for algebra");
+});
+
+test("the card budget doesn't quietly cap drawings", () => {
+  // This is the bug that made it stop drawing: "two to five board cards" was
+  // the first and most concrete rule, so a picture competed for a scarce slot
+  // against the title, the working and a question — and lost every time.
+  const prompt = promptFor();
+  assert.match(prompt, /does not count against that budget/i,
+    "a picture must be exempt from the per-turn card budget");
+});
+
+test("nothing in the prompt rations pictures", () => {
+  // Guards against the earlier wording coming back in any form.
+  const prompt = promptFor().toLowerCase();
+  for (const phrase of ["one picture per turn at most", "at most one picture", "sparingly"]) {
+    assert.ok(!prompt.includes(phrase), `the prompt still rations drawings: "${phrase}"`);
   }
 });
 

@@ -40,6 +40,13 @@ export interface TurnResult {
   citedLocators: string[];
 }
 
+const DRAW_REMINDER = `<drawing>
+Before you answer: is there a physical thing in this topic — apparatus, a
+specimen, an organ, a device, a place, a mechanism, an artefact? If there is,
+include a show_image of it in this turn. Don't mention that you're drawing it
+and don't wait for it. If the topic is purely symbolic, skip it.
+</drawing>`;
+
 const MAX_TRANSCRIPT_ENTRIES = 16;
 const MAX_IMAGES = 4;
 
@@ -95,6 +102,16 @@ function buildMessages(request: TurnRequest): ChatMessage[] {
   if (request.boardSummary) {
     blocks.push(`<board>\nAlready on the board:\n${request.boardSummary}\n</board>`);
   }
+
+  /*
+   * A standing reminder, sent every turn rather than left in the system
+   * prompt. Drawing is an optional branch of a fourteen-type schema, and a
+   * model asked once at the top of a long prompt reliably forgets it by the
+   * time it's writing the turn — the instruction has to be recent to compete.
+   * Phrased as a test the model applies to this specific topic, so algebra
+   * still doesn't get a picture it doesn't need.
+   */
+  blocks.push(DRAW_REMINDER);
   blocks.push(request.studentMessage);
 
   messages.push({
