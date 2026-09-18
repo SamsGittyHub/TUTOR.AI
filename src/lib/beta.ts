@@ -30,7 +30,7 @@ export const BETA_REALTIME_VOICE = "alloy";
  *
  * The live tutor draws its own illustrations — a labelled cross-section, a
  * free-body diagram, the thing the student can't picture — rather than only
- * the shapes the board can render from JSON. Same shared key, same daily cap.
+ * the shapes the board can render from JSON. Same shared key as everything else.
  */
 export { IMAGE_MODEL as BETA_IMAGE_MODEL } from "./board-image";
 
