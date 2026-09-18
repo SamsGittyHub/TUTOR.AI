@@ -412,22 +412,6 @@ h2 {
   animation: float-slow 6s ease-in-out infinite;
 }
 
-@keyframes marquee {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(-50%);
-  }
-}
-.marquee-track {
-  animation: marquee var(--speed, 38s) linear infinite;
-  width: max-content;
-}
-.marquee-track:hover {
-  animation-play-state: paused;
-}
-
 @keyframes pulse-dot {
   0%,
   100% {
@@ -447,7 +431,6 @@ h2 {
   .card-in,
   .stroke-draw,
   .float-slow,
-  .marquee-track,
   .thinking-dot,
   .pop-in,
   .rise-in,
