@@ -259,4 +259,40 @@ await run([
       );
     },
   },
+  {
+    name: "the tour and feedback popovers open over the board, not under it",
+    async fn({ page }) {
+      // Both used to be clipped by the header's overflow-hidden and trapped in
+      // the stacking context .chrome's backdrop-filter creates, so they opened
+      // underneath the whiteboard. Sampled down their full height, because the
+      // old failure only showed below the header's bottom edge.
+      const unobstructed = async (selector) =>
+        page.evaluate((sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return false;
+          const b = el.getBoundingClientRect();
+          return [0.15, 0.5, 0.9].every((f) => {
+            const top = document.elementFromPoint(b.x + b.width / 2, b.y + b.height * f);
+            return top && el.contains(top);
+          });
+        }, selector);
+
+      await page.getByRole("button", { name: "Send feedback" }).first().click();
+      await page.waitForTimeout(400);
+      expect(
+        await unobstructed('button[aria-label="Send this feedback"]'),
+        "the feedback popover is covered or clipped",
+      );
+      await page.keyboard.press("Escape");
+      await page.waitForTimeout(300);
+
+      await page.getByRole("button", { name: "How this works" }).first().click();
+      await page.waitForTimeout(500);
+      expect(await unobstructed('[role="dialog"]'), "the tour is covered or clipped");
+      expect(
+        await page.evaluate(() => !document.querySelector('[role="dialog"]')?.closest("header")),
+        "the tour should render outside the header, not inside it",
+      );
+    },
+  },
 ]);

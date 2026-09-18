@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 
 import { useLanguage } from "@/lib/language";
 import { TOUR_STEPS } from "@/lib/tour";
@@ -30,6 +31,15 @@ export function Tour({ compact = false }: { compact?: boolean }) {
 
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
+  /*
+   * Rendered into document.body rather than in place. A modal that lives
+   * inside a header inherits that header's stacking context and overflow —
+   * .chrome's backdrop-filter makes one, and this used to surface as the
+   * tour opening underneath the whiteboard. From the body it has no
+   * ancestors left to be trapped by.
+   */
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const dialog = useRef<HTMLDivElement>(null);
   const closer = useRef<HTMLButtonElement>(null);
 
@@ -107,9 +117,10 @@ export function Tour({ compact = false }: { compact?: boolean }) {
         </svg>
       </button>
 
-      {open ? (
+      {open && mounted
+        ? createPortal(
         <div
-          className="fixed inset-0 z-[70] flex items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
+          className="fixed inset-0 z-[90] flex items-end justify-center bg-black/45 p-0 backdrop-blur-[2px] sm:items-center sm:p-6"
           onMouseDown={(event) => {
             if (!dialog.current?.contains(event.target as Node)) close();
           }}
@@ -224,8 +235,10 @@ export function Tour({ compact = false }: { compact?: boolean }) {
               </button>
             </footer>
           </div>
-        </div>
-      ) : null}
+        </div>,
+            document.body,
+          )
+        : null}
     </>
   );
 }

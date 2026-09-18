@@ -187,11 +187,18 @@ export default function AppPage() {
   return (
     <div className="flex h-dvh flex-col bg-ink">
       {/*
-        min-w-0 and overflow-hidden are load-bearing: without them this row's
-        min-content width became the whole page's, and on a phone the board
-        scrolled sideways under a header running off the right edge.
+        min-w-0 is load-bearing: without it this row's min-content width became
+        the whole page's, and on a phone the board scrolled sideways under a
+        header running off the right edge. It must do that job alone —
+        overflow-hidden here also clips the Tour and Feedback popovers, which
+        open below the header and are several times taller than it.
+
+        relative z-50 for the same reason from the other direction: .chrome
+        applies a backdrop-filter, which makes this a stacking context, and a
+        static one paints underneath every sibling that follows it — the board
+        included.
       */}
-      <header className="chrome hair flex w-full min-w-0 shrink-0 items-center gap-2 overflow-hidden px-3 py-2 sm:gap-3 sm:px-4">
+      <header className="chrome hair relative z-50 flex w-full min-w-0 shrink-0 items-center gap-2 px-3 py-2 sm:gap-3 sm:px-4">
         <Link href="/" className="shrink-0">
           <Logo size={24} />
         </Link>

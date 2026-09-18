@@ -28,7 +28,7 @@ export default function QuizPage() {
     <div className="flex h-dvh flex-col bg-ink">
       {/* min-w-0 + overflow-hidden, same as the board: without them this row's
           min-content width becomes the page's and a phone scrolls sideways. */}
-      <header className="chrome hair flex w-full min-w-0 shrink-0 items-center gap-2 overflow-hidden px-3 py-2.5 sm:gap-3 sm:px-4">
+      <header className="chrome hair relative z-50 flex w-full min-w-0 shrink-0 items-center gap-2 px-3 py-2.5 sm:gap-3 sm:px-4">
         <Link href="/" className="flex items-center gap-2">
           <Logo size={24} />
         </Link>
