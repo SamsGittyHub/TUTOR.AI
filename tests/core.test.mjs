@@ -2445,7 +2445,7 @@ test("no dictionary entry is an empty string or a leftover key", () => {
 
 test("every placeholder in a string is one a caller could fill", () => {
   // {n} with no caller passing n renders as "{n}" on the page.
-  const allowed = new Set(["n", "total", "where", "query", "percent"]);
+  const allowed = new Set(["n", "total", "where", "query", "percent", "model"]);
   for (const [key, value] of Object.entries(STRINGS)) {
     for (const [, name] of value.matchAll(/\{(\w+)\}/g)) {
       assert.ok(allowed.has(name), `${key} uses an unknown placeholder {${name}}`);

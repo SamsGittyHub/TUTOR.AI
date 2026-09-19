@@ -15,6 +15,7 @@ import {
   getChunksFor, getSession, putSession,
   type MaterialChunk, type Session,
 } from "@/lib/db";
+import { spokenLanguageInstruction, useLanguage } from "@/lib/language";
 import { useLibrary } from "@/lib/useLibrary";
 import { useRealtime } from "@/lib/useRealtime";
 import { applyDrawnImage, type ImageRequest } from "@/lib/board-image";
@@ -127,6 +128,7 @@ loses them — call remember_this so your next self knows it. One short, specifi
 sentence, only once you've seen it more than once, and never out loud.`;
 
 export default function VoicePage() {
+  const { t } = useLanguage();
   const [actions, setActions] = useState<TutorAction[]>([]);
   const [lines, setLines] = useState<{ role: "student" | "tutor"; text: string }[]>([]);
   /*
@@ -190,7 +192,7 @@ export default function VoicePage() {
     const firstAsked = said.find((line) => line.role === "student")?.text;
     const session: Session = {
       id: sessionId.current,
-      title: (firstAsked ?? "Live voice lesson").slice(0, 60),
+      title: (firstAsked ?? t("voice.lessonTitle")).slice(0, 60),
       createdAt: startedAt.current,
       updatedAt: Date.now(),
       materialIds: [],
@@ -357,7 +359,13 @@ export default function VoicePage() {
       return;
     }
     setKeyMissing(false);
-    void rt.start(openaiKey, INSTRUCTIONS + buildBriefing(context));
+    // Appended last so it's the most recent thing the model read, and read
+    // at start rather than captured at import: a student who changes language
+    // and starts a session expects the session to be in it.
+    void rt.start(
+      openaiKey,
+      INSTRUCTIONS + buildBriefing(context) + spokenLanguageInstruction(),
+    );
   }
 
   const live = rt.status === "live";
@@ -377,11 +385,10 @@ export default function VoicePage() {
             emptyState={
               <div className="text-center">
                 <p className="hand text-[34px] leading-tight text-[var(--board-ink)]">
-                  Just start talking.
+                  {t("voice.emptyTitle")}
                 </p>
                 <p className="mx-auto mt-3 max-w-sm text-[13.5px] leading-relaxed text-[var(--board-ink)] opacity-70">
-                  The tutor listens continuously — interrupt it mid-sentence the
-                  way you would a person. It writes here while it explains.
+                  {t("voice.emptyBody")}
                 </p>
               </div>
             }
@@ -390,12 +397,12 @@ export default function VoicePage() {
 
         <aside className="flex w-full shrink-0 flex-col surface rounded-md lg:w-[340px]">
           <header className="flex items-center gap-2 border-b border-line px-4 py-3">
-            <h2 className="flex-1 text-[13px] font-semibold text-fg">Live voice</h2>
+            <h2 className="flex-1 text-[13px] font-semibold text-fg">{t("voice.title")}</h2>
             <BoardExport
               actions={actions}
               title={
                 lines.find((line) => line.role === "student")?.text.slice(0, 60) ??
-                "Live voice lesson"
+                t("voice.lessonTitle")
               }
               materialName={(id) =>
                 lib.materials.find((m) => m.id === id)?.name ?? "material"
@@ -426,10 +433,14 @@ export default function VoicePage() {
                 }`}
               />
               {live && rt.paused
-                ? "paused"
+                ? t("voice.paused")
                 : rt.status === "connecting"
-                  ? "connecting"
-                  : rt.status}
+                  ? t("voice.connecting")
+                  : rt.status === "live"
+                    ? t("voice.live")
+                    : rt.status === "error"
+                      ? t("voice.errored")
+                      : t("voice.idle")}
             </span>
           </header>
 
@@ -455,9 +466,7 @@ export default function VoicePage() {
 
             {!lines.length ? (
               <p className="text-[13px] leading-relaxed text-muted">
-                {live
-                  ? "Listening. Say what you're stuck on."
-                  : "Start the session and talk — the transcript shows up here while the board fills in."}
+                {live ? t("voice.listening") : t("voice.idleHint")}
               </p>
             ) : (
               <ul className="flex flex-col gap-3">
@@ -509,14 +518,14 @@ export default function VoicePage() {
                   }`}
                 >
                   <span aria-hidden>{rt.paused ? "▶" : "❚❚"}</span>
-                  {rt.paused ? "Resume" : "Pause"}
+                  {rt.paused ? t("voice.resume") : t("voice.pause")}
                 </button>
                 <button
                   type="button"
                   onClick={rt.stop}
                   className="rounded-full border border-line px-5 py-3 text-[13px] font-semibold text-muted transition hover:border-pink/50 hover:text-pink"
                 >
-                  End
+                  {t("voice.endShort")}
                 </button>
               </div>
             ) : (
@@ -526,7 +535,7 @@ export default function VoicePage() {
                 disabled={rt.status === "connecting"}
                 className="w-full rounded-full grad px-5 py-3 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
               >
-                {rt.status === "connecting" ? "Connecting…" : "Start talking"}
+                {rt.status === "connecting" ? t("voice.connecting") : t("voice.start")}
               </button>
             )}
             <p
@@ -538,8 +547,8 @@ export default function VoicePage() {
                 ? // The one thing worth being unambiguous about: a paused
                   // session is still open, and people assume an open session
                   // is still listening.
-                  "Microphone off. Nothing is being sent or heard — your lesson and the board are exactly where you left them."
-                : "Your mic streams straight to OpenAI. TUTOR AI only mints the session token — it never stores your key."}
+                  t("voice.pausedNote")
+                : t("voice.privacy")}
             </p>
           </div>
         </aside>

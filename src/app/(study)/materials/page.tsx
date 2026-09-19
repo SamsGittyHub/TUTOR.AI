@@ -48,7 +48,7 @@ export default function MaterialsPage() {
       lede={language.t("material.lede")}
       actions={
         <ButtonLink href="/app" tone="primary">
-          Upload on the board
+          {language.t("material.upload")}
         </ButtonLink>
       }
     >
@@ -57,9 +57,11 @@ export default function MaterialsPage() {
       ) : lib.error ? (
         <LoadError message={lib.error} />
       ) : !lib.materials.length ? (
-        <Empty title="Nothing uploaded yet" action={{ href: "/app", label: "Upload something" }}>
-          Notes, slides, a PDF, a photo of your handwriting, or a lecture
-          recording. The tutor teaches from whatever you give it.
+        <Empty
+          title={language.t("material.empty")}
+          action={{ href: "/app", label: language.t("material.uploadSomething") }}
+        >
+          {language.t("material.emptyBody")}
         </Empty>
       ) : (
         <ul className="flex flex-col gap-2">
@@ -92,7 +94,7 @@ export default function MaterialsPage() {
                         }}
                         className="tx h-7 rounded-full bg-[var(--tint)] px-2.5 text-[11.5px] font-medium text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] outline-none hover:text-fg"
                       >
-                        <option value="">No subject</option>
+                        <option value="">{language.t("material.noSubject")}</option>
                         {lib.courses.map((c) => (
                           <option key={c.id} value={c.id}>
                             {c.name}
@@ -112,7 +114,7 @@ export default function MaterialsPage() {
                       onClick={() => remove(m.id, m.name)}
                       disabled={busy === m.id}
                     >
-                      {busy === m.id ? "Deleting…" : "Delete"}
+                      {busy === m.id ? language.t("common.deleting") : language.t("common.delete")}
                     </Button>
                   </div>
                 </div>

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { isBoardAction, type TutorAction } from "@/lib/actions";
 import type { LessonPlanState } from "@/lib/db";
+import { useLanguage } from "@/lib/language";
 import { BoardCard } from "./BoardCard";
 import type { BoardTheme } from "./ink";
 
@@ -71,6 +72,7 @@ export function Whiteboard({
     pinnedToBottom.current = distance < 140;
   };
 
+  const { t } = useLanguage();
   const paper = theme === "paper";
 
   return (
@@ -100,7 +102,7 @@ export function Whiteboard({
               </span>
             </>
           ) : (
-            <span className="text-sm font-bold text-dim">Whiteboard</span>
+            <span className="text-sm font-bold text-dim">{t("board.whiteboard")}</span>
           )}
         </div>
 
@@ -109,10 +111,10 @@ export function Whiteboard({
         <button
           type="button"
           onClick={onToggleTheme}
-          title={paper ? "Switch to chalkboard" : "Switch to whiteboard"}
+          title={paper ? t("board.toChalk") : t("board.toPaper")}
           className="rounded-full border border-line px-3 py-1 text-xs font-bold text-muted transition hover:border-line-2 hover:text-fg"
         >
-          {paper ? "◑ chalk" : "◐ paper"}
+          {paper ? t("board.chalk") : t("board.paper")}
         </button>
         {visible.length ? (
           <button

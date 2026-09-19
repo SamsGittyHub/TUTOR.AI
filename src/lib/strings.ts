@@ -36,6 +36,20 @@ export const STRINGS = {
   "account.signOut": "Sign out",
   "account.language": "Language",
   "account.settings": "Settings",
+  "settings.title": "Settings",
+  "settings.lede": "Your key, your model.",
+  "settings.ledeBeta":
+    "Nothing to configure during the beta — the tutor is already running. Your material lives on your account and follows you between devices.",
+  "settings.betaTitle": "Everything's on us during the beta",
+  "settings.betaBody":
+    "No API key needed. The tutor runs on our key while we gather feedback, so just use it. There's a daily limit so it keeps working for everyone — if you reach it, it resets at midnight UTC.",
+  "settings.runningOn":
+    "Running on {model}. Your material and lessons are still yours, on your account, and travel with you between devices.",
+  "settings.deleteAll": "Delete all my data",
+  "settings.deleteConfirm":
+    "Delete every uploaded material and saved lesson? This can't be undone.",
+  "settings.ledeKeys":
+    "Your key never leaves this browser — it goes straight to the provider you pick. Your material lives on your account so it follows you between devices.",
   "language.search": "Search languages",
   "language.note":
     "The tutor teaches, writes and marks entirely in the language you pick. The interface follows it, translated once and then cached — a language nobody has chosen yet takes a moment the first time.",
@@ -62,13 +76,27 @@ export const STRINGS = {
   "board.whiteboard": "Whiteboard",
   "board.blank": "Blank board.",
   "board.blankHint": "Upload your notes, or just start with a question.",
+  "board.needKey": "One thing first.",
+  "board.needKeyHint":
+    "TUTOR AI runs on your own API key, so nothing here costs you a subscription. Paste one and the board wakes up.",
+  "board.pickHint":
+    "Pick what to study on the left and hit Start the lesson — or just ask below.",
+  "board.starter1": "Teach me integration by parts from scratch",
+  "board.starter2": "Walk me through balancing redox equations",
+  "board.starter3": "Explain how a bill becomes a law, with a diagram",
   "board.askAnything": "Ask anything",
   "board.interrupt": "interrupt any time",
   "board.chatPlaceholder": "Wait — where did that 2 come from?",
+  "board.chatNeedsKey": "Add an API key to start",
+  "board.chatListening": "Listening — or just type…",
   "board.chatIntro":
     "Your tutor talks here while it writes on the board. Cut in whenever — asking a question mid-lesson is the point.",
   "board.showWork": "Show your work",
   "board.newLesson": "New lesson",
+  "board.chalk": "◑ chalk",
+  "board.paper": "◐ paper",
+  "board.toChalk": "Switch to chalkboard",
+  "board.toPaper": "Switch to whiteboard",
 
   /* material -------------------------------------------------------------- */
   "material.title": "Material",
@@ -81,11 +109,17 @@ export const STRINGS = {
   "material.emptyHint":
     "Notes, slides, a PDF, a photo of your handwriting, or a lecture recording. The tutor teaches from whatever you give it.",
   "material.upload": "Upload on the board",
+  "material.uploadSomething": "Upload something",
+  "material.emptyBody":
+    "Notes, slides, a PDF, a photo of your handwriting, or a lecture recording. The tutor teaches from whatever you give it.",
+  "material.kindAudio": "Recording",
   "material.noSubject": "No subject",
   "material.pastLessons": "Past Lessons",
   "material.whatCover": "What should we cover?",
   "material.goalPlaceholder": "chapter 4, or 'the parts I flagged'",
   "material.start": "Start the lesson",
+  "material.pastePlaceholder": "Paste a homework problem, a page of notes, anything…",
+  "material.deleteFile": "Delete permanently",
 
   /* subjects -------------------------------------------------------------- */
   "subjects.title": "Subjects",
@@ -93,6 +127,8 @@ export const STRINGS = {
     "Folders for a subject — Maths, Chemistry, whatever you study. Put your material and your past lessons in one, and the tutor draws on everything in it.",
   "subjects.name": "Subject",
   "subjects.term": "Term",
+  "subjects.namePlaceholder": "Maths",
+  "subjects.termPlaceholder": "Fall 2026",
   "subjects.addSubject": "Add subject",
   "subjects.empty": "No subjects yet",
   "subjects.emptyHint":
@@ -113,6 +149,11 @@ export const STRINGS = {
     "Ask the tutor to teach you something and it'll show up here, resumable from any device you sign in on.",
   "lessons.boardCards": "board cards",
   "lessons.step": "step",
+  "lessons.delete": "Delete lesson",
+  "lessons.start": "Start a lesson",
+  "lessons.emptyBody":
+    "Ask the tutor to teach you something and it'll show up here, resumable from any device you sign in on.",
+  "lessons.downloadNotes": "Download as Markdown notes",
 
   /* progress -------------------------------------------------------------- */
   "progress.title": "Progress",
@@ -123,6 +164,8 @@ export const STRINGS = {
   "progress.quizzesTaken": "Quizzes taken",
   "progress.averageScore": "Average score",
   "progress.nextSeven": "Next seven days",
+  "progress.nothingWeekShown":
+    "Nothing scheduled this week — answer some quiz questions and the queue fills itself in.",
   "progress.nothingWeek":
     "Nothing scheduled this week — answer some quiz questions and the queue fills itself in.",
   "progress.byMaterial": "By material",
@@ -135,7 +178,13 @@ export const STRINGS = {
   "progress.notEnoughHint":
     "Take a few quizzes and the ranking fills in. One quiz isn't a pattern.",
   "progress.reviewDue": "Review {n} due",
+  "progress.forget": "Forget this",
   "progress.noMaterial": "No material yet",
+  "progress.noMaterialBody":
+    "Upload a file and take a quiz on it — mastery appears once there's something to measure.",
+  "progress.howYouLearn": "How you learn",
+  "progress.learnEmpty":
+    "Nothing yet. As the tutor teaches you, it works out what makes things click — pictures, worked steps, being asked before being told — and leans on that next time. It needs {n} or so lessons before it will commit to anything.",
   "progress.noMaterialHint":
     "Upload a file and take a quiz on it — mastery appears once there's something to measure.",
 
@@ -151,6 +200,11 @@ export const STRINGS = {
   "review.right": "Right.",
   "review.nothingDue": "Nothing due today",
   "review.noCards": "No review cards yet",
+  "review.takeQuiz": "Take a quiz",
+  "review.noCardsBody":
+    "Every quiz question you answer becomes a card here, scheduled so it comes back just as you're about to forget it.",
+  "review.nothingDueBody":
+    "You have {n} cards on the schedule — none of them are ripe yet. Come back tomorrow, or make more.",
 
   /* calendar -------------------------------------------------------------- */
   "calendar.title": "Calendar",
@@ -174,6 +228,17 @@ export const STRINGS = {
   "quiz.lede":
     "Unlimited quizzes, straight from your material. Every question you answer becomes a review card on the board's schedule.",
   "quiz.generate": "Generate a quiz",
+  "quiz.writing": "Writing questions…",
+  "quiz.topic": "Topic (optional)",
+  "quiz.topicPlaceholder": "chapter 4, the Calvin cycle, integration by parts…",
+  "quiz.questions": "Questions",
+  "quiz.backToBoard": "Back to the board",
+  "quiz.noMaterialHint":
+    "Nothing uploaded yet — quizzes will draw on the tutor's own knowledge.",
+  "quiz.uploadLink": "Upload material on the board",
+  "quiz.noMaterialTail": "to be quizzed on your class.",
+  "quiz.answerPlaceholder": "Type your answer",
+  "quiz.seeResults": "See results",
   "exam.title": "Practice exam",
   "exam.lede":
     "Examine a whole subject, or pick individual lessons. The paper is weighted toward the things you actually got stuck on.",
@@ -205,6 +270,23 @@ export const STRINGS = {
   "voice.end": "End session",
   "voice.connecting": "Connecting…",
   "voice.listening": "Listening. Say what you're stuck on.",
+  "voice.idleHint":
+    "Start the session and talk — the transcript shows up here while the board fills in.",
+  "voice.pause": "Pause",
+  "voice.resume": "Resume",
+  "voice.paused": "paused",
+  "voice.idle": "idle",
+  "voice.live": "live",
+  "voice.errored": "error",
+  "voice.endShort": "End",
+  "voice.pausedNote":
+    "Microphone off. Nothing is being sent or heard — your lesson and the board are exactly where you left them.",
+  "voice.privacy":
+    "Your mic streams straight to OpenAI. TUTOR AI only mints the session token — it never stores your key.",
+  "voice.lessonTitle": "Live voice lesson",
+  "voice.emptyTitle": "Just start talking.",
+  "voice.emptyBody":
+    "The tutor listens continuously — interrupt it mid-sentence the way you would a person. It writes here while it explains.",
 
   "tour.heading": "How this works · {n} of {total}",
   "tour.takeMeTo": "Take me to {where}",

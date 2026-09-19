@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TutorAction } from "@/lib/actions";
 import type { TranscriptEntry } from "@/lib/db";
 import type { TutorStatus } from "@/lib/useTutor";
+import { useLanguage } from "@/lib/language";
 
 interface Props {
   actions: TutorAction[];
@@ -86,6 +87,7 @@ export function ChatRail({
   micError,
   onToggleMic,
 }: Props) {
+  const { t } = useLanguage();
   const [draft, setDraft] = useState("");
   const scroller = useRef<HTMLDivElement>(null);
   const items = useMemo(() => buildChat(actions, transcript), [actions, transcript]);
@@ -114,7 +116,7 @@ export function ChatRail({
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-line bg-panel">
       <header className="flex shrink-0 items-center justify-between border-b border-line px-4 py-2.5">
-        <span className="text-sm font-semibold">Ask anything</span>
+        <span className="text-sm font-semibold">{t("board.askAnything")}</span>
         {busy ? (
           <button
             type="button"
@@ -124,15 +126,14 @@ export function ChatRail({
             ■ stop
           </button>
         ) : (
-          <span className="text-xs font-semibold text-dim">interrupt any time</span>
+          <span className="text-xs font-semibold text-dim">{t("board.interrupt")}</span>
         )}
       </header>
 
       <div ref={scroller} className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
         {items.length === 0 ? (
           <p className="mt-6 text-sm leading-relaxed text-dim">
-            Your tutor talks here while it writes on the board. Cut in whenever —
-            asking a question mid-lesson is the point.
+            {t("board.chatIntro")}
           </p>
         ) : (
           items.map((item) =>
@@ -222,10 +223,10 @@ export function ChatRail({
             disabled={disabled}
             placeholder={
               disabled
-                ? "Add an API key to start"
+                ? t("board.chatNeedsKey")
                 : micOn
-                  ? "Listening — or just type…"
-                  : "Wait — where did that 2 come from?"
+                  ? t("board.chatListening")
+                  : t("board.chatPlaceholder")
             }
             className="max-h-40 min-h-[42px] flex-1 resize-none bg-transparent px-2 py-1 text-[13.5px] leading-relaxed outline-none placeholder:text-dim"
           />

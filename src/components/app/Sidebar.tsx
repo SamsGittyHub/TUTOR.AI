@@ -66,7 +66,9 @@ export function Sidebar(props: Props) {
               tab === value ? "bg-panel-3 text-fg" : "text-dim hover:text-muted"
             }`}
           >
-            {value === "material" ? "Material" : "Past lessons"}
+            {value === "material"
+              ? language.t("material.title")
+              : language.t("material.pastLessons")}
           </button>
         ))}
       </div>
@@ -113,7 +115,7 @@ export function Sidebar(props: Props) {
             ) : (
               <>
                 <p className="text-[13.5px] font-bold text-muted">
-                  Drop notes, slides, a PDF, a photo, a recording
+                  {language.t("material.drop")}
                 </p>
                 <div className="mt-2.5 flex justify-center gap-2">
                   <button
@@ -121,14 +123,14 @@ export function Sidebar(props: Props) {
                     onClick={() => fileInput.current?.click()}
                     className="grad rounded-full px-3.5 py-1.5 text-[13px] font-semibold text-white"
                   >
-                    Choose files
+                    {language.t("material.choose")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setPasting((v) => !v)}
                     className="rounded-full border border-line px-3.5 py-1.5 text-[13px] font-bold text-muted transition hover:text-fg"
                   >
-                    Paste text
+                    {language.t("material.paste")}
                   </button>
                 </div>
               </>
@@ -141,7 +143,7 @@ export function Sidebar(props: Props) {
                 value={pasted}
                 onChange={(event) => setPasted(event.target.value)}
                 rows={5}
-                placeholder="Paste a homework problem, a page of notes, anything…"
+                placeholder={language.t("material.pastePlaceholder")}
                 className="w-full resize-none bg-transparent p-1 text-[14px] outline-none placeholder:text-dim"
               />
               <button
@@ -202,7 +204,7 @@ export function Sidebar(props: Props) {
                       <button
                         type="button"
                         onClick={() => props.onRemove(material.id)}
-                        title="Delete permanently"
+                        title={language.t("material.deleteFile")}
                         className="opacity-0 transition group-hover:opacity-100 hover:text-pink"
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -221,14 +223,13 @@ export function Sidebar(props: Props) {
             </ul>
           ) : (
             <p className="px-1 text-[13px] leading-relaxed text-dim">
-              Nothing uploaded yet. You can also just ask the tutor to teach you
-              something — material makes it specific to your class.
+              {language.t("material.emptyHint")}
             </p>
           )}
 
           <div className="rounded-md border border-line bg-panel-2 p-2.5">
             <label className="mb-1.5 block text-[14px] font-semibold uppercase tracking-wide text-dim">
-              What should we cover?
+              {language.t("material.whatCover")}
             </label>
             <input
               value={goal}
@@ -236,7 +237,7 @@ export function Sidebar(props: Props) {
               onKeyDown={(event) => {
                 if (event.key === "Enter") props.onStartLesson(goal);
               }}
-              placeholder="chapter 4, or 'the parts I flagged'"
+              placeholder={language.t("material.goalPlaceholder")}
               className="w-full rounded-sm border border-line bg-ink px-2.5 py-1.5 text-[13.5px] outline-none focus:border-cyan/60"
             />
             <button
@@ -245,7 +246,7 @@ export function Sidebar(props: Props) {
               onClick={() => props.onStartLesson(goal)}
               className="mt-2 w-full rounded-full grad py-2 text-[13.5px] font-semibold text-white disabled:opacity-40"
             >
-              Start the lesson
+              {language.t("material.start")}
             </button>
             {props.dueCount > 0 ? (
               <button
@@ -262,7 +263,7 @@ export function Sidebar(props: Props) {
                 a student is already deciding what to do next. */}
             <div className="mt-4 border-t border-line pt-3">
               <p className="text-[12px] font-semibold uppercase tracking-wider text-dim">
-                Go to
+                {language.t("nav.goTo")}
               </p>
               <div className="mt-2 grid grid-cols-2 gap-1.5">
                 {BOARD_LINKS.map((link) => (
@@ -285,12 +286,11 @@ export function Sidebar(props: Props) {
             onClick={props.onNewSession}
             className="w-full rounded-full border border-line py-2 text-[13.5px] font-bold text-muted transition hover:border-cyan/50 hover:text-fg"
           >
-            + New lesson
+            + {language.t("board.newLesson")}
           </button>
           {props.sessions.length === 0 ? (
             <p className="px-1 pt-3 text-[13px] text-dim">
-              Finished lessons show up here. They resume exactly where you left
-              them — board and all.
+              {language.t("lessons.emptyHint")}
             </p>
           ) : (
             props.sessions.map((session) => (
@@ -322,7 +322,7 @@ export function Sidebar(props: Props) {
                   type="button"
                   onClick={() => props.onDeleteSession(session.id)}
                   className="opacity-0 transition group-hover:opacity-100 hover:text-pink"
-                  title="Delete lesson"
+                  title={language.t("lessons.delete")}
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
                     <path

@@ -89,12 +89,16 @@ export default function ReviewPage() {
         <LoadError message={lib.error} />
       ) : !queue ? (
         <Empty
-          title={lib.cards.length ? "Nothing due today" : "No review cards yet"}
-          action={{ href: "/quiz", label: "Take a quiz" }}
+          title={
+            lib.cards.length
+              ? language.t("review.nothingDue")
+              : language.t("review.noCards")
+          }
+          action={{ href: "/quiz", label: language.t("review.takeQuiz") }}
         >
           {lib.cards.length
-            ? `You have ${lib.cards.length} cards on the schedule — none of them are ripe yet. Come back tomorrow, or make more.`
-            : "Every quiz question you answer becomes a card here, scheduled so it comes back just as you're about to forget it."}
+            ? language.t("review.nothingDueBody", { n: lib.cards.length })
+            : language.t("review.noCardsBody")}
           {/* The scheduler has always known what's ripe and never told anyone,
               which made spaced repetition work only for people who were going
               to open the app anyway. */}

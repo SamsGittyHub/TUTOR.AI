@@ -22,6 +22,7 @@ import {
 } from "@/lib/keys";
 import { wipeEverything } from "@/lib/db";
 import type { Settings } from "@/lib/settings";
+import { useLanguage } from "@/lib/language";
 
 interface Props {
   settings: Settings;
@@ -80,6 +81,7 @@ export function SettingsModal({
     }
   };
 
+  const { t } = useLanguage();
   const page = variant === "page";
 
   // In the free beta there is no key to enter — the server holds one — so the
@@ -89,31 +91,26 @@ export function SettingsModal({
     const body = (
       <div className="px-5 py-5">
         <p className="text-[14px] font-semibold text-fg">
-          Everything&rsquo;s on us during the beta
+          {t("settings.betaTitle")}
         </p>
         <p className="mt-1.5 text-[13px] leading-[1.6] text-muted">
-          No API key needed. The tutor runs on our key while we gather feedback,
-          so just use it. There&rsquo;s a daily limit so it keeps working for
-          everyone — if you reach it, it resets at midnight UTC.
+          {t("settings.betaBody")}
         </p>
         <p className="mt-3 text-[11.5px] text-dim">
-          Running on {BETA_MODEL}. Your material and lessons are still yours, on
-          your account, and travel with you between devices.
+          {t("settings.runningOn", { model: BETA_MODEL })}
         </p>
         <button
           type="button"
           onClick={() => {
             if (
-              confirm(
-                "Delete every uploaded material and saved lesson? This can't be undone.",
-              )
+              confirm(t("settings.deleteConfirm"))
             ) {
               void wipeEverything().then(() => window.location.reload());
             }
           }}
           className="tx press mt-5 inline-flex h-8 items-center rounded-full px-3.5 text-[12px] font-medium text-pink shadow-[inset_0_0_0_0.5px_color-mix(in_srgb,var(--color-pink)_35%,transparent)] hover:bg-pink/10"
         >
-          Delete all my data
+          {t("settings.deleteAll")}
         </button>
       </div>
     );
@@ -421,7 +418,7 @@ export function SettingsModal({
               }}
               className="rounded-full border border-line px-3.5 py-1.5 text-[11.5px] font-bold text-muted transition hover:border-pink/50 hover:text-pink"
             >
-              Delete all my data
+              {t("settings.deleteAll")}
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Material, QuizAttempt } from "@/lib/db";
 import { bucketForecast, masteryForMaterial } from "@/lib/progress";
 import { DAY_MS, isDue, startOfDay, type ReviewCard } from "@/lib/srs";
+import { useLanguage } from "@/lib/language";
 
 interface Props {
   materials: Material[];
@@ -40,6 +41,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
     return total > 0 ? Math.round((score / total) * 100) : null;
   }, [attempts]);
 
+  const { t, code } = useLanguage();
   const mastered = rollup.filter((m) => m.label === "Strong").length;
   const maxBucket = Math.max(1, ...forecast);
   // Same day boundary the forecast buckets on — labels must not drift from math.
@@ -73,10 +75,10 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
         <div className="space-y-5 p-5">
           {/* overall ----------------------------------------------------- */}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Due today" value={String(dueToday)} accent={dueToday > 0} />
-            <Stat label="Review cards" value={String(cards.length)} />
-            <Stat label="Quizzes taken" value={String(attempts.length)} />
-            <Stat label="Average score" value={avgScore === null ? "—" : `${avgScore}%`} />
+            <Stat label={t("progress.dueToday")} value={String(dueToday)} accent={dueToday > 0} />
+            <Stat label={t("progress.reviewCards")} value={String(cards.length)} />
+            <Stat label={t("progress.quizzesTaken")} value={String(attempts.length)} />
+            <Stat label={t("progress.averageScore")} value={avgScore === null ? "—" : `${avgScore}%`} />
           </div>
 
           {dueToday > 0 ? (
@@ -107,7 +109,9 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
                         title={`${count} card${count === 1 ? "" : "s"} due`}
                       />
                       <span className="text-[10px] text-dim">
-                        {day === 0 ? "Today" : date.toLocaleDateString(undefined, { weekday: "short" })}
+                        {day === 0
+                          ? t("common.today")
+                          : date.toLocaleDateString(code, { weekday: "short" })}
                       </span>
                     </div>
                   );
@@ -132,7 +136,7 @@ export function ProgressPanel({ materials, cards, attempts, onReview, onClose }:
                     >
                       <div className="flex items-baseline gap-2">
                         <span className="min-w-0 flex-1 truncate text-xs font-bold">
-                          {material?.name ?? "Material"}
+                          {material?.name ?? t("material.title")}
                         </span>
                         <span
                           className={`shrink-0 text-[10px] font-semibold uppercase tracking-wide ${

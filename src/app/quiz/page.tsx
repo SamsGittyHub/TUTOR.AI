@@ -14,10 +14,12 @@ import { loadKeys } from "@/lib/keys";
 import { Feedback } from "@/components/shell/Feedback";
 import { Tour } from "@/components/shell/Tour";
 import { useVoice } from "@/lib/voice";
+import { useLanguage } from "@/lib/language";
 
 const COUNT_PRESETS = [4, 6, 10, 15];
 
 export default function QuizPage() {
+  const { t } = useLanguage();
   const lab = useQuizLab();
   const voice = useVoice({ onTranscript: () => undefined });
   const [showSettings, setShowSettings] = useState(false);
@@ -59,7 +61,7 @@ export default function QuizPage() {
             type="button"
             onClick={() => setShowSettings(true)}
             className="flex h-8 w-8 items-center justify-center rounded-full border border-line text-muted transition hover:text-fg"
-            aria-label="Settings"
+            aria-label={t("account.settings")}
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden>
               <path
@@ -74,7 +76,7 @@ export default function QuizPage() {
             href="/app"
             className="rounded-full grad px-3.5 py-1.5 text-[11.5px] font-semibold text-white"
           >
-            Back to the board
+            {t("quiz.backToBoard")}
           </Link>
           <AccountMenu />
         </div>
@@ -133,21 +135,21 @@ function Setup({
   count: number;
   setCount: (n: number) => void;
 }) {
+  const { t } = useLanguage();
   const hasKey = hasUsableKey(loadKeys()[lab.settings.providerId]);
 
   return (
     <div className="space-y-5 py-6">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Flashcards</h1>
+        <h1 className="text-2xl font-bold tracking-tight">{t("quiz.title")}</h1>
         <p className="mt-1 text-[13px] leading-relaxed text-muted">
-          Unlimited quizzes, straight from your material. Every question you
-          answer becomes a review card on the board&apos;s schedule.
+          {t("quiz.lede")}
         </p>
       </div>
 
       <section>
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
-          Material
+          {t("material.title")}
         </h2>
         {lab.materials.length ? (
           <div className="flex flex-wrap gap-1.5">
@@ -171,31 +173,30 @@ function Setup({
           </div>
         ) : (
           <p className="text-[11.5px] leading-relaxed text-dim">
-            Nothing uploaded yet — quizzes will draw on the tutor&apos;s own
-            knowledge.{" "}
+            {t("quiz.noMaterialHint")}{" "}
             <Link href="/app" className="font-bold text-cyan hover:underline">
-              Upload material on the board
+              {t("quiz.uploadLink")}
             </Link>{" "}
-            to be quizzed on your class.
+            {t("quiz.noMaterialTail")}
           </p>
         )}
       </section>
 
       <section>
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
-          Topic (optional)
+          {t("quiz.topic")}
         </h2>
         <input
           value={topic}
           onChange={(event) => setTopic(event.target.value)}
-          placeholder="chapter 4, the Calvin cycle, integration by parts…"
+          placeholder={t("quiz.topicPlaceholder")}
           className="w-full surface rounded-md px-3 py-2 text-[13px] outline-none focus:border-cyan/60"
         />
       </section>
 
       <section>
         <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-dim">
-          Questions
+          {t("quiz.questions")}
         </h2>
         <div className="flex flex-wrap items-center gap-1.5">
           {COUNT_PRESETS.map((preset) => (
@@ -229,7 +230,7 @@ function Setup({
         onClick={() => void lab.generate(topic, count)}
         className="w-full rounded-full grad py-3 text-sm font-semibold text-white disabled:opacity-40"
       >
-        {lab.busy ? "Writing questions…" : "Generate a quiz"}
+        {lab.busy ? t("quiz.writing") : t("quiz.generate")}
       </button>
       {!hasKey ? (
         <p className="-mt-2 text-center text-[11.5px] text-pink">
@@ -274,6 +275,7 @@ function Setup({
 }
 
 function FlashcardRun({ lab, voice }: { lab: Lab; voice: Voice }) {
+  const { t } = useLanguage();
   const run = lab.run;
   const spokenRef = useRef<string | null>(null);
 
@@ -378,7 +380,7 @@ function FlashcardRun({ lab, voice }: { lab: Lab; voice: Voice }) {
                 name="a"
                 autoFocus
                 disabled={answered}
-                placeholder="Type your answer"
+                placeholder={t("quiz.answerPlaceholder")}
                 className="min-w-0 flex-1 rounded-md border border-line bg-ink px-3 py-2 text-[13px] outline-none focus:border-cyan/60"
               />
               <button
@@ -426,7 +428,7 @@ function FlashcardRun({ lab, voice }: { lab: Lab; voice: Voice }) {
                   onClick={lab.advance}
                   className="rounded-full border border-line px-4 py-1.5 text-[11px] font-bold text-muted transition hover:border-cyan/50 hover:text-fg"
                 >
-                  {run.finished ? "See results" : "Next card"}
+                  {run.finished ? t("quiz.seeResults") : t("review.next")}
                 </button>
               </div>
             </div>
@@ -438,6 +440,7 @@ function FlashcardRun({ lab, voice }: { lab: Lab; voice: Voice }) {
 }
 
 function ScoreCard({ lab, run }: { lab: Lab; run: NonNullable<Lab["run"]> }) {
+  const { t } = useLanguage();
   const score = run.questions.filter((q) => q.correct).length;
   const missed = run.questions.filter((q) => !q.correct);
   return (
@@ -462,7 +465,7 @@ function ScoreCard({ lab, run }: { lab: Lab; run: NonNullable<Lab["run"]> }) {
           href="/app"
           className="rounded-full border border-line px-5 py-2 text-[12.5px] font-bold text-muted transition hover:text-fg"
         >
-          Back to the board
+          {t("quiz.backToBoard")}
         </Link>
       </div>
       {missed.length ? (

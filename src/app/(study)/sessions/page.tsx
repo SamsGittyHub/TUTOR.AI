@@ -99,9 +99,11 @@ export default function SessionsPage() {
       ) : lib.error ? (
         <LoadError message={lib.error} />
       ) : !lib.sessions.length ? (
-        <Empty title="No lessons yet" action={{ href: "/app", label: "Start a lesson" }}>
-          Ask the tutor to teach you something and it'll show up here, resumable
-          from any device you sign in on.
+        <Empty
+          title={language.t("lessons.empty")}
+          action={{ href: "/app", label: language.t("lessons.start") }}
+        >
+          {language.t("lessons.emptyBody")}
         </Empty>
       ) : (
         <div className="flex flex-col gap-8">
@@ -170,7 +172,7 @@ export default function SessionsPage() {
                       }}
                       className="tx h-7 rounded-full bg-[var(--tint)] px-2.5 text-[11.5px] font-medium text-muted shadow-[inset_0_0_0_0.5px_var(--hairline)] outline-none hover:text-fg"
                     >
-                      <option value="">No subject</option>
+                      <option value="">{language.t("material.noSubject")}</option>
                       {lib.courses.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.name}
@@ -191,7 +193,7 @@ export default function SessionsPage() {
                     type="button"
                     onClick={() => exportLesson(s.id)}
                     disabled={!s.actions.length}
-                    title="Download as Markdown notes"
+                    title={language.t("lessons.downloadNotes")}
                     className="tx press inline-flex h-7 items-center rounded-full px-3 text-[11.5px] font-medium text-muted hover:bg-[var(--tint)] hover:text-fg disabled:pointer-events-none disabled:opacity-40"
                   >
                     Markdown
@@ -202,7 +204,7 @@ export default function SessionsPage() {
                     disabled={busy === s.id}
                     className="rounded-full border border-line px-3 py-1.5 text-[11.5px] font-bold text-dim transition hover:border-pink/50 hover:text-pink disabled:opacity-50"
                   >
-                    {busy === s.id ? "Deleting…" : "Delete"}
+                    {busy === s.id ? language.t("common.deleting") : language.t("common.delete")}
                   </button>
                 </div>
               </li>

@@ -214,6 +214,26 @@ export function currentLanguage(): string {
  * sometimes translate variable names and LaTeX commands along with the prose,
  * which produces equations that don't render.
  */
+/**
+ * The same, for a tutor that talks.
+ *
+ * The written instruction says "write everything the student reads", which a
+ * realtime model reasonably takes as being about the board — so it wrote
+ * French cards and went on speaking English. Speaking has to be named.
+ */
+export function spokenLanguageInstruction(code = currentLanguage()): string {
+  if (code === DEFAULT_LANGUAGE) return "";
+  return `\n\n## Language
+
+Speak ${languageLabel(code)}, and write ${languageLabel(code)} on the board.
+Greet the student in it and stay in it for the whole session, even if they use
+an English word for a technical term — match their term, keep the conversation
+in ${languageLabel(code)}.
+
+Leave notation alone: LaTeX commands, variable names, chemical formulae, code,
+and standard units stay exactly as they are.`;
+}
+
 export function languageInstruction(code = currentLanguage()): string {
   if (code === DEFAULT_LANGUAGE) return "";
   return `\n\n## Language

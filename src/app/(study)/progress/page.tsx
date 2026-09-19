@@ -12,7 +12,9 @@ import { useLibrary } from "@/lib/useLibrary";
 import { useLearning } from "@/lib/useLearning";
 import { MIN_MODE_SHOWN, modeName, modeRanking } from "@/lib/learning";
 
-const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+/* Weekday names come from the browser in the student's own locale — a
+   dictionary entry per day would be 182 languages of avoidable work, and
+   wrong about capitalisation in most of them. */
 
 const SWATCH: Record<string, string> = {
   cyan: "bg-cyan",
@@ -94,15 +96,15 @@ export default function ProgressPage() {
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <Stat value={String(dueToday)} label="Due today" />
-            <Stat value={String(lib.cards.length)} label="Review cards" />
-            <Stat value={String(lib.attempts.length)} label="Quizzes taken" />
-            <Stat value={average === null ? "—" : `${average}%`} label="Average score" />
+            <Stat value={String(dueToday)} label={language.t("progress.dueToday")} />
+            <Stat value={String(lib.cards.length)} label={language.t("progress.reviewCards")} />
+            <Stat value={String(lib.attempts.length)} label={language.t("progress.quizzesTaken")} />
+            <Stat value={average === null ? "—" : `${average}%`} label={language.t("progress.averageScore")} />
           </div>
 
           <section className="mt-8">
             <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-              Next seven days
+              {language.t("progress.nextSeven")}
             </h2>
             <div className="surface mt-3 flex items-end gap-2 rounded-md px-4 py-4">
               {forecast.map((count, i) => {
@@ -118,7 +120,9 @@ export default function ProgressPage() {
                       }}
                     />
                     <span className="text-[10.5px] font-bold uppercase text-dim">
-                      {i === 0 ? "Today" : DAY_NAMES[day.getDay()]}
+                      {i === 0
+                        ? language.t("common.today")
+                        : day.toLocaleDateString(language.code, { weekday: "short" })}
                     </span>
                   </div>
                 );
@@ -126,8 +130,7 @@ export default function ProgressPage() {
             </div>
             {forecast.every((n) => n === 0) && (
               <p className="mt-2.5 text-[12.5px] text-dim">
-                Nothing scheduled this week — answer some quiz questions and the
-                queue fills itself in.
+                {language.t("progress.nothingWeekShown")}
               </p>
             )}
           </section>
@@ -210,9 +213,11 @@ export default function ProgressPage() {
             </h2>
             {!rollup.length ? (
               <div className="mt-3">
-                <Empty title="No material yet" action={{ href: "/app", label: "Upload something" }}>
-                  Upload a file and take a quiz on it — mastery appears once
-                  there's something to measure.
+                <Empty
+                  title={language.t("progress.noMaterial")}
+                  action={{ href: "/app", label: language.t("material.uploadSomething") }}
+                >
+                  {language.t("progress.noMaterialBody")}
                 </Empty>
               </div>
             ) : (
@@ -257,6 +262,7 @@ export default function ProgressPage() {
  * kind of thing from a tutor remembering how last term went.
  */
 function HowYouLearn({ learning }: { learning: ReturnType<typeof useLearning> }) {
+  const language = useLanguage();
   const ranked = modeRanking(learning.profile).filter((m) => m.confident);
   const notes = [...learning.profile.notes].sort((a, b) => b.seen - a.seen || b.at - a.at);
   const [confirming, setConfirming] = useState(false);
@@ -265,7 +271,7 @@ function HowYouLearn({ learning }: { learning: ReturnType<typeof useLearning> })
     <section className="mt-8">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-          How you learn
+          {language.t("progress.howYouLearn")}
         </h2>
         {ranked.length || notes.length ? (
           confirming ? (
@@ -302,10 +308,7 @@ function HowYouLearn({ learning }: { learning: ReturnType<typeof useLearning> })
 
       {!ranked.length && !notes.length ? (
         <p className="mt-3 surface rounded-md px-4 py-3.5 text-[13px] leading-relaxed text-muted">
-          Nothing yet. As the tutor teaches you, it works out what makes things
-          click — pictures, worked steps, being asked before being told — and
-          leans on that next time. It needs {MIN_MODE_SHOWN} or so lessons
-          before it will commit to anything.
+          {language.t("progress.learnEmpty", { n: MIN_MODE_SHOWN })}
         </p>
       ) : (
         <div className="mt-3 flex flex-col gap-2">
@@ -344,8 +347,8 @@ function HowYouLearn({ learning }: { learning: ReturnType<typeof useLearning> })
               <button
                 type="button"
                 onClick={() => learning.forget(note.id)}
-                title="Forget this"
-                aria-label="Forget this"
+                title={language.t("progress.forget")}
+                aria-label={language.t("progress.forget")}
                 className="shrink-0 text-[12px] text-dim transition hover:text-pink"
               >
                 forget

@@ -67,23 +67,23 @@ export default function CoursesPage() {
       >
         <label className="flex min-w-[180px] flex-1 flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-            Subject
+            {language.t("subjects.name")}
           </span>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Maths"
+            placeholder={language.t("subjects.namePlaceholder")}
             className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-[13px] text-fg outline-none transition placeholder:text-dim focus:border-line-2"
           />
         </label>
         <label className="flex w-32 flex-col gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
-            Term
+            {language.t("subjects.term")}
           </span>
           <input
             value={term}
             onChange={(e) => setTerm(e.target.value)}
-            placeholder="Fall 2026"
+            placeholder={language.t("subjects.termPlaceholder")}
             className="rounded-xs border border-line bg-panel-2 px-3 py-2 text-[13px] text-fg outline-none transition placeholder:text-dim focus:border-line-2"
           />
         </label>
@@ -106,7 +106,7 @@ export default function CoursesPage() {
           disabled={busy || !name.trim()}
           className="rounded-full grad px-4 py-2 text-[13px] font-semibold text-white transition hover:opacity-90 disabled:opacity-40"
         >
-          {busy ? "Adding…" : "Add subject"}
+          {busy ? language.t("common.adding") : language.t("subjects.addSubject")}
         </button>
       </form>
 
@@ -116,10 +116,8 @@ export default function CoursesPage() {
         ) : lib.error ? (
           <LoadError message={lib.error} />
         ) : !lib.courses.length ? (
-          <Empty title="No subjects yet">
-            Add one above — Maths, English, Science — then file material and
-            past lessons into it from those pages. Mastery and the study plan
-            roll up per subject too.
+          <Empty title={language.t("subjects.empty")}>
+            {language.t("subjects.emptyHint")}
           </Empty>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2">

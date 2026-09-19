@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { useLanguage } from "@/lib/language";
 import { PageShell } from "@/components/shell/PageShell";
 import { SettingsModal } from "@/components/app/SettingsModal";
 import { BETA } from "@/lib/beta";
@@ -17,6 +18,7 @@ import { loadSettings, saveSettings, type Settings } from "@/lib/settings";
  */
 export default function SettingsPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [nonce, setNonce] = useState(0);
 
@@ -32,20 +34,16 @@ export default function SettingsPage() {
 
   if (!settings) {
     return (
-      <PageShell title="Settings" lede="Your key, your model.">
-        <p className="py-14 text-center text-[13px] text-dim">Loading…</p>
+      <PageShell title={t("settings.title")} lede={t("settings.lede")}>
+        <p className="py-14 text-center text-[13px] text-dim">{t("common.loading")}</p>
       </PageShell>
     );
   }
 
   return (
     <PageShell
-      title="Settings"
-      lede={
-        BETA
-          ? "Nothing to configure during the beta — the tutor is already running. Your material lives on your account and follows you between devices."
-          : "Your key never leaves this browser — it goes straight to the provider you pick. Your material lives on your account so it follows you between devices."
-      }
+      title={t("settings.title")}
+      lede={BETA ? t("settings.ledeBeta") : t("settings.ledeKeys")}
     >
       <SettingsModal
         key={nonce}

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import type { TutorAction } from "@/lib/actions";
 import { isBoardAction, type BoardAction } from "@/lib/actions";
 import { exportBoard, FORMAT_LABEL, type BoardFormat } from "@/lib/board-export";
+import { useLanguage } from "@/lib/language";
 import { BoardCard } from "./BoardCard";
 
 /**
@@ -37,9 +38,11 @@ export function BoardExport({
   title,
   date,
   materialName,
-  label = "Export",
+  label,
   size = "sm",
 }: Props) {
+  const { t } = useLanguage();
+  const shown = label ?? t("common.export");
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<BoardFormat | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -127,7 +130,7 @@ export function BoardExport({
             strokeLinejoin="round"
           />
         </svg>
-        {label}
+        {shown}
       </button>
 
       {open && (

@@ -23,6 +23,7 @@ import { BoardExport } from "@/components/board/BoardExport";
 import { Feedback } from "@/components/shell/Feedback";
 import { Tour } from "@/components/shell/Tour";
 import { useVoice } from "@/lib/voice";
+import { useLanguage } from "@/lib/language";
 
 type MobileView = "material" | "board" | "chat";
 
@@ -622,11 +623,8 @@ function Banner({
   );
 }
 
-const STARTERS = [
-  "Teach me integration by parts from scratch",
-  "Walk me through balancing redox equations",
-  "Explain how a bill becomes a law, with a diagram",
-];
+/* Example questions, translated like anything else the student reads. */
+const STARTER_KEYS = ["board.starter1", "board.starter2", "board.starter3"];
 
 function EmptyBoard({
   hasKey,
@@ -641,23 +639,24 @@ function EmptyBoard({
   onAddKey: () => void;
   onAsk: (prompt: string) => void;
 }) {
+  const { t } = useLanguage();
   const paper = theme === "paper";
   return (
     <div className="mx-auto max-w-md text-center">
       <p className={`hand text-[32px] leading-tight ${paper ? "text-board-ink/80" : "text-white/80"}`}>
-        {hasKey ? "Blank board." : "One thing first."}
+        {t(hasKey ? "board.blank" : "board.needKey")}
       </p>
       <p className={`mt-2 text-sm leading-relaxed ${paper ? "text-black/45" : "text-white/45"}`}>
         {hasKey
           ? hasMaterial
-            ? "Pick what to study on the left and hit Start the lesson — or just ask below."
-            : "Upload your notes, or just start with a question."
-          : "TUTOR AI runs on your own API key, so nothing here costs you a subscription. Paste one and the board wakes up."}
+            ? t("board.pickHint")
+            : t("board.blankHint")
+          : t("board.needKeyHint")}
       </p>
 
       {hasKey ? (
         <div className="mt-5 flex flex-col items-center gap-1.5">
-          {STARTERS.map((prompt) => (
+          {STARTER_KEYS.map((key) => t(key)).map((prompt) => (
             <button
               key={prompt}
               type="button"
