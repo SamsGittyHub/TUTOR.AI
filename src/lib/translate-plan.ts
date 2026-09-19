@@ -22,13 +22,23 @@ export interface Dict {
 }
 
 /**
- * Keys per request.
+ * How much English goes in one request, in characters.
  *
- * Fifty keys is roughly 3KB of English in and, at the worst expansion we've
- * seen, under 4000 tokens back — comfortably inside any output limit, and
- * small enough that one bad batch costs a batch rather than a language.
+ * Packed by size rather than by key count, because the strings are nothing
+ * like uniform: fifty keys of navigation labels is 2.4KB and fifty keys of
+ * help text is 5.1KB, and since the batches run in parallel a wave takes as
+ * long as its largest member. Splitting by count produced one batch twice the
+ * size of the rest — which set the wall-clock time for everybody — and a last
+ * batch of 235 characters that cost a whole round trip to say almost nothing.
+ *
+ * Smaller is faster up to a point: a model generates a reply serially, so
+ * halving the output halves the time, and the batches don't wait on each
+ * other. The floor is the per-request overhead, which is why this isn't 200.
  */
-export const CHUNK_SIZE = 50;
+export const BATCH_CHARS = 1900;
+
+/** A ceiling as well, so a batch of very short labels stays answerable. */
+export const MAX_BATCH_KEYS = 40;
 
 /**
  * How much of the dictionary must actually come back translated.
@@ -40,15 +50,51 @@ export const CHUNK_SIZE = 50;
  */
 export const MIN_COVERAGE = 0.7;
 
-/** The dictionary in batches, in a stable order. */
-export function chunkDictionary(strings: Dict, size = CHUNK_SIZE): Dict[] {
-  const keys = Object.keys(strings);
+/** Roughly what one pair costs as JSON: two quoted strings and a comma. */
+function costOf(key: string, value: string): number {
+  return key.length + value.length + 6;
+}
+
+/**
+ * The dictionary in evenly-sized batches, in a stable order.
+ *
+ * The target is derived from how many batches the budget implies rather than
+ * being the budget itself, so the work spreads evenly instead of filling each
+ * batch to the brim and leaving a sliver at the end. A sliver still costs a
+ * whole round trip, and every batch is waited on.
+ */
+export function chunkDictionary(strings: Dict, budget = BATCH_CHARS): Dict[] {
+  const entries = Object.entries(strings);
+  if (!entries.length) return [];
+
+  const total = entries.reduce((sum, [k, v]) => sum + costOf(k, v), 0);
+  const wanted = Math.max(
+    Math.ceil(total / budget),
+    Math.ceil(entries.length / MAX_BATCH_KEYS),
+  );
+  const target = total / wanted;
+
   const out: Dict[] = [];
-  for (let i = 0; i < keys.length; i += size) {
-    const chunk: Dict = {};
-    for (const key of keys.slice(i, i + size)) chunk[key] = strings[key];
-    out.push(chunk);
+  let current: Dict = {};
+  let size = 0;
+  let count = 0;
+
+  for (const [key, value] of entries) {
+    const cost = costOf(key, value);
+    // Close the batch once it's nearer the target with this pair left out
+    // than with it in — which keeps the last batch the same size as the rest.
+    const overshootsLess = size > 0 && size + cost - target > target - size;
+    if (count && (overshootsLess || count >= MAX_BATCH_KEYS) && out.length < wanted - 1) {
+      out.push(current);
+      current = {};
+      size = 0;
+      count = 0;
+    }
+    current[key] = value;
+    size += cost;
+    count += 1;
   }
+  if (count) out.push(current);
   return out;
 }
 

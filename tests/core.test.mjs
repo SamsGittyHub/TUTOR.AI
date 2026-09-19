@@ -7,7 +7,8 @@ import {
   chunkDictionary,
   mergeTranslation,
   worthCaching,
-  CHUNK_SIZE,
+  BATCH_CHARS,
+  MAX_BATCH_KEYS,
   MIN_COVERAGE,
 } from "../.test-build/core/translate-plan.js";
 import {
@@ -568,12 +569,30 @@ test("the dictionary is split into batches small enough to come back whole", () 
   const batches = chunkDictionary(STRINGS);
   assert.ok(batches.length > 1, "308 strings in one request is the original bug");
   for (const batch of batches) {
-    assert.ok(Object.keys(batch).length <= CHUNK_SIZE);
+    assert.ok(Object.keys(batch).length <= MAX_BATCH_KEYS);
     assert.ok(JSON.stringify(batch).length < 6000, "a batch is small enough to answer in full");
   }
   const keys = batches.flatMap((b) => Object.keys(b));
   assert.equal(keys.length, Object.keys(STRINGS).length, "every key is in exactly one batch");
   assert.equal(new Set(keys).size, keys.length, "and no key is in two");
+});
+
+test("batches are the same size, because a wave waits for its slowest", () => {
+  /*
+   * Splitting by key count gave batches of 2.4KB and 5.1KB — fifty navigation
+   * labels weigh nothing and fifty paragraphs of help text weigh a lot. They
+   * run in parallel, so the biggest one set the wall-clock time for the whole
+   * translation, and a 235-character tail batch spent a round trip on almost
+   * nothing.
+   */
+  const sizes = chunkDictionary(STRINGS).map((b) => JSON.stringify(b).length);
+  const largest = Math.max(...sizes);
+  const smallest = Math.min(...sizes);
+  assert.ok(largest <= BATCH_CHARS * 1.6, `a batch ran to ${largest} chars`);
+  assert.ok(
+    largest / smallest < 3,
+    `batches are lopsided: ${smallest} to ${largest} — the big one sets the wait`,
+  );
 });
 
 test("a batch that failed costs a batch, not the language", () => {

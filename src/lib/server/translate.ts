@@ -36,8 +36,15 @@ const BATCH_TIMEOUT_MS = 60_000;
  */
 const BATCH_MAX_TOKENS = 4000;
 
-/** Batches in flight at once — polite to the API, still finishes promptly. */
-const CONCURRENCY = 4;
+/**
+ * Batches in flight at once.
+ *
+ * High enough that the whole dictionary goes in a single wave: the batches
+ * are independent, so a second wave doubles the time a student spends
+ * watching English. Capped so a burst of small requests still looks like an
+ * application rather than an attack.
+ */
+const MAX_CONCURRENCY = 12;
 
 function buildPrompt(languageLabel: string, batch: Dict): string {
   return `Translate this interface into ${languageLabel}.
@@ -132,7 +139,7 @@ export async function translateDict(
   const results: (Dict | null)[] = new Array(batches.length).fill(null);
 
   let next = 0;
-  const workers = Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
+  const workers = Array.from({ length: Math.min(MAX_CONCURRENCY, batches.length) }, async () => {
     for (;;) {
       const i = next++;
       if (i >= batches.length) return;
