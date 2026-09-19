@@ -262,8 +262,6 @@ export default function AppPage() {
         <button
           type="button"
           onClick={() => setShowSettings(true)}
-          // Which model is running matters on a desktop and not at all on a
-          // phone, where it was pushing everything else off the screen.
           className={`${tutor.hasKey ? "hidden md:flex" : "flex"} shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-bold transition ${
             tutor.hasKey
               ? "border-line text-muted hover:border-line-2 hover:text-fg"
@@ -272,10 +270,7 @@ export default function AppPage() {
         >
           <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
           {tutor.hasKey ? (
-            <>
-              <span className="hidden sm:inline">{provider.label}</span>
-              <span className="font-mono">{model?.label ?? tutor.settings.model}</span>
-            </>
+            <span className="hidden sm:inline">Live</span>
           ) : (
             "Add your API key"
           )}

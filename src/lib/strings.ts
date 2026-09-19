@@ -282,7 +282,7 @@ export const STRINGS = {
   "voice.pausedNote":
     "Microphone off. Nothing is being sent or heard — your lesson and the board are exactly where you left them.",
   "voice.privacy":
-    "Your mic streams straight to OpenAI. TUTOR AI only mints the session token — it never stores your key.",
+    "Your mic streams straight to the live session backend. TUTOR AI only mints the session token — it never stores your key.",
   "voice.lessonTitle": "Live voice lesson",
   "voice.emptyTitle": "Just start talking.",
   "voice.emptyBody":

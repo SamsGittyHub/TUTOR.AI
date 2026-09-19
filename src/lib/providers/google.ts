@@ -10,30 +10,30 @@ const BASE = "https://generativelanguage.googleapis.com/v1beta";
 
 export const google: Provider = {
   id: "google",
-  label: "Google",
-  blurb: "Gemini. Huge context window — good when you upload a whole textbook.",
+  label: "Provider 2",
+  blurb: "A secondary option with a large context window.",
   keyPrefix: "AIza",
-  keyUrl: "https://aistudio.google.com/apikey",
+  keyUrl: "",
   allowsCustomModel: true,
   models: [
     {
       id: "gemini-2.5-pro",
-      label: "Gemini 2.5 Pro",
+      label: "Deep",
       inputPrice: 1.25,
       outputPrice: 10,
       vision: true,
     },
     {
       id: "gemini-2.5-flash",
-      label: "Gemini 2.5 Flash",
+      label: "Quick",
       inputPrice: 0.3,
       outputPrice: 2.5,
       vision: true,
-      note: "Free tier available — the cheapest way to try the tutor.",
+      note: "A quick option for shorter review sessions.",
     },
     {
       id: "gemini-2.0-flash",
-      label: "Gemini 2.0 Flash",
+      label: "Light",
       inputPrice: 0.1,
       outputPrice: 0.4,
       vision: true,

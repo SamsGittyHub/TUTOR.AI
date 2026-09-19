@@ -96,15 +96,15 @@ export async function throwForResponse(
   }
 
   const hints: Record<number, string> = {
-    401: "That key was rejected. Check for a stray space, or that it belongs to this provider.",
-    403: "The key is valid but not allowed to use this model. Check your plan or model access.",
-    404: "That model id doesn't exist for this provider. Pick another from the list.",
+    401: "That key was rejected. Check for a stray space or try a different saved key.",
+    403: "The key is valid but not allowed to use the selected session settings.",
+    404: "That model id isn't available for the active connection. Choose another option.",
     413: "The request was too large — trim the material context or use a smaller excerpt.",
-    429: "Rate limited or out of credit on your account. Wait a moment or top up.",
+    429: "Rate limited or out of credit. Wait a moment or try again later.",
   };
 
   throw new ProviderError(
-    `${providerLabel} returned ${response.status}${detail ? `: ${detail.slice(0, 400)}` : ""}`,
+    `The active backend returned ${response.status}${detail ? `: ${detail.slice(0, 400)}` : ""}`,
     response.status,
     hints[response.status],
   );

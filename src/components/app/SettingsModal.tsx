@@ -96,9 +96,7 @@ export function SettingsModal({
         <p className="mt-1.5 text-[13px] leading-[1.6] text-muted">
           {t("settings.betaBody")}
         </p>
-        <p className="mt-3 text-[11.5px] text-dim">
-          {t("settings.runningOn", { model: BETA_MODEL })}
-        </p>
+        <p className="mt-3 text-[11.5px] text-dim">Using the default session model.</p>
         <button
           type="button"
           onClick={() => {
@@ -163,10 +161,9 @@ export function SettingsModal({
         {!page && (
           <header className="flex items-center justify-between border-b border-line px-5 py-3.5">
             <div>
-              <h2 className="text-base font-semibold">Your key, your model</h2>
+              <h2 className="text-base font-semibold">Your key</h2>
               <p className="text-xs text-dim">
-                Keys stay in this browser and go straight to the provider. There is no
-                server in the middle.
+                Keys stay in this browser and are sent only when needed.
               </p>
             </div>
             <button
@@ -247,19 +244,21 @@ export function SettingsModal({
                 {results[active].message}
               </p>
             ) : null}
-            <a
-              href={provider.keyUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1.5 inline-block text-[11.5px] font-bold text-cyan hover:underline"
-            >
-              Get a {provider.label} key →
-            </a>
+            {provider.keyUrl ? (
+              <a
+                href={provider.keyUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1.5 inline-block text-[11.5px] font-bold text-cyan hover:underline"
+              >
+                Get a key →
+              </a>
+            ) : null}
           </div>
 
           <div>
             <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-wide text-dim">
-              Model for this session
+              Session settings
             </label>
             <div className="grid gap-1.5 sm:grid-cols-2">
               {provider.models.map((model) => {
@@ -296,7 +295,7 @@ export function SettingsModal({
                 <input
                   value={customModel}
                   onChange={(event) => setCustomModel(event.target.value)}
-                  placeholder="or type any model id this provider serves"
+                  placeholder="or type any supported model id"
                   className="min-w-0 flex-1 rounded-md border border-line bg-ink px-3 py-1.5 font-mono text-[11.5px] outline-none focus:border-cyan/60"
                 />
                 <button
@@ -311,9 +310,7 @@ export function SettingsModal({
             ) : null}
             {settings.providerId === active &&
             !provider.models.some((m) => m.id === settings.model) ? (
-              <p className="mt-1.5 font-mono text-[11px] text-cyan">
-                using custom model: {settings.model}
-              </p>
+              <p className="mt-1.5 text-[11px] text-cyan">using a custom model</p>
             ) : null}
           </div>
 

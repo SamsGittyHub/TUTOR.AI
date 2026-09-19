@@ -105,38 +105,38 @@ export async function streamOpenAICompatible(
 
 export const openai: Provider = {
   id: "openai",
-  label: "OpenAI",
-  blurb: "GPT models. Reliable JSON, wide model range, easy key to get.",
+  label: "Primary",
+  blurb: "Use your saved key to keep the session moving.",
   keyPrefix: "sk-",
-  keyUrl: "https://platform.openai.com/api-keys",
+  keyUrl: "",
   allowsCustomModel: true,
   models: [
     {
       id: "gpt-5.6-luna",
-      label: "GPT-5.6 Luna",
+      label: "Default",
       inputPrice: 0.2,
       outputPrice: 1.2,
       vision: true,
-      note: "The free beta's default — cheap enough to run unmetered.",
+      note: "The server default for the free tier.",
     },
     {
       id: "gpt-5.6-terra",
-      label: "GPT-5.6 Terra",
+      label: "Balanced",
       inputPrice: 2,
       outputPrice: 12,
       vision: true,
     },
-    { id: "gpt-4.1", label: "GPT-4.1", inputPrice: 2, outputPrice: 8, vision: true },
+    { id: "gpt-4.1", label: "Wide", inputPrice: 2, outputPrice: 8, vision: true },
     {
       id: "gpt-4.1-mini",
-      label: "GPT-4.1 mini",
+      label: "Fast",
       inputPrice: 0.4,
       outputPrice: 1.6,
       vision: true,
-      note: "Cheap and quick — good default for review sessions.",
+      note: "Best for short, quick review rounds.",
     },
-    { id: "gpt-4o", label: "GPT-4o", inputPrice: 2.5, outputPrice: 10, vision: true },
-    { id: "o4-mini", label: "o4-mini", inputPrice: 1.1, outputPrice: 4.4, vision: true },
+    { id: "gpt-4o", label: "Visual", inputPrice: 2.5, outputPrice: 10, vision: true },
+    { id: "o4-mini", label: "Reasoning", inputPrice: 1.1, outputPrice: 4.4, vision: true },
   ],
 
   async validateKey(apiKey, signal): Promise<ValidationResult> {
@@ -147,11 +147,11 @@ export const openai: Provider = {
       });
       if (response.ok) return { ok: true, message: "Key works." };
       if (response.status === 401)
-        return { ok: false, message: "OpenAI rejected that key." };
+        return { ok: false, message: "That key was rejected." };
       const body = await response.text();
-      return { ok: false, message: `OpenAI returned ${response.status}: ${body.slice(0, 160)}` };
+      return { ok: false, message: `The key could not be validated: ${body.slice(0, 160)}` };
     } catch (error) {
-      return { ok: false, message: `Couldn't reach OpenAI: ${(error as Error).message}` };
+      return { ok: false, message: `Couldn't reach the active backend: ${(error as Error).message}` };
     }
   },
 
@@ -161,7 +161,7 @@ export const openai: Provider = {
     return streamOpenAICompatible(
       `${BASE}/chat/completions`,
       {},
-      "OpenAI",
+      "Active backend",
       options,
       isReasoning
         ? { reasoning_effort: options.effort ?? "low" }

@@ -18,37 +18,37 @@ function referer(): Record<string, string> {
 /** The catch-all: Llama, Mistral, DeepSeek, Qwen, and anything else routed. */
 export const openrouter: Provider = {
   id: "openrouter",
-  label: "OpenRouter",
-  blurb: "One key, hundreds of models — including open-weight and free tiers.",
+  label: "Provider 3",
+  blurb: "A secondary routing option for a saved key.",
   keyPrefix: "sk-or-",
-  keyUrl: "https://openrouter.ai/keys",
+  keyUrl: "",
   allowsCustomModel: true,
   models: [
     {
       id: "deepseek/deepseek-chat",
-      label: "DeepSeek Chat",
+      label: "Math",
       inputPrice: 0.27,
       outputPrice: 1.1,
-      note: "Strong math for the price.",
+      note: "A strong cost-to-depth option.",
     },
     {
       id: "meta-llama/llama-3.3-70b-instruct",
-      label: "Llama 3.3 70B",
+      label: "Balanced",
       inputPrice: 0.12,
       outputPrice: 0.3,
     },
     {
       id: "qwen/qwen-2.5-72b-instruct",
-      label: "Qwen 2.5 72B",
+      label: "Wide",
       inputPrice: 0.12,
       outputPrice: 0.39,
     },
     {
       id: "mistralai/mistral-small-3.2-24b-instruct",
-      label: "Mistral Small 3.2",
+      label: "Cheap",
       inputPrice: 0.05,
       outputPrice: 0.1,
-      note: "Pennies per session. Expect rougher diagrams.",
+      note: "A lower-cost fallback option.",
     },
   ],
 

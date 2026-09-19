@@ -455,8 +455,7 @@ export default function VoicePage() {
             )}
             {keyMissing && (
               <p className="mb-3 rounded-xs border border-warn/40 bg-warn/10 px-3 py-2 text-[12.5px] font-bold text-warn">
-                Live voice runs on OpenAI&apos;s realtime model, so it needs an
-                OpenAI key specifically.{" "}
+                Live voice needs a saved session key. {" "}
                 <Link href="/settings" className="underline">
                   Add one
                 </Link>
