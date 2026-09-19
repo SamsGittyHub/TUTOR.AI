@@ -3,6 +3,7 @@ import { query, queryOne } from "@/lib/server/db";
 import { languageByCode, languageLabel } from "@/lib/languages";
 import { sourceHash, STRINGS } from "@/lib/strings";
 import { translateDict } from "@/lib/server/translate";
+import { mergeTranslation, worthCaching } from "@/lib/translate-plan";
 
 /**
  * The interface, in one language.
@@ -32,8 +33,22 @@ export async function GET(
     "select dict from ui_translations where locale = $1 and source_hash = $2",
     [locale, hash],
   );
+  /*
+   * A cached row is trusted only if it's actually translated.
+   *
+   * Rows written before the batching fix can be mostly English — that was the
+   * bug — and they carry a valid source hash, so nothing would ever look at
+   * them again. Checking on the way out costs one pass over 300 strings and
+   * lets a language that failed once heal itself on the next request.
+   */
   if (cached) {
-    return Response.json({ locale, dict: cached.dict, source: "cache" });
+    const quality = mergeTranslation(STRINGS, [cached.dict]);
+    if (worthCaching(quality)) {
+      return Response.json({ locale, dict: cached.dict, source: "cache" });
+    }
+    console.warn(
+      `[translate] cached ${locale} is only ${Math.round(quality.coverage * 100)}% translated — regenerating`,
+    );
   }
 
   // Generating costs a model call, so only a signed-in user can trigger one.
@@ -44,7 +59,27 @@ export async function GET(
   }
 
   try {
-    const dict = await translateDict(locale, languageLabel(locale));
+    const result = await translateDict(locale, languageLabel(locale));
+
+    /*
+     * A thin result is not cached.
+     *
+     * This is the difference between a language that fails today and a
+     * language that is broken for good: the cache is keyed on the source
+     * hash, so writing a mostly-English dictionary once means every student
+     * who picks that language from then on is served the failure, and nothing
+     * ever tries again. Better to hand back English now and retry on the next
+     * request.
+     */
+    if (!result.usable) {
+      return Response.json({
+        locale: "en",
+        dict: STRINGS,
+        source: "incomplete",
+        coverage: result.coverage,
+      });
+    }
+
     await query(
       `insert into ui_translations (locale, dict, source_hash)
        values ($1, $2, $3)
@@ -52,9 +87,14 @@ export async function GET(
          dict = excluded.dict,
          source_hash = excluded.source_hash,
          updated_at = now()`,
-      [locale, JSON.stringify(dict), hash],
+      [locale, JSON.stringify(result.dict), hash],
     );
-    return Response.json({ locale, dict, source: "generated" });
+    return Response.json({
+      locale,
+      dict: result.dict,
+      source: "generated",
+      coverage: result.coverage,
+    });
   } catch (error) {
     // A failed translation must never break the app — English still works.
     console.error("[translate]", (error as Error).message);

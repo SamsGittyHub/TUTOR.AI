@@ -4,6 +4,13 @@ import { actionToText, isBoardAction, normalizeAction, unescapeBreaks } from "..
 import { compileExpression } from "../.test-build/core/expr.js";
 import { requestImage } from "../.test-build/core/draw-image.js";
 import {
+  chunkDictionary,
+  mergeTranslation,
+  worthCaching,
+  CHUNK_SIZE,
+  MIN_COVERAGE,
+} from "../.test-build/core/translate-plan.js";
+import {
   askedForPicture,
   pictureIsDue,
   shouldOfferPicture,
@@ -550,6 +557,77 @@ test("a chunk of the advertised length stays under the upload cap", () => {
 });
 
 // Async checks resolve after the synchronous ones have all been queued.
+console.log("\n— translating the interface —");
+
+test("the dictionary is split into batches small enough to come back whole", () => {
+  /*
+   * The bug this exists to prevent: one request for all 308 strings, which is
+   * fine in French and runs past the model's output limit in Russian or
+   * Chinese, where the same dictionary is two to three times larger in tokens.
+   */
+  const batches = chunkDictionary(STRINGS);
+  assert.ok(batches.length > 1, "308 strings in one request is the original bug");
+  for (const batch of batches) {
+    assert.ok(Object.keys(batch).length <= CHUNK_SIZE);
+    assert.ok(JSON.stringify(batch).length < 6000, "a batch is small enough to answer in full");
+  }
+  const keys = batches.flatMap((b) => Object.keys(b));
+  assert.equal(keys.length, Object.keys(STRINGS).length, "every key is in exactly one batch");
+  assert.equal(new Set(keys).size, keys.length, "and no key is in two");
+});
+
+test("a batch that failed costs a batch, not the language", () => {
+  const batches = chunkDictionary(STRINGS);
+  // One batch dropped entirely, the rest translated.
+  const parts = batches.map((b, i) =>
+    i === 2 ? null : Object.fromEntries(Object.entries(b).map(([k, v]) => [k, `«${v}»`])),
+  );
+  const merged = mergeTranslation(STRINGS, parts);
+  // One batch of seven, so ~86% — well clear of the floor.
+  assert.ok(merged.coverage > 0.8, `one lost batch shouldn't sink it: ${merged.coverage}`);
+  assert.ok(worthCaching(merged), "and the rest is still worth keeping");
+  // The lost batch's keys are English, not missing — the page must not render
+  // a raw key at someone.
+  for (const key of Object.keys(batches[2])) assert.equal(merged.dict[key], STRINGS[key]);
+});
+
+test("a mostly-English result is refused rather than cached", () => {
+  // The failure that made a language broken permanently: a truncated reply
+  // parses, most keys fall back to English, and that gets written to the
+  // cache against the source hash and served to everyone from then on.
+  const batches = chunkDictionary(STRINGS);
+  const parts = batches.map((b, i) =>
+    i === 0 ? Object.fromEntries(Object.entries(b).map(([k, v]) => [k, `«${v}»`])) : null,
+  );
+  const merged = mergeTranslation(STRINGS, parts);
+  assert.ok(merged.coverage < MIN_COVERAGE, `${merged.coverage} should be under the floor`);
+  assert.ok(!worthCaching(merged), "this must never reach the cache");
+});
+
+test("a model that echoes the English back counts as untranslated", () => {
+  // A perfectly-shaped, complete, entirely useless reply. Counting keys
+  // present would score this 100%.
+  const merged = mergeTranslation(STRINGS, [{ ...STRINGS }]);
+  assert.equal(merged.translated, 0);
+  assert.ok(!worthCaching(merged));
+});
+
+test("a real translation is kept", () => {
+  const full = Object.fromEntries(Object.entries(STRINGS).map(([k, v]) => [k, `«${v}»`]));
+  const merged = mergeTranslation(STRINGS, [full]);
+  assert.equal(merged.coverage, 1);
+  assert.ok(worthCaching(merged));
+});
+
+test("values that are the same word in both languages don't fail the whole dictionary", () => {
+  // "PDF" is "PDF" in a lot of languages, so the floor is deliberately not 100%.
+  const nearly = Object.fromEntries(
+    Object.entries(STRINGS).map(([k, v], i) => [k, i % 5 === 0 ? v : `«${v}»`]),
+  );
+  const merged = mergeTranslation(STRINGS, [nearly]);
+  assert.ok(worthCaching(merged), `${merged.coverage} of real words should still pass`);
+});
+
 await Promise.all(pending);
 
 

@@ -2,6 +2,12 @@ import "server-only";
 
 import { BETA_CHAT_MODEL, BETA_OPENAI_KEY, hasBetaOpenAiKey } from "./beta-key";
 import { STRINGS, type Dict } from "@/lib/strings";
+import {
+  chunkDictionary,
+  mergeTranslation,
+  worthCaching,
+  type Merged,
+} from "@/lib/translate-plan";
 
 /**
  * Translates the whole interface dictionary in one call.
@@ -18,7 +24,22 @@ import { STRINGS, type Dict } from "@/lib/strings";
 const SYSTEM =
   "You localise software interfaces. You reply with JSON and nothing else.";
 
-function buildPrompt(languageLabel: string): string {
+/** Bounded per batch, so one slow language can't hold a request open. */
+const BATCH_TIMEOUT_MS = 60_000;
+
+/**
+ * Generous for 50 short strings, even in a script that expands badly.
+ *
+ * Named max_completion_tokens, not max_tokens: the models this runs on reject
+ * the older parameter outright, which would fail every language rather than
+ * the large ones — see the OpenAI provider, which has always sent it this way.
+ */
+const BATCH_MAX_TOKENS = 4000;
+
+/** Batches in flight at once — polite to the API, still finishes promptly. */
+const CONCURRENCY = 4;
+
+function buildPrompt(languageLabel: string, batch: Dict): string {
   return `Translate this interface into ${languageLabel}.
 
 Reply with a JSON object using exactly the same keys, and nothing else.
@@ -34,49 +55,104 @@ Rules:
 - Where a language has a formal and an informal register, use the one a study
   tool would use with a student.
 
-${JSON.stringify(STRINGS, null, 0)}`;
+${JSON.stringify(batch, null, 0)}`;
 }
 
+/** One batch, or null if it failed — a batch is never allowed to throw. */
+async function translateBatch(
+  batch: Dict,
+  languageLabel: string,
+): Promise<Dict | null> {
+  const timeout = new AbortController();
+  const expired = setTimeout(() => timeout.abort(), BATCH_TIMEOUT_MS);
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${BETA_OPENAI_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: BETA_CHAT_MODEL,
+        messages: [
+          { role: "system", content: SYSTEM },
+          { role: "user", content: buildPrompt(languageLabel, batch) },
+        ],
+        response_format: { type: "json_object" },
+        max_completion_tokens: BATCH_MAX_TOKENS,
+      }),
+      signal: timeout.signal,
+    });
+    if (!response.ok) {
+      console.error(`[translate] batch failed (${response.status})`);
+      return null;
+    }
+    const body = (await response.json()) as {
+      choices?: { message?: { content?: string }; finish_reason?: string }[];
+    };
+    const choice = body.choices?.[0];
+    if (choice?.finish_reason === "length") {
+      // Truncated: whatever parsed out of it is a fragment, and treating a
+      // fragment as a result is exactly how half-English dictionaries used to
+      // reach the cache and stay there.
+      console.error("[translate] batch hit the output limit");
+      return null;
+    }
+    return JSON.parse(choice?.message?.content ?? "{}") as Dict;
+  } catch (error) {
+    console.error("[translate] batch error:", (error as Error).message);
+    return null;
+  } finally {
+    clearTimeout(expired);
+  }
+}
+
+export interface Translation extends Merged {
+  /** False when too little came back to be worth keeping. */
+  usable: boolean;
+}
+
+/**
+ * Translates the whole interface, in batches.
+ *
+ * Never throws for a partial result: it reports coverage and lets the caller
+ * decide. The one thing it will not do is quietly hand back a dictionary that
+ * is mostly English, because that is indistinguishable from success at every
+ * layer above it.
+ */
 export async function translateDict(
   locale: string,
   languageLabel: string,
-): Promise<Dict> {
+): Promise<Translation> {
   if (!hasBetaOpenAiKey()) {
     throw new Error("No key configured to translate with.");
   }
 
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${BETA_OPENAI_KEY}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: BETA_CHAT_MODEL,
-      messages: [
-        { role: "system", content: SYSTEM },
-        { role: "user", content: buildPrompt(languageLabel) },
-      ],
-      response_format: { type: "json_object" },
-    }),
+  const batches = chunkDictionary(STRINGS);
+  const results: (Dict | null)[] = new Array(batches.length).fill(null);
+
+  let next = 0;
+  const workers = Array.from({ length: Math.min(CONCURRENCY, batches.length) }, async () => {
+    for (;;) {
+      const i = next++;
+      if (i >= batches.length) return;
+      /*
+       * One retry. A batch is a seventh of the interface, and the usual
+       * reasons one fails — a rate limit, a blip, a single over-long reply —
+       * are exactly the reasons a second attempt succeeds.
+       */
+      results[i] =
+        (await translateBatch(batches[i], languageLabel)) ??
+        (await translateBatch(batches[i], languageLabel));
+    }
   });
+  await Promise.all(workers);
 
-  if (!response.ok) {
-    throw new Error(`Translation failed (${response.status}).`);
-  }
-
-  const body = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
-  };
-  const raw = body.choices?.[0]?.message?.content ?? "{}";
-  const parsed = JSON.parse(raw) as Record<string, unknown>;
-
-  // Only keys we asked for, only strings, and English for anything missing —
-  // a partial translation should degrade key by key, not fail wholesale.
-  const dict: Dict = {};
-  for (const [key, english] of Object.entries(STRINGS)) {
-    const value = parsed[key];
-    dict[key] = typeof value === "string" && value.trim() ? value : english;
-  }
-  return dict;
+  const merged = mergeTranslation(STRINGS, results);
+  const usable = worthCaching(merged);
+  console.log(
+    `[translate] ${locale}: ${merged.translated}/${Object.keys(STRINGS).length} strings ` +
+      `(${Math.round(merged.coverage * 100)}%)${usable ? "" : " — too thin to cache"}`,
+  );
+  return { ...merged, usable };
 }
